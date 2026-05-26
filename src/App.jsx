@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useState } from "react";
 import Layout from "./Components/Layout";
 import Home from "./Pages/Home";
+import RegisterCustomer from "./Pages/RegisterCustomer";
 import Register from "./Pages/Register";
 import RegisterIncome from "./Pages/RegisterIncome";
 import ShowIncomes from "./Pages/ShowIncomes";
@@ -23,7 +24,9 @@ import "./App.css";
 import Privacy from "./Pages/Privacy";
 import Terms from "./Pages/Terms";
 import Support from "./Pages/Support";
-
+import RegisterSupplier from "./Pages/RegisterSupplier.jsx";
+import RegisterWorkOrder from "./Pages/RegisterWorkOrder.jsx";
+import PrintWorkOrder from "./Pages/PrintWorkOrder.jsx";
 function App() {
   const [income, setIncome] = useState({
     Id: "", Foto: "", Fecha: "", Mes: "", Importe: "", NombreIngreso: "", IngresoId: "", Descripcion: ""
@@ -47,8 +50,33 @@ function App() {
              <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/print-order/:id" element={<PrintWorkOrder />} />
 
             {/* protegidas (ajusta según tu necesidad) */}
+            <Route
+              path="/register-work-order"
+              element={
+                <ProtectedRoute>
+             <RegisterWorkOrder />
+                </ProtectedRoute>
+              }
+            />
+               <Route
+              path="/register-customer"
+              element={
+                <ProtectedRoute>
+                  <RegisterCustomer />
+                </ProtectedRoute>
+              }
+            />
+             <Route
+              path="/register-supplier"
+              element={
+                <ProtectedRoute>
+              <RegisterSupplier />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/register-income"
               element={
