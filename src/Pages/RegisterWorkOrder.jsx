@@ -587,14 +587,14 @@ export default function RegisterWorkOrder() {
                     Editar
                   </button>
 
-                  <a
-                    href="https://invoice.familyapp.store"
+                  <Link
+                    to={`/workshop-invoice/${o.Id}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
                   >
                     Facturar
-                  </a>
+                  </Link>
                 </div>
               </div>
             </article>

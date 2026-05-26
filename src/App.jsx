@@ -27,6 +27,8 @@ import Support from "./Pages/Support";
 import RegisterSupplier from "./Pages/RegisterSupplier.jsx";
 import RegisterWorkOrder from "./Pages/RegisterWorkOrder.jsx";
 import PrintWorkOrder from "./Pages/PrintWorkOrder.jsx";
+import WorkshopInvoice from "./Pages/WorkshopInvoice.jsx";
+
 function App() {
   const [income, setIncome] = useState({
     Id: "", Foto: "", Fecha: "", Mes: "", Importe: "", NombreIngreso: "", IngresoId: "", Descripcion: ""
@@ -51,8 +53,10 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
             <Route path="/print-order/:id" element={<PrintWorkOrder />} />
+            <Route path="/workshop-invoice/:id" element={<WorkshopInvoice />} />
 
             {/* protegidas (ajusta según tu necesidad) */}
+            
             <Route
               path="/register-work-order"
               element={
