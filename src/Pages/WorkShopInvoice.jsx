@@ -10,7 +10,7 @@ const EMPTY_ITEM = {
 };
 
 const DEFAULT_TALLER = {
-  nombre: "TALLER CROWNED",
+  nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNÁNDEZ SILVA",
   nif: " 61407055E",
   direccion: "CALLE ALCÁCER 63 D, Albal, 46470",

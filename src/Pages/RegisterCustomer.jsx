@@ -4,7 +4,6 @@ import { ArrowLeft } from "lucide-react";
 import api from "../Components/api";
 import { soloFecha } from "../utils/date";
 
-
 const EMPTY_CUSTOMER = {
   Id: "",
   // Cliente
@@ -31,7 +30,11 @@ const Banner = ({ type = "success", text, onClose, actionLabel, onAction }) => {
     error: "bg-rose-50 text-rose-700 ring-rose-200",
   };
   return (
-    <div role="alert" aria-live="polite" className={`mb-4 rounded-xl p-3 text-sm ring-1 ${map[type]}`}>
+    <div
+      role="alert"
+      aria-live="polite"
+      className={`mb-4 rounded-xl p-3 text-sm ring-1 ${map[type]}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <span>{text}</span>
         <div className="flex items-center gap-3">
@@ -44,7 +47,11 @@ const Banner = ({ type = "success", text, onClose, actionLabel, onAction }) => {
               {actionLabel}
             </button>
           )}
-          <button type="button" onClick={onClose} className="text-xs underline underline-offset-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-xs underline underline-offset-2"
+          >
             Cerrar
           </button>
         </div>
@@ -57,7 +64,6 @@ const workOrderBtn =
   "inline-flex items-center rounded-xl px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-700 transition shadow-md font-semibold";
 
 export default function RegisterCustomer() {
-
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [customers, setCustomers] = useState([]);
 
@@ -69,41 +75,62 @@ export default function RegisterCustomer() {
   const [notice, setNotice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    customer: null,
+  });
+  const [deleting, setDeleting] = useState(false);
+
+  const [editingId, setEditingId] = useState(null);
+
   const setField = (name, value) => {
-  setCustomer(prev => ({
-    ...prev,
-    [name]: value
-  }));
-
-  if (errors[name]) {
-    setErrors(prev => ({
+    setCustomer((prev) => ({
       ...prev,
-      [name]: undefined
+      [name]: value,
     }));
-  }
-};
 
-const handleChange = (e) => {
-  setField(e.target.name, e.target.value);
-};
+    if (errors[name]) {
+      setErrors((prev) => ({
+        ...prev,
+        [name]: undefined,
+      }));
+    }
+  };
 
-const cls = (name) =>
-  `w-full rounded-xl border bg-white px-3 py-2 text-sm ${
-    errors[name]
-      ? "border-rose-400 ring-1 ring-rose-200 focus-visible:ring-rose-400"
-      : "border-slate-300"
-  }`;
+  const handleChange = (e) => {
+    setField(e.target.name, e.target.value);
+  };
+
+  const cls = (name) =>
+    `w-full rounded-xl border bg-white px-3 py-2 text-sm ${
+      errors[name]
+        ? "border-rose-400 ring-1 ring-rose-200 focus-visible:ring-rose-400"
+        : "border-slate-300"
+    }`;
 
   const loadCustomers = async () => {
-    const res = await api.get("/Cliente", {
-      params: {
-        search,
-        page,
-        pageSize
-      }
-    });
+    try {
+      const res = await api.get("/Cliente", {
+        params: {
+          search,
+          page,
+          pageSize,
+        },
+      });
 
-    setCustomers(res.data?.data || []);
+      const pack = res?.data?.data?.[0];
+      setCustomers(pack?.items || []);
+    } catch (err) {
+      console.error(err);
+      setCustomers([]);
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudieron cargar los clientes.",
+      });
+    }
   };
 
   useEffect(() => {
@@ -113,291 +140,438 @@ const cls = (name) =>
   const onSubmit = async (e) => {
     e.preventDefault();
 
-    await api.post("/Cliente/Create", {
-      nombre: customer.Nombre,
-      telefono: customer.Telefono,
-      email: customer.Email || null,
-      direccion: customer.Direccion || null,
-      matricula: customer.Matricula,
-      marca: customer.Marca || null,
-      modelo: customer.Modelo,
-      anio: customer.Anio || null,
-      kilometraje: customer.Kilometraje || null
-    });
+    try {
+      setSubmitting(true);
 
-    setCustomer(EMPTY_CUSTOMER);
-    setNotice({
-      type: "success",
-      text: "Cliente registrado correctamente."
-    });
+      const payload = {
+        nombre: customer.Nombre,
+        telefono: customer.Telefono,
+        email: customer.Email || null,
+        direccion: customer.Direccion || null,
+        matricula: customer.Matricula,
+        marca: customer.Marca || null,
+        modelo: customer.Modelo,
+        anio: customer.Anio ? Number(customer.Anio) : null,
+        kilometraje: customer.Kilometraje ? Number(customer.Kilometraje) : null,
+        observaciones: customer.Observaciones || null,
+      };
 
-    await loadCustomers();
+      if (editingId) {
+        await api.put(`/Cliente/${editingId}`, payload);
+
+        setNotice({
+          type: "success",
+          text: "Cliente actualizado correctamente.",
+        });
+      } else {
+        await api.post("/Cliente", payload);
+
+        setNotice({
+          type: "success",
+          text: "Cliente registrado correctamente.",
+        });
+      }
+      setCustomer(EMPTY_CUSTOMER);
+      setEditingId(null);
+      await loadCustomers();
+
+      setNotice({
+        type: "success",
+        text: "Cliente registrado correctamente.",
+      });
+    } catch (err) {
+      console.error(err);
+
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo registrar el cliente.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
- return (
-  <>
-    <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
-      <div>
-        <h2 className="text-2xl font-semibold text-slate-900">
-          Registro de cliente
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Gestiona clientes y vehículos del taller.
-        </p>
+  const confirmDeleteCustomer = async () => {
+    if (!deleteModal.customer) return;
+
+    const id = deleteModal.customer.id ?? deleteModal.customer.Id;
+
+    try {
+      setDeleting(true);
+
+      await api.delete(`/Cliente/${id}`);
+
+      setNotice({
+        type: "success",
+        text: "Cliente eliminado correctamente.",
+      });
+
+      setDeleteModal({
+        open: false,
+        customer: null,
+      });
+
+      await loadCustomers();
+    } catch (err) {
+      console.error(err);
+
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo eliminar el cliente.",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const startEditCustomer = (customer) => {
+    setEditingId(customer.Id);
+    setCustomer({
+      Nombre: customer.Nombre || "",
+      Telefono: customer.Telefono || "",
+      Email: customer.Email || "",
+      Direccion: customer.Direccion || "",
+      Matricula: customer.Matricula || "",
+      Marca: customer.Marca || "",
+      Modelo: customer.Modelo || "",
+      Kilometraje: customer.Kilometraje ? String(customer.Kilometraje) : "",
+      Observaciones: customer.Observaciones || "",
+    });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">
+            Registro de cliente
+          </h2>
+          <p className="text-sm text-slate-500 mt-1">
+            Gestiona clientes y vehículos del taller.
+          </p>
+        </div>
+
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-700 text-white hover:bg-slate-800 transition"
+        >
+          <ArrowLeft size={18} />
+          Volver
+        </Link>
       </div>
 
-      <Link
-        to="/"
-        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-700 text-white hover:bg-slate-800 transition"
+      {/* Banner */}
+      <Banner
+        type={notice?.type}
+        text={notice?.text}
+        onClose={() => setNotice(null)}
+      />
+
+      {/* FORMULARIO */}
+      <form
+        onSubmit={onSubmit}
+        className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 space-y-5"
       >
-        <ArrowLeft size={18} />
-        Volver
-      </Link>
-    </div>
+        {/* DATOS CLIENTE */}
+        <div>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">
+            Datos del cliente
+          </h3>
 
-    {/* Banner */}
-    <Banner
-      type={notice?.type}
-      text={notice?.text}
-      onClose={() => setNotice(null)}
-    />
-    
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Nombre *
+              </label>
 
-    {/* FORMULARIO */}
-    <form
-      onSubmit={onSubmit}
-      className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 space-y-5"
-    >
+              <input
+                type="text"
+                name="Nombre"
+                value={customer.Nombre}
+                onChange={handleChange}
+                className={cls("Nombre")}
+                placeholder="Nombre del cliente"
+              />
+            </div>
 
-      {/* DATOS CLIENTE */}
-      <div>
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">
-          Datos del cliente
-        </h3>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Teléfono *
+              </label>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <input
+                type="text"
+                name="Telefono"
+                value={customer.Telefono}
+                onChange={handleChange}
+                className={cls("Telefono")}
+                placeholder="Teléfono"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Nombre *
-            </label>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Email
+              </label>
 
-            <input
-              type="text"
-              name="Nombre"
-              value={customer.Nombre}
-              onChange={handleChange}
-              className={cls("Nombre")}
-              placeholder="Nombre del cliente"
-            />
+              <input
+                type="email"
+                name="Email"
+                value={customer.Email}
+                onChange={handleChange}
+                className={cls("Email")}
+                placeholder="correo@email.com"
+              />
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Teléfono *
-            </label>
-
-            <input
-              type="text"
-              name="Telefono"
-              value={customer.Telefono}
-              onChange={handleChange}
-              className={cls("Telefono")}
-              placeholder="Teléfono"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Email
-            </label>
-
-            <input
-              type="email"
-              name="Email"
-              value={customer.Email}
-              onChange={handleChange}
-              className={cls("Email")}
-              placeholder="correo@email.com"
-            />
-          </div>
-
         </div>
-      </div>
 
-      {/* VEHÍCULO */}
-      <div>
-        <h3 className="text-lg font-semibold text-slate-800 mb-4">
-          Vehículo
-        </h3>
+        {/* VEHÍCULO */}
+        <div>
+          <h3 className="text-lg font-semibold text-slate-800 mb-4">
+            Vehículo
+          </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Matrícula *
+              </label>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Matrícula *
-            </label>
+              <input
+                type="text"
+                name="Matricula"
+                value={customer.Matricula}
+                onChange={handleChange}
+                className={cls("Matricula")}
+                placeholder="1234ABC"
+              />
+            </div>
 
-            <input
-              type="text"
-              name="Matricula"
-              value={customer.Matricula}
-              onChange={handleChange}
-              className={cls("Matricula")}
-              placeholder="1234ABC"
-            />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Marca
+              </label>
+
+              <input
+                type="text"
+                name="Marca"
+                value={customer.Marca}
+                onChange={handleChange}
+                className={cls("Marca")}
+                placeholder="Toyota"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Modelo *
+              </label>
+
+              <input
+                type="text"
+                name="Modelo"
+                value={customer.Modelo}
+                onChange={handleChange}
+                className={cls("Modelo")}
+                placeholder="Corolla"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Kilometraje
+              </label>
+
+              <input
+                type="number"
+                name="Kilometraje"
+                value={customer.Kilometraje}
+                onChange={handleChange}
+                className={cls("Kilometraje")}
+                placeholder="120000"
+              />
+            </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Marca
-            </label>
-
-            <input
-              type="text"
-              name="Marca"
-              value={customer.Marca}
-              onChange={handleChange}
-              className={cls("Marca")}
-              placeholder="Toyota"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Modelo *
-            </label>
-
-            <input
-              type="text"
-              name="Modelo"
-              value={customer.Modelo}
-              onChange={handleChange}
-              className={cls("Modelo")}
-              placeholder="Corolla"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Kilometraje
-            </label>
-
-            <input
-              type="number"
-              name="Kilometraje"
-              value={customer.Kilometraje}
-              onChange={handleChange}
-              className={cls("Kilometraje")}
-              placeholder="120000"
-            />
-          </div>
-
         </div>
-      </div>
 
-      {/* BOTONES */}
-      <div className="flex items-center gap-3 pt-2">
+        {/* BOTONES */}
+        <div className="flex items-center gap-3 pt-2">
+          <button type="submit" disabled={submitting} className={workOrderBtn}>
+            {submitting
+              ? "Guardando..."
+              : editingId
+                ? "Actualizar cliente"
+                : "Registrar cliente"}
+          </button>
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className={workOrderBtn}
-        >
-          {submitting
-            ? "Guardando..."
-            : "Registrar cliente"}
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCustomer(EMPTY_CUSTOMER);
+              setEditingId(null);
+            }}
+            className="inline-flex items-center rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
+          >
+            Limpiar
+          </button>
+        </div>
+      </form>
 
-        <button
-          type="button"
-          onClick={() => setCustomer(EMPTY_CUSTOMER)}
-          className="inline-flex items-center rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
-        >
-          Limpiar
-        </button>
+      {/* LISTADO */}
+      <div className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
+          <h3 className="text-lg font-semibold text-slate-800">
+            Clientes registrados
+          </h3>
 
-      </div>
-    </form>
+          <input
+            type="text"
+            placeholder="Buscar cliente..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full md:w-80 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
 
-    {/* LISTADO */}
-    <div className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5">
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
-
-        <h3 className="text-lg font-semibold text-slate-800">
-          Clientes registrados
-        </h3>
-
-        <input
-          type="text"
-          placeholder="Buscar cliente..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full md:w-80 rounded-xl border border-slate-300 px-3 py-2 text-sm"
-        />
-      </div>
-
-      <div className="overflow-x-auto">
-
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-200 text-slate-600">
-              <th className="text-left py-3">Cliente</th>
-              <th className="text-left py-3">Teléfono</th>
-              <th className="text-left py-3">Matrícula</th>
-              <th className="text-left py-3">Modelo</th>
-              <th className="text-left py-3">Acciones</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {customers.map((c) => (
-              <tr
-                key={c.id}
-                className="border-b border-slate-100 hover:bg-slate-50"
-              >
-                <td className="py-3">{c.nombre}</td>
-                <td className="py-3">{c.telefono}</td>
-                <td className="py-3">{c.matricula}</td>
-                <td className="py-3">{c.modelo}</td>
-
-                <td className="py-3">
-                  <button className="text-sky-600 hover:underline">
-                    Editar
-                  </button>
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-600">
+                <th className="text-left py-3">Cliente</th>
+                <th className="text-left py-3">Teléfono</th>
+                <th className="text-left py-3">Matrícula</th>
+                <th className="text-left py-3">Modelo</th>
+                <th className="text-left py-3">Acciones</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
 
+            <tbody>
+              {customers.map((c) => {
+                const id = c.id ?? c.Id;
+                const nombre = c.nombre ?? c.Nombre;
+                const telefono = c.telefono ?? c.Telefono;
+                const matricula = c.matricula ?? c.Matricula;
+                const modelo = c.modelo ?? c.Modelo;
+
+                return (
+                  <tr
+                    key={id}
+                    className="border-b border-slate-100 hover:bg-slate-50"
+                  >
+                    <td className="py-3">{nombre}</td>
+                    <td className="py-3">{telefono}</td>
+                    <td className="py-3">{matricula}</td>
+                    <td className="py-3">{modelo}</td>
+
+                    <td className="py-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => startEditCustomer(c)}
+                          className="text-sky-600 hover:underline"
+                        >
+                          Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDeleteModal({
+                              open: true,
+                              customer: {
+                                id,
+                                nombre,
+                              },
+                            })
+                          }
+                          className="text-rose-600 hover:underline"
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* PAGINADO */}
+        <div className="flex items-center justify-end gap-2 mt-5">
+          <button className="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200">
+            Anterior
+          </button>
+
+          <button className="rounded-lg px-3 py-1.5 bg-slate-700 text-white">
+            1
+          </button>
+
+          <button className="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200">
+            Siguiente
+          </button>
+        </div>
       </div>
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Eliminar cliente
+            </h3>
 
-      {/* PAGINADO */}
-      <div className="flex items-center justify-end gap-2 mt-5">
+            <p className="mt-2 text-sm text-slate-600">
+              ¿Seguro que deseas eliminar a{" "}
+              <span className="font-semibold text-slate-900">
+                {deleteModal.customer?.nombre ??
+                  deleteModal.customer?.Nombre ??
+                  "este cliente"}
+              </span>
+              ?
+            </p>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200"
-        >
-          Anterior
-        </button>
+            <p className="mt-2 text-xs text-slate-500">
+              Esta acción ocultará el cliente del sistema, pero no borrará
+              físicamente el registro de la base de datos.
+            </p>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-slate-700 text-white"
-        >
-          1
-        </button>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() =>
+                  setDeleteModal({
+                    open: false,
+                    customer: null,
+                  })
+                }
+                className="rounded-xl px-4 py-2 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
+              >
+                Cancelar
+              </button>
 
-        <button
-          className="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200"
-        >
-          Siguiente
-        </button>
-
-      </div>
-
-    </div>
-  </>
-);
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteCustomer}
+                className="rounded-xl px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 transition disabled:opacity-60"
+              >
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

@@ -27,6 +27,31 @@ const states = [
   "Entregado",
 ];
 
+const getStateStyles = (estado) => {
+  switch (estado) {
+    case "Recibido":
+      return "border-sky-300 bg-sky-50/40";
+
+    case "Diagnóstico":
+      return "border-violet-300 bg-violet-50/40";
+
+    case "Reparando":
+      return "border-amber-300 bg-amber-50/40";
+
+    case "Esperando repuesto":
+      return "border-orange-500 bg-orange-50/40";
+
+    case "Listo":
+      return "border-emerald-300 bg-emerald-50/40";
+
+    case "Entregado":
+      return "border-slate-300 bg-slate-100/60";
+
+    default:
+      return "border-slate-200 bg-white";
+  }
+};
+
 export default function RegisterWorkOrder() {
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [orders, setOrders] = useState([]);
@@ -478,7 +503,7 @@ export default function RegisterWorkOrder() {
           {filteredOrders.map((o) => (
             <article
               key={o.Id}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition"
+              className={`rounded-2xl border p-5 shadow-sm hover:shadow-md transition ${getStateStyles(o.Estado)}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>

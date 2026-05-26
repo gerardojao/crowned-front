@@ -29,9 +29,7 @@ export default function PrintWorkOrder() {
 
   if (!order) {
     return (
-      <div className="p-10 text-center text-slate-500">
-        Cargando orden...
-      </div>
+      <div className="p-10 text-center text-slate-500">Cargando orden...</div>
     );
   }
 
@@ -39,50 +37,43 @@ export default function PrintWorkOrder() {
     <div className="bg-white text-black print-page">
       <div className="max-w-2xl mx-auto border border-black p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold">
-            TALLER CROWNED
-          </h1>
+          <h1 className="text-3xl font-bold">Multiservicios Crower</h1>
 
-          <p className="text-lg mt-2">
-            Orden #{order.id || order.Id}
-          </p>
+          <p className="text-lg mt-2">Orden #{order.id || order.Id}</p>
         </div>
 
         <div className="space-y-5">
-          <div>
+          {/* <div>
             <p className="font-bold">Cliente</p>
             <p>{order.cliente || order.Cliente}</p>
-          </div>
-
-
+          </div> */}
 
           <div>
             <p className="font-bold">Vehículo</p>
             <p>
-              {order.marca || order.Marca}{" "}
-              {order.modelo || order.Modelo}
+              {order.marca || order.Marca} {order.modelo || order.Modelo}
             </p>
           </div>
 
-<div className="text-center border-2 border-black py-4 px-6">
-  <p className="text-sm font-bold uppercase tracking-widest">
-    Matrícula
-  </p>
+          <div className="text-center border-2 border-black py-4 px-6">
+            <p className="text-sm font-bold uppercase tracking-widest">
+              Matrícula
+            </p>
 
-  <p className="text-4xl font-extrabold tracking-wider mt-2">
-    {order.matricula || order.Matricula}
-  </p>
-</div>
+            <p className="text-4xl font-extrabold tracking-wider mt-2">
+              {order.matricula || order.Matricula}
+            </p>
+          </div>
 
-<div className="border-2 border-black p-5">
-  <p className="text-sm font-bold uppercase tracking-widest mb-3">
-    Trabajo a realizar
-  </p>
+          <div className="border-2 border-black p-5">
+            <p className="text-sm font-bold uppercase tracking-widest mb-3">
+              Trabajo a realizar
+            </p>
 
-  <p className="text-2xl font-bold leading-relaxed text-center">
-    {order.trabajo || order.Trabajo}
-  </p>
-</div>
+            <p className="text-4xl font-bold leading-relaxed text-center">
+              {order.trabajo || order.Trabajo}
+            </p>
+          </div>
 
           <div>
             <p className="font-bold">Estado</p>
@@ -92,9 +83,7 @@ export default function PrintWorkOrder() {
           <div>
             <p className="font-bold">Fecha</p>
             <p>
-              {new Date(
-                order.fecha || order.Fecha
-              ).toLocaleDateString("es-ES")}
+              {new Date(order.fecha || order.Fecha).toLocaleDateString("es-ES")}
             </p>
           </div>
         </div>
