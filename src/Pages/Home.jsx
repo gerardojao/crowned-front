@@ -1,312 +1,3 @@
-// // src/Pages/Home.jsx
-// import { Link } from "react-router-dom";
-// import { useEffect, useMemo, useState } from "react";
-// import { currency } from "../utils/currency";
-// import { loadStatementSummary } from "../utils/statementStore";
-// import api from "../Components/api";
-// import KPIs from "../Components/Kpi";
-
-// function soloFecha(value) {
-//   if (!value) return "";
-//   const d = new Date(value);
-//   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-//   return d.toISOString().slice(0, 10);
-// }
-
-// // Helper para leer respuestas envueltas en { data } o { Data } e incluso data[0]
-// async function fetchList(url) {
-//   try {
-//     const r = await fetch(url);
-//     if (!r.ok) return [];
-//     const j = await r.json();
-
-//     // casos: { data: [...] } | { data: [ [...] ] } | { Data: [...] } | array directo
-//     const raw = j?.data ?? j?.Data ?? j;
-//     if (Array.isArray(raw)) {
-//       return Array.isArray(raw[0]) ? raw[0] : raw;
-//     }
-//     return [];
-//   } catch {
-//     return [];
-//   }
-// }
-// // helper arriba del componente (o fuera)
-// const pickDataList = (res) => {
-//   // Soporta { data: [...] } o { data: [ [...] ] }
-//   const pack = res?.data?.data ?? res?.data?.Data ?? [];
-//   if (Array.isArray(pack)) return Array.isArray(pack[0]) ? pack[0] : pack;
-//   return [];
-// };
-// export default function Home() {
-//   const [ingresos, setIngresos] = useState([]);
-//   const [egresos, setEgresos] = useState([]);
-//   const [movimientos, setMovimientos] = useState([]);
-//   const [lastStatement, setLastStatement] = useState(null);
-
-//   const ts = (d) => (d ? new Date(d).getTime() : 0);
-
-// // ordenados DESC por fecha (y por id si hay empate)
-// const movimientosSorted = useMemo(
-//   () =>
-//     [...movimientos].sort(
-//       (a, b) =>
-//         (ts(b.fecha) - ts(a.fecha)) || ((b.id ?? 0) - (a.id ?? 0))
-//     ),
-//   [movimientos]
-// );
-
-// useEffect(() => {
-//   (async () => {
-//     try {
-
-//       const [inRes, egRes, movRes] = await Promise.all([
-//         api.get("/Ingreso/detalle"),
-//         api.get("/Egreso/detalle"),
-//         api.get("/Ingreso/ultimos", { params: { take: 10 } }),
-
-//       ]);
-
-//       setIngresos(pickDataList(inRes));
-//       setEgresos(pickDataList(egRes));
-//       setMovimientos(pickDataList(movRes));
-
-//     } catch (err) {
-//       console.error(err);
-//       setIngresos([]);
-//       setEgresos([]);
-//       setMovimientos([]);
-//     } finally {
-//       setLastStatement(loadStatementSummary());
-//     }
-//   })();
-// }, []);
-
-//   // Totales locales (fallback si aún no hay Statement)
-//   const totalIngresosLocal = useMemo(
-//     () => ingresos.reduce((a, x) => a + Number(x.importe ?? x.Importe ?? 0), 0),
-//     [ingresos]
-//   );
-//   const totalEgresosLocal = useMemo(
-//     () => egresos.reduce((a, x) => a + Number(x.importe ?? x.Importe ?? 0), 0),
-//     [egresos]
-//   );
-//   const balanceLocal = totalIngresosLocal - totalEgresosLocal;
-
-//   // Preferimos el último statement si existe; si no, los locales
-//   const totalIngresos = lastStatement?.totalIngresos ?? totalIngresosLocal;
-//   const totalEgresos = lastStatement?.totalEgresos ?? totalEgresosLocal;
-//   const balance = lastStatement?.balance ?? balanceLocal;
-
-//   const balColor = balance >= 0 ? "text-emerald-700" : "text-rose-700";
-
-//   return (
-//     <>
-//       {/* KPIs superiores */}
-
-//       <KPIs  /* refreshKey={refreshKey} */ />
-//       {/* Acciones */}
-//       <section className="text-center">
-//         <h3 className="text-2xl font-semibold text-slate-900">Acciones</h3>
-//       </section>
-
-//       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-//         {/* Ingresos */}
-//         <div className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-6">
-//           <h3 className="text-lg font-semibold text-slate-700 text-center mb-4">Ingresos</h3>
-//           <div className="space-y-3">
-//             <Link
-//               to="/register-income"
-//               className="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-base shadow transition
-//                          bg-emerald-600 text-white hover:bg-emerald-700 w-full justify-center"
-//             >
-//               Registrar ingreso
-//             </Link>
-//             <Link
-//               to="/showIncomes"
-//               className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 shadow transition
-//                          bg-white text-emerald-700 ring-1 ring-emerald-600 hover:bg-emerald-50
-//                          w-full justify-center"
-//             >
-//               Ver ingresos
-//             </Link>
-//             <Link
-//               to="/ingresos-detalle"
-//               className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 shadow transition
-//                          bg-white text-emerald-700 ring-1 ring-emerald-600 hover:bg-emerald-50
-//                          w-full justify-center"
-//             >
-//               Detalle de ingresos
-//             </Link>
-//           </div>
-//         </div>
-
-//         {/* Gastos */}
-//         <div className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-6">
-//           <h3 className="text-lg font-semibold text-slate-700 text-center mb-4">Gastos</h3>
-//           <div className="space-y-3">
-//             <Link
-//               to="/register-expense"
-//               className="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-base shadow transition
-//                          bg-sky-600 text-white hover:bg-sky-700 w-full justify-center"
-//             >
-//               Registrar gasto
-//             </Link>
-//             <Link
-//               to="/showExpenses"
-//               className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 shadow transition
-//                          bg-white text-rose-700 ring-1 ring-rose-600 hover:bg-rose-50
-//                          w-full justify-center"
-//             >
-//               Ver gastos
-//             </Link>
-//             <Link
-//               to="/egresos-detalle"
-//               className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 shadow transition
-//                          bg-white text-rose-700 ring-1 ring-rose-600 hover:bg-rose-50
-//                          w-full justify-center"
-//             >
-//               Detalle de gastos
-//             </Link>
-//           </div>
-//         </div>
-//       </section>
-
-//       {/* Relación ingresos / gastos */}
-//       <section className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-6
-//                           flex items-center justify-between gap-4 mt-6">
-//         <div>
-//           <h3 className="text-lg font-semibold text-slate-900">Relación de ingresos y gastos</h3>
-//           <p className="mt-1 text-sm text-slate-500">Compara periodos y categorías.</p>
-//         </div>
-//         <Link
-//           to="/statement"
-//           className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 shadow transition
-//                      bg-sky-600 text-white hover:bg-sky-700"
-//         >
-//           Generar
-//         </Link>
-//       </section>
-
-// {/* Movimientos recientes */}
-// <section className="rounded-2xl bg-white/80 backdrop-blur ring-1 ring-slate-200 shadow-sm p-4">
-//   <div className="flex items-center justify-between gap-3 mb-3">
-//     <h3 className="text-lg md:text-xl font-semibold text-slate-900">
-//       Movimientos recientes
-//     </h3>
-//     <Link
-//       to="/statement"
-//       className="hidden sm:inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700"
-//     >
-//       Ver todo
-//     </Link>
-//   </div>
-
-//   {/* --- Móvil: lista de tarjetas --- */}
-//   <div className="md:hidden divide-y rounded-xl border border-slate-200 bg-white/60">
-//     {movimientos.length === 0 && (
-//       <div className="px-3 py-4 text-slate-500">No hay movimientos aún.</div>
-//     )}
-
-//     {movimientosSorted.map((m) => (
-//       <div key={`${m.kind}-${m.id}`} className="px-3 py-3 flex items-start justify-between gap-3">
-//         <div className="min-w-0">
-//           <div className="text-sm font-medium text-slate-800">
-//             {soloFecha(m.fecha)}
-//             {" "}
-//             <span
-//               className={`ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${
-//                 m.kind === "ingreso"
-//                   ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-//                   : "bg-rose-50 text-rose-700 ring-rose-200"
-//               }`}
-//             >
-//               {m.kind === "ingreso" ? "Ingreso" : "Egreso"}
-//             </span>
-//           </div>
-//           <div className="text-sm text-slate-600 mt-0.5 truncate max-w-[14rem]">
-//             {m.descripcion ?? "—"}
-//           </div>
-//         </div>
-//         <div
-//           className={`shrink-0 text-right font-semibold text-sm ${
-//             m.kind === "ingreso" ? "text-emerald-700" : "text-rose-700"
-//           }`}
-//         >
-//           {m.kind === "ingreso" ? "+" : "-"}
-//           {currency(m.importe)}
-//         </div>
-//       </div>
-//     ))}
-//   </div>
-
-//   {/* --- Desktop: tabla --- */}
-//   <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
-//     <div className="max-h-[420px] overflow-y-auto">
-//       <table className="min-w-full text-sm">
-//         <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-//           <tr className="text-left text-slate-600">
-//             <th className="py-2.5 px-3 font-semibold w-[140px]">Fecha</th>
-//             <th className="py-2.5 px-3 font-semibold w-[120px]">Tipo</th>
-//             <th className="py-2.5 px-3 font-semibold">Descripción</th>
-//             <th className="py-2.5 px-3 font-semibold text-right w-[160px]">Importe</th>
-//           </tr>
-//         </thead>
-//         <tbody className="divide-y divide-slate-100">
-//           {movimientos.length === 0 && (
-//             <tr>
-//               <td className="py-4 px-3 text-slate-500" colSpan={4}>No hay movimientos aún.</td>
-//             </tr>
-//           )}
-
-//           {movimientosSorted.map((m) => (
-//             <tr key={`${m.kind}-${m.id}`} className="hover:bg-slate-50">
-//               <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-//                 {soloFecha(m.fecha)}
-//               </td>
-//               <td className="py-2.5 px-3">
-//                 <span
-//                   className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${
-//                     m.kind === "ingreso"
-//                       ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-//                       : "bg-rose-50 text-rose-700 ring-rose-200"
-//                   }`}
-//                 >
-//                   {m.kind === "ingreso" ? "Ingreso" : "Egreso"}
-//                 </span>
-//               </td>
-//               <td className="py-2.5 px-3 text-slate-700 truncate">
-//                 {m.descripcion ?? "—"}
-//               </td>
-//               <td
-//                 className={`py-2.5 px-3 text-right font-semibold whitespace-nowrap ${
-//                   m.kind === "ingreso" ? "text-emerald-700" : "text-rose-700"
-//                 }`}
-//               >
-//                 {m.kind === "ingreso" ? "+" : "-"}
-//                 {currency(m.importe)}
-//               </td>
-//             </tr>
-//           ))}
-//         </tbody>
-//       </table>
-//     </div>
-//   </div>
-
-//   {/* CTA móvil (debajo de la lista) */}
-//   <div className="mt-3 md:hidden">
-//     <Link
-//       to="/statement"
-//       className="inline-flex w-full justify-center items-center rounded-lg px-3 py-2 text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700"
-//     >
-//       Ver todo
-//     </Link>
-//   </div>
-// </section>
-
-//     </>
-//   );
-// }
-// src/Pages/Home.jsx
 import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -345,60 +36,58 @@ const moduleIcon =
 const actionLink =
   "inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-slate-50 text-slate-700 hover:bg-slate-100 ring-1 ring-slate-200 transition";
 
+const getEstadoBadge = (estado) => {
+  switch (estado) {
+    case "Recibido":
+      return "bg-sky-50 text-sky-700 ring-sky-200";
+    case "Diagnóstico":
+      return "bg-violet-50 text-violet-700 ring-violet-200";
+    case "Reparando":
+      return "bg-amber-50 text-amber-700 ring-amber-200";
+    case "Esperando repuesto":
+      return "bg-orange-50 text-orange-700 ring-orange-200";
+    case "Listo":
+      return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+    case "Entregado":
+      return "bg-slate-100 text-slate-700 ring-slate-300";
+    default:
+      return "bg-slate-50 text-slate-700 ring-slate-200";
+  }
+};
+
 export default function Home() {
-  const [ingresos, setIngresos] = useState([]);
-  const [egresos, setEgresos] = useState([]);
-  const [movimientos, setMovimientos] = useState([]);
+  const [ordenes, setOrdenes] = useState([]);
   const [lastStatement, setLastStatement] = useState(null);
 
   const ts = (d) => (d ? new Date(d).getTime() : 0);
 
-  const movimientosSorted = useMemo(
+  const ordenesSorted = useMemo(
     () =>
-      [...movimientos].sort(
+      [...ordenes].sort(
         (a, b) => ts(b.fecha) - ts(a.fecha) || (b.id ?? 0) - (a.id ?? 0),
       ),
-    [movimientos],
+    [ordenes],
   );
 
   useEffect(() => {
     (async () => {
       try {
-        const [inRes, egRes, movRes] = await Promise.all([
-          api.get("/Ingreso/detalle"),
-          api.get("/Egreso/detalle"),
-          api.get("/Ingreso/ultimos", { params: { take: 10 } }),
+        const [movRes] = await Promise.all([
+          api.get("/OrdenTrabajo/ultimas", { params: { take: 10 } }),
         ]);
 
-        setIngresos(pickDataList(inRes));
-        setEgresos(pickDataList(egRes));
-        setMovimientos(pickDataList(movRes));
+        setOrdenes(pickDataList(movRes));
       } catch (err) {
         console.error(err);
-        setIngresos([]);
-        setEgresos([]);
-        setMovimientos([]);
+
+        setOrdenes([]);
       } finally {
         setLastStatement(loadStatementSummary());
       }
     })();
   }, []);
 
-  const totalIngresosLocal = useMemo(
-    () => ingresos.reduce((a, x) => a + Number(x.importe ?? x.Importe ?? 0), 0),
-    [ingresos],
-  );
 
-  const totalEgresosLocal = useMemo(
-    () => egresos.reduce((a, x) => a + Number(x.importe ?? x.Importe ?? 0), 0),
-    [egresos],
-  );
-
-  const balanceLocal = totalIngresosLocal - totalEgresosLocal;
-
-  const totalIngresos = lastStatement?.totalIngresos ?? totalIngresosLocal;
-  const totalEgresos = lastStatement?.totalEgresos ?? totalEgresosLocal;
-  const balance = lastStatement?.balance ?? balanceLocal;
 
   return (
     <>
@@ -451,14 +140,12 @@ export default function Home() {
                     >
                       Ver órdenes <ArrowRight size={15} />
                     </Link>
-                    <a
-                      href="https://invoice.familyapp.store"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Link
+                      to="/workshop-invoice"
                       className={actionLink}
                     >
-                      Facturar orden <ArrowRight size={15} />
-                    </a>
+                      Facturar <ArrowRight size={15} />
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -556,10 +243,10 @@ export default function Home() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-lg md:text-xl font-semibold text-slate-900">
-              Movimientos recientes
+              Ordenes recientes
             </h3>
             <p className="text-sm text-slate-500">
-              Últimos ingresos y egresos registrados.
+              Últimas ordenes registrados.
             </p>
           </div>
 
@@ -572,46 +259,58 @@ export default function Home() {
         </div>
 
         <div className="md:hidden divide-y rounded-xl border border-slate-200 bg-white/60">
-          {movimientos.length === 0 && (
+          {ordenes.length === 0 && (
             <div className="px-3 py-4 text-slate-500">
-              No hay movimientos aún.
+              No hay ordenes registradas.
             </div>
           )}
 
-          {movimientosSorted.map((m) => (
-            <div
-              key={`${m.kind}-${m.id}`}
-              className="px-3 py-3 flex items-start justify-between gap-3"
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-slate-800">
-                  {soloFecha(m.fecha)}
-                  <span
-                    className={`ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${
-                      m.kind === "ingreso"
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                        : "bg-rose-50 text-rose-700 ring-rose-200"
-                    }`}
-                  >
-                    {m.kind === "ingreso" ? "Ingreso" : "Egreso"}
-                  </span>
-                </div>
+{ordenes.length === 0 && (
+  <tr>
+    <td className="py-4 px-3 text-slate-500" colSpan={5}>
+      No hay órdenes recientes.
+    </td>
+  </tr>
+)}
 
-                <div className="text-sm text-slate-600 mt-0.5 truncate max-w-[14rem]">
-                  {m.descripcion ?? "—"}
-                </div>
-              </div>
+{ordenesSorted.map((o) => {
+  const id = o.id ?? o.Id;
+  const fecha = o.fecha ?? o.Fecha;
+  const estado = o.estado ?? o.Estado;
+  const cliente = o.cliente ?? o.Cliente;
+  const matricula = o.matricula ?? o.Matricula;
 
-              <div
-                className={`shrink-0 text-right font-semibold text-sm ${
-                  m.kind === "ingreso" ? "text-emerald-700" : "text-rose-700"
-                }`}
-              >
-                {m.kind === "ingreso" ? "+" : "-"}
-                {currency(m.importe)}
-              </div>
-            </div>
-          ))}
+  return (
+    <tr key={id} className="hover:bg-slate-50">
+      <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
+        {soloFecha(fecha)}
+      </td>
+
+      <td className="py-2.5 px-3">
+        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}>
+          {estado}
+        </span>
+      </td>
+
+      <td className="py-2.5 px-3 text-slate-700 truncate">
+        {cliente ?? "—"}
+      </td>
+
+      <td className="py-2.5 px-3 font-semibold text-slate-900">
+        {matricula ?? "—"}
+      </td>
+
+      <td className="py-2.5 px-3 text-right">
+        <Link
+          to="/register-work-order#ordenes-recientes"
+          className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
+        >
+          Ir a orden
+        </Link>
+      </td>
+    </tr>
+  );
+})}
         </div>
 
         <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
@@ -619,58 +318,69 @@ export default function Home() {
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                 <tr className="text-left text-slate-600">
-                  <th className="py-2.5 px-3 font-semibold w-[140px]">Fecha</th>
-                  <th className="py-2.5 px-3 font-semibold w-[120px]">Tipo</th>
-                  <th className="py-2.5 px-3 font-semibold">Descripción</th>
-                  <th className="py-2.5 px-3 font-semibold text-right w-[160px]">
-                    Importe
+                  <th className="py-2.5 px-3 font-bold w-[140px] text-center">Fecha</th>
+                  <th className="py-2.5 px-3 font-bold w-[160px] text-center">
+                    Estado
+                  </th>
+                  <th className="py-2.5 px-3 text-center font-bold">Cliente</th>
+                  <th className="py-2.5 px-3 font-bold w-[140px] text-center">
+                    Matrícula
+                  </th>
+                  <th className="py-2.5 px-3 font-semibold text-center w-[140px]">
+                    
                   </th>
                 </tr>
               </thead>
 
               <tbody className="divide-y divide-slate-100">
-                {movimientos.length === 0 && (
+                {ordenes.length === 0 && (
                   <tr>
                     <td className="py-4 px-3 text-slate-500" colSpan={4}>
-                      No hay movimientos aún.
+                      No hay ordenes aún.
                     </td>
                   </tr>
                 )}
 
-                {movimientosSorted.map((m) => (
-                  <tr key={`${m.kind}-${m.id}`} className="hover:bg-slate-50">
-                    <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-                      {soloFecha(m.fecha)}
-                    </td>
+                {ordenesSorted.map((o) => {
+                  const id = o.id ?? o.Id;
+                  const fecha = o.fecha ?? o.Fecha;
+                  const estado = o.estado ?? o.Estado;
+                  const cliente = o.cliente ?? o.Cliente;
+                  const matricula = o.matricula ?? o.Matricula;
 
-                    <td className="py-2.5 px-3">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${
-                          m.kind === "ingreso"
-                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                            : "bg-rose-50 text-rose-700 ring-rose-200"
-                        }`}
-                      >
-                        {m.kind === "ingreso" ? "Ingreso" : "Egreso"}
-                      </span>
-                    </td>
+                  return (
+                    <tr key={id} className="hover:bg-slate-50">
+                      <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
+                        {soloFecha(fecha)}
+                      </td>
 
-                    <td className="py-2.5 px-3 text-slate-700 truncate">
-                      {m.descripcion ?? "—"}
-                    </td>
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
+                        >
+                          {estado}
+                        </span>
+                      </td>
 
-                    <td
-                      className={`py-2.5 px-3 text-right font-semibold whitespace-nowrap ${
-                        m.kind === "ingreso"
-                          ? "text-emerald-700"
-                          : "text-rose-700"
-                      }`}
-                    >
-                      {m.kind === "ingreso" ? "+" : "-"}
-                      {currency(m.importe)}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="py-2.5 px-3 text-slate-700 truncate">
+                        {cliente ?? "—"}
+                      </td>
+
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                        {matricula ?? "—"}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right">
+                        <Link
+                          to="/register-work-order#ordenes-recientes"
+                          className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
+                        >
+                          Ir a orden
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

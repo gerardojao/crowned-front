@@ -175,10 +175,6 @@ export default function RegisterCustomer() {
       setEditingId(null);
       await loadCustomers();
 
-      setNotice({
-        type: "success",
-        text: "Cliente registrado correctamente.",
-      });
     } catch (err) {
       console.error(err);
 
@@ -230,18 +226,25 @@ export default function RegisterCustomer() {
     }
   };
 
-  const startEditCustomer = (customer) => {
-    setEditingId(customer.Id);
+  const startEditCustomer = (c) => {
+    
+    const id = c.id ?? c.Id;
+    setEditingId(c.id);
     setCustomer({
-      Nombre: customer.Nombre || "",
-      Telefono: customer.Telefono || "",
-      Email: customer.Email || "",
-      Direccion: customer.Direccion || "",
-      Matricula: customer.Matricula || "",
-      Marca: customer.Marca || "",
-      Modelo: customer.Modelo || "",
-      Kilometraje: customer.Kilometraje ? String(customer.Kilometraje) : "",
-      Observaciones: customer.Observaciones || "",
+      Id: id,
+      Nombre: c.nombre ?? c.Nombre ?? "",
+      Telefono: c.telefono ?? c.Telefono ?? "",
+      Email: c.email ?? c.Email ?? "",
+      Direccion: c.direccion ?? c.Direccion ?? "",
+      Matricula: c.matricula ?? c.Matricula ?? "",
+      Marca: c.marca ?? c.Marca ?? "",
+      Modelo: c.modelo ?? c.Modelo ?? "",
+      Anio: c.anio ?? c.Anio ?? "",
+      Kilometraje:
+        (c.kilometraje ?? c.Kilometraje)
+          ? String(c.kilometraje ?? c.Kilometraje)
+          : "",
+      Observaciones: c.observaciones ?? c.Observaciones ?? "",
     });
     window.scrollTo({
       top: 0,
@@ -452,6 +455,7 @@ export default function RegisterCustomer() {
                 <th className="text-left py-3">Teléfono</th>
                 <th className="text-left py-3">Matrícula</th>
                 <th className="text-left py-3">Modelo</th>
+                <th className="text-left py-3">Kilometraje</th>
                 <th className="text-left py-3">Acciones</th>
               </tr>
             </thead>
@@ -463,6 +467,7 @@ export default function RegisterCustomer() {
                 const telefono = c.telefono ?? c.Telefono;
                 const matricula = c.matricula ?? c.Matricula;
                 const modelo = c.modelo ?? c.Modelo;
+                const kilometraje = c.kilometraje ?? c.Kilometraje;
 
                 return (
                   <tr
@@ -473,6 +478,7 @@ export default function RegisterCustomer() {
                     <td className="py-3">{telefono}</td>
                     <td className="py-3">{matricula}</td>
                     <td className="py-3">{modelo}</td>
+                    <td className="py-3">{kilometraje}</td>
 
                     <td className="py-3">
                       <div className="flex items-center gap-3">

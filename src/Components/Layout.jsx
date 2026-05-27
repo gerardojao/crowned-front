@@ -153,7 +153,7 @@ export default function Layout({ children }) {
                         Ver balance
                       </NavLink>
                       <Link
-                        to="https://invoice.familyapp.store"
+                        to="/workshop-invoice"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
@@ -270,27 +270,6 @@ export default function Layout({ children }) {
                     </Link>
 
                     <Link
-                      to="/statement"
-                      className={`${heroBtnBase} bg-sky-600 hover:bg-sky-700`}
-                    >
-                      <span className={heroBtnIcon}>
-                        <BarChart3 size={26} />
-                      </span>
-
-                      <span className="flex-1">
-                        <span className="block text-base font-bold">
-                          Balance
-                        </span>
-
-                        <span className="block text-xs text-white/90">
-                          Finanzas y reportes
-                        </span>
-                      </span>
-
-                      <span className="text-xl opacity-80">›</span>
-                    </Link>
-
-                    <Link
                       to="/register-supplier"
                       className={`${heroBtnBase} bg-slate-700 hover:bg-slate-800`}
                     >
@@ -305,6 +284,27 @@ export default function Layout({ children }) {
 
                         <span className="block text-xs text-white/90">
                           Gestión de repuestos
+                        </span>
+                      </span>
+
+                      <span className="text-xl opacity-80">›</span>
+                    </Link>
+
+                    <Link
+                      to="/statement"
+                      className={`${heroBtnBase} bg-sky-600 hover:bg-sky-700`}
+                    >
+                      <span className={heroBtnIcon}>
+                        <BarChart3 size={26} />
+                      </span>
+
+                      <span className="flex-1">
+                        <span className="block text-base font-bold">
+                          Balance
+                        </span>
+
+                        <span className="block text-xs text-white/90">
+                          Finanzas y reportes
                         </span>
                       </span>
 
@@ -345,8 +345,8 @@ export default function Layout({ children }) {
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center justify-center gap-3 py-4 md:py-6 text-sm text-slate-500 md:flex-row md:justify-between">
               <div className="order-2 md:order-1 text-center md:text-left">
-                © {new Date().getFullYear()} Multiservicios Crower. Todos los derechos
-                reservados.
+                © {new Date().getFullYear()} Multiservicios Crower. Todos los
+                derechos reservados.
               </div>
 
               <nav className="order-1 md:order-2 w-full md:w-auto">

@@ -31,10 +31,22 @@ import WorkshopInvoice from "./Pages/WorkshopInvoice.jsx";
 
 function App() {
   const [income, setIncome] = useState({
-    Id: "", Foto: "", Fecha: "", Mes: "", Importe: "", NombreIngreso: "", IngresoId: "", Descripcion: ""
+    Id: "",
+    Foto: "",
+    Fecha: "",
+    Mes: "",
+    Importe: "",
+    NombreIngreso: "",
+    IngresoId: "",
+    Descripcion: "",
   });
   const [expense, setExpense] = useState({
-    Foto: "", Fecha: "", Mes: "", Importe: "", NombreEgreso: "", Descripcion: ""
+    Foto: "",
+    Fecha: "",
+    Mes: "",
+    Importe: "",
+    NombreEgreso: "",
+    Descripcion: "",
   });
 
   return (
@@ -49,23 +61,25 @@ function App() {
             <Route path="/forgot" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/" element={<Home />} />
-             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
             <Route path="/print-order/:id" element={<PrintWorkOrder />} />
             <Route path="/workshop-invoice/:id" element={<WorkshopInvoice />} />
 
+            <Route path="/workshop-invoice" element={<WorkshopInvoice />} />
+
             {/* protegidas (ajusta según tu necesidad) */}
-            
+
             <Route
               path="/register-work-order"
               element={
                 <ProtectedRoute>
-             <RegisterWorkOrder />
+                  <RegisterWorkOrder />
                 </ProtectedRoute>
               }
             />
-               <Route
+            <Route
               path="/register-customer"
               element={
                 <ProtectedRoute>
@@ -73,11 +87,11 @@ function App() {
                 </ProtectedRoute>
               }
             />
-             <Route
+            <Route
               path="/register-supplier"
               element={
                 <ProtectedRoute>
-              <RegisterSupplier />
+                  <RegisterSupplier />
                 </ProtectedRoute>
               }
             />
@@ -153,10 +167,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-             
           </Routes>
-          
-         
         </Layout>
       </AuthProvider>
     </BrowserRouter>

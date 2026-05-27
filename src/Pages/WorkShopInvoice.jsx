@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Printer } from "lucide-react";
 import api from "../Components/api";
+import logoTaller from "../assets/LogoTallerCrowned.png";
 
 const EMPTY_ITEM = {
   descripcion: "",
@@ -23,6 +24,9 @@ const eur = new Intl.NumberFormat("es-ES", {
   style: "currency",
   currency: "EUR",
 });
+
+const round2 = (value) =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 export default function WorkshopInvoice() {
   const { id } = useParams();
@@ -53,11 +57,6 @@ export default function WorkshopInvoice() {
     { descripcion: "Mano de obra", cantidad: 1, importe: 0 },
   ]);
 
-  useEffect(() => {
-    loadOrder();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
   const normalizeOrder = (o) => ({
     id: o.id ?? o.Id,
     cliente: o.cliente ?? o.Cliente ?? "",
@@ -72,6 +71,14 @@ export default function WorkshopInvoice() {
     estado: o.estado ?? o.Estado ?? "",
     observaciones: o.observaciones ?? o.Observaciones ?? "",
   });
+
+  useEffect(() => {
+    if (id) {
+      loadOrder();
+    } else {
+      setLoading(false);
+    }
+  }, [id]);
 
   const loadOrder = async () => {
     try {
@@ -94,16 +101,26 @@ export default function WorkshopInvoice() {
         observaciones: o.observaciones || "",
       }));
 
+      const ivaPct = Number(invoice.ivaPct || 0) / 100;
+      const totalOrden = round2(
+        Number(o.manoObra || 0) + Number(o.repuestos || 0),
+      );
+
+      const baseTotal = round2(totalOrden / (1 + ivaPct));
+
+      const baseRepuestos = round2(Number(o.repuestos || 0) / (1 + ivaPct));
+      const baseManoObra = round2(baseTotal - baseRepuestos);
+
       setItems([
         {
           descripcion: o.trabajo || "Trabajo realizado",
           cantidad: 1,
-          importe: Number(o.manoObra || 0),
+           importe: baseRepuestos,
         },
         {
-          descripcion: "Repuestos",
+          descripcion: "Mano de obra",
           cantidad: 1,
-          importe: Number(o.repuestos || 0),
+          importe: baseManoObra,
         },
       ]);
     } catch (err) {
@@ -118,26 +135,23 @@ export default function WorkshopInvoice() {
     }
   };
 
-  const total = useMemo(
-    () =>
+  const subtotal = useMemo(() => {
+    return round2(
       items.reduce(
         (sum, item) =>
           sum + Number(item.cantidad || 0) * Number(item.importe || 0),
         0,
       ),
-    [items],
-  );
+    );
+  }, [items]);
 
-  // 2. El subtotal (base imponible) se calcula quitándole el IVA al total
-  const subtotal = useMemo(() => {
-    const porcentajeIva = Number(invoice.ivaPct || 0) / 100;
-    return total / (1 + porcentajeIva);
-  }, [total, invoice.ivaPct]);
-
-  // 3. El IVA es simplemente la diferencia entre el total y el subtotal
   const iva = useMemo(() => {
-    return total - subtotal;
-  }, [total, subtotal]);
+    return round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
+  }, [subtotal, invoice.ivaPct]);
+
+  const totalFinal = useMemo(() => {
+    return round2(subtotal + iva);
+  }, [subtotal, iva]);
 
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
@@ -194,7 +208,9 @@ export default function WorkshopInvoice() {
             Factura de taller
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Genera una factura a partir de la orden de trabajo #{id}.
+            {id
+              ? `Genera una factura a partir de la orden de trabajo #${id}.`
+              : "Genera una nueva Factura."}
           </p>
         </div>
 
@@ -430,21 +446,29 @@ export default function WorkshopInvoice() {
       <section className="invoice-print bg-white text-black">
         <div className="invoice-sheet mx-auto max-w-5xl">
           <div className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
-            <div>
-              <h1 className="text-3xl font-extrabold tracking-wide">
-                {taller.nombre}
-              </h1>
+            <div className="flex items-start gap-5">
+              <img
+                src={logoTaller}
+                alt="Logo taller"
+                className="h-50 w-50 object-contain"
+              />
 
-              <div className="mt-3 text-sm leading-5">
-                <p>{taller.razonSocial}</p>
-                <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
-                <p>{taller.direccion}</p>
-                <p>{taller.telefono}</p>
-                <p>{taller.email}</p>
+              <div className="text-center min-w-[280px]">
+                <h1 className="text-3xl font-extrabold tracking-wide uppercase mt-8">
+                  {taller.nombre}
+                </h1>
+
+                <div className="mt-4 text-sm leading-5">
+                  <p>{taller.razonSocial}</p>
+                  <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
+                  <p>{taller.direccion}</p>
+                  <p>{taller.telefono}</p>
+                  <p>{taller.email}</p>
+                </div>
               </div>
             </div>
 
-            <div className="text-sm min-w-[320px]">
+            <div className="text-sm mt-8 min-w-[320px]">
               <div className="grid grid-cols-[120px_1fr] gap-y-1">
                 <p className="font-bold">FECHA:</p>
                 <p>{formatDate(invoice.fecha)}</p>
@@ -482,14 +506,23 @@ export default function WorkshopInvoice() {
 
           <table className="w-full border-collapse text-sm mt-2">
             <thead>
-              <tr className="bg-slate-200">
-                <th className="border border-black px-2 py-2 text-left">
+              <tr style={{ backgroundColor: "#e2e8f0" }}>
+                <th
+                  className="border border-black px-2 py-2 text-center"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
                   DESCRIPCIÓN
                 </th>
-                <th className="border border-black px-2 py-2 w-28 text-center">
+                <th
+                  className="border border-black px-2 py-2 w-28 text-center"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
                   CANTIDAD
                 </th>
-                <th className="border border-black px-2 py-2 w-36 text-right">
+                <th
+                  className="border border-black px-2 py-2 w-36 text-right"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
                   IMPORTE
                 </th>
               </tr>
@@ -512,7 +545,7 @@ export default function WorkshopInvoice() {
             </tbody>
           </table>
 
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
             <div className="text-sm">
               <p className="font-extrabold">GARANTÍA DE 60 DÍAS O 2000KM</p>
 
@@ -533,7 +566,7 @@ export default function WorkshopInvoice() {
               </p>
 
               <div className="mt-4">
-                <p className="text-lg font-extrabold underline">
+                <p className="text-left text-lg font-extrabold underline">
                   OBSERVACIONES:
                 </p>
 
@@ -545,8 +578,8 @@ export default function WorkshopInvoice() {
               <Row label="SUBTOTAL" value={formatMoney(subtotal)} />
               <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
               <Row label="IVA" value={formatMoney(iva)} />
-              <Row label="OTROS" value="-" />
-              <Row label="TOTAL" value={formatMoney(total)} strong />
+
+              <Row label="TOTAL" value={formatMoney(totalFinal)} strong />
             </div>
           </div>
 
