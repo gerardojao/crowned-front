@@ -6,11 +6,12 @@ import api from "../Components/api";
 const EMPTY_SUPPLIER = {
   Id: "",
   Nombre: "",
+  Contacto: "",
   Telefono: "",
   Email: "",
   Direccion: "",
-  Nif: "",
-  Rubro: "",
+  NifCif: "",
+  Categoria: "",
   Observaciones: "",
 };
 
@@ -23,10 +24,18 @@ const Banner = ({ type = "success", text, onClose }) => {
   };
 
   return (
-    <div role="alert" aria-live="polite" className={`mb-4 rounded-xl p-3 text-sm ring-1 ${map[type]}`}>
+    <div
+      role="alert"
+      aria-live="polite"
+      className={`mb-4 rounded-xl p-3 text-sm ring-1 ${map[type]}`}
+    >
       <div className="flex items-start justify-between gap-3">
         <span>{text}</span>
-        <button type="button" onClick={onClose} className="text-xs underline underline-offset-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs underline underline-offset-2"
+        >
           Cerrar
         </button>
       </div>
@@ -49,16 +58,25 @@ export default function RegisterSupplier() {
   const [notice, setNotice] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const [editingId, setEditingId] = useState(null);
+
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    supplier: null,
+  });
+
+  const [deleting, setDeleting] = useState(false);
+
   const setField = (name, value) => {
-    setSupplier(prev => ({
+    setSupplier((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
 
     if (errors[name]) {
-      setErrors(prev => ({
+      setErrors((prev) => ({
         ...prev,
-        [name]: undefined
+        [name]: undefined,
       }));
     }
   };
@@ -80,14 +98,19 @@ export default function RegisterSupplier() {
         params: {
           search,
           page,
-          pageSize
-        }
+          pageSize,
+        },
       });
-
-      setSuppliers(res.data?.data || []);
+      const pack = res?.data?.data?.[0];
+      console.log(pack);
+      setSuppliers(pack?.items || []);
     } catch (err) {
       console.error(err);
       setSuppliers([]);
+      setNotice({
+        type: "error",
+        text: "No se pudieron cargar los proveedores.",
+      });
     }
   };
 
@@ -115,21 +138,94 @@ export default function RegisterSupplier() {
     try {
       setSubmitting(true);
 
-      await api.post("/Proveedor/Create", {
+      const payload = {
         nombre: supplier.Nombre,
-        telefono: supplier.Telefono,
+        contacto: supplier.Contacto || null,
+        telefono: supplier.Telefono || null,
         email: supplier.Email || null,
         direccion: supplier.Direccion || null,
-        nif: supplier.Nif || null,
-        rubro: supplier.Rubro || null,
-        observaciones: supplier.Observaciones || null
-      });
+        categoria: supplier.Categoria || null,
+        nifCif: supplier.NifCif || null,
+        observaciones: supplier.Observaciones || null,
+      };
+
+      if (editingId) {
+        await api.put(`/Proveedor/${editingId}`, payload);
+
+        setNotice({
+          type: "success",
+          text: "Proveedor actualizado correctamente.",
+        });
+      } else {
+        await api.post("/Proveedor", payload);
+
+        setNotice({
+          type: "success",
+          text: "Proveedor registrado correctamente.",
+        });
+      }
 
       setSupplier(EMPTY_SUPPLIER);
 
+      setEditingId(null);
+
+      await loadSuppliers();
+    } catch (err) {
+      console.error(err);
+
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo guardar el proveedor.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const startEditSupplier = (s) => {
+    const id = s.id ?? s.Id;
+
+    setEditingId(id);
+
+    setSupplier({
+      Id: id,
+      Nombre: s.nombre ?? s.Nombre ?? "",
+      Contacto: s.contacto ?? s.Contacto ?? "",
+      Telefono: s.telefono ?? s.Telefono ?? "",
+      Email: s.email ?? s.Email ?? "",
+      Direccion: s.direccion ?? s.Direccion ?? "",
+      NifCif: s.nifCif ?? s.NifCif ?? "",
+      Categoria: s.categoria ?? s.Categoria ?? "",
+      Observaciones: s.observaciones ?? s.Observaciones ?? "",
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const confirmDeleteSupplier = async () => {
+    if (!deleteModal.supplier) return;
+
+    const id = deleteModal.supplier.id;
+
+    try {
+      setDeleting(true);
+
+      await api.delete(`/Proveedor/${id}`);
+
       setNotice({
         type: "success",
-        text: "Proveedor registrado correctamente."
+        text: "Proveedor eliminado correctamente.",
+      });
+
+      setDeleteModal({
+        open: false,
+        supplier: null,
       });
 
       await loadSuppliers();
@@ -138,10 +234,13 @@ export default function RegisterSupplier() {
 
       setNotice({
         type: "error",
-        text: err?.response?.data?.message || err?.message || "No se pudo registrar el proveedor."
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo eliminar el proveedor.",
       });
     } finally {
-      setSubmitting(false);
+      setDeleting(false);
     }
   };
 
@@ -194,7 +293,9 @@ export default function RegisterSupplier() {
                 className={cls("Nombre")}
                 placeholder="Nombre del proveedor"
               />
-              {errors.Nombre && <p className="mt-1 text-xs text-rose-600">{errors.Nombre}</p>}
+              {errors.Nombre && (
+                <p className="mt-1 text-xs text-rose-600">{errors.Nombre}</p>
+              )}
             </div>
 
             <div>
@@ -209,7 +310,9 @@ export default function RegisterSupplier() {
                 className={cls("Telefono")}
                 placeholder="Teléfono"
               />
-              {errors.Telefono && <p className="mt-1 text-xs text-rose-600">{errors.Telefono}</p>}
+              {errors.Telefono && (
+                <p className="mt-1 text-xs text-rose-600">{errors.Telefono}</p>
+              )}
             </div>
 
             <div>
@@ -232,24 +335,24 @@ export default function RegisterSupplier() {
               </label>
               <input
                 type="text"
-                name="Nif"
-                value={supplier.Nif}
+                name="NifCif"
+                value={supplier.NifCif}
+                className={cls("NifCif")}
                 onChange={handleChange}
-                className={cls("Nif")}
                 placeholder="B12345678"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Rubro
+                Categoria
               </label>
               <input
                 type="text"
-                name="Rubro"
-                value={supplier.Rubro}
+                name="Categoria"
+                value={supplier.Categoria}
                 onChange={handleChange}
-                className={cls("Rubro")}
+                className={cls("Categoria")}
                 placeholder="Repuestos, pintura, neumáticos..."
               />
             </div>
@@ -285,17 +388,20 @@ export default function RegisterSupplier() {
         </div>
 
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={submitting}
-            className={supplierBtn}
-          >
-            {submitting ? "Guardando..." : "Registrar proveedor"}
+          <button type="submit" disabled={submitting} className={supplierBtn}>
+            {submitting
+              ? "Guardando..."
+              : editingId
+                ? "Actualizar proveedor"
+                : "Registrar proveedor"}
           </button>
 
           <button
             type="button"
-            onClick={() => setSupplier(EMPTY_SUPPLIER)}
+            onClick={() => {
+              setSupplier(EMPTY_SUPPLIER);
+              setEditingId(null);
+            }}
             className="inline-flex items-center rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
           >
             Limpiar
@@ -325,11 +431,11 @@ export default function RegisterSupplier() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-slate-600">
-                <th className="text-left py-3">Proveedor</th>
-                <th className="text-left py-3">Teléfono</th>
-                <th className="text-left py-3">Email</th>
-                <th className="text-left py-3">Rubro</th>
-                <th className="text-left py-3">Acciones</th>
+                <th className="text-center py-3">Proveedor</th>
+                <th className="text-center py-3">Teléfono</th>
+                <th className="text-center py-3">Email</th>
+                <th className="text-center py-3">Categoria</th>
+                <th className="text-center py-3">-</th>
               </tr>
             </thead>
 
@@ -342,12 +448,34 @@ export default function RegisterSupplier() {
                   <td className="py-3">{s.nombre}</td>
                   <td className="py-3">{s.telefono}</td>
                   <td className="py-3">{s.email}</td>
-                  <td className="py-3">{s.rubro}</td>
+                  <td className="py-3">{s.categoria ?? s.Categoria ?? "—"}</td>
 
-                  <td className="py-3">
-                    <button className="text-sky-600 hover:underline">
-                      Editar
-                    </button>
+                  <td className="py-3 text-center">
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => startEditSupplier(s)}
+                        className="text-sky-600 hover:underline"
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDeleteModal({
+                            open: true,
+                            supplier: {
+                              id: s.id ?? s.Id,
+                              nombre: s.nombre ?? s.Nombre,
+                            },
+                          })
+                        }
+                        className="text-rose-600 hover:underline"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -367,7 +495,7 @@ export default function RegisterSupplier() {
           <button
             type="button"
             disabled={page <= 1}
-            onClick={() => setPage(prev => Math.max(1, prev - 1))}
+            onClick={() => setPage((prev) => Math.max(1, prev - 1))}
             className="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
           >
             Anterior
@@ -379,13 +507,61 @@ export default function RegisterSupplier() {
 
           <button
             type="button"
-            onClick={() => setPage(prev => prev + 1)}
+            onClick={() => setPage((prev) => prev + 1)}
             className="rounded-lg px-3 py-1.5 bg-slate-100 hover:bg-slate-200"
           >
             Siguiente
           </button>
         </div>
       </div>
+
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Eliminar proveedor
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-600">
+              ¿Seguro que deseas eliminar a{" "}
+              <span className="font-semibold text-slate-900">
+                {deleteModal.supplier?.nombre ?? "este proveedor"}
+              </span>
+              ?
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Esta acción ocultará el proveedor del sistema, pero no borrará
+              físicamente el registro de la base de datos.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() =>
+                  setDeleteModal({
+                    open: false,
+                    supplier: null,
+                  })
+                }
+                className="rounded-xl px-4 py-2 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={confirmDeleteSupplier}
+                className="rounded-xl px-4 py-2 bg-rose-600 text-white hover:bg-rose-700 transition disabled:opacity-60"
+              >
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
