@@ -28,6 +28,7 @@ import RegisterSupplier from "./Pages/RegisterSupplier.jsx";
 import RegisterWorkOrder from "./Pages/RegisterWorkOrder.jsx";
 import PrintWorkOrder from "./Pages/PrintWorkOrder.jsx";
 import WorkshopInvoice from "./Pages/WorkshopInvoice.jsx";
+import StockParts from "./Pages/StockParts.jsx";
 
 function App() {
   const [income, setIncome] = useState({
@@ -68,6 +69,8 @@ function App() {
             <Route path="/workshop-invoice/:id" element={<WorkshopInvoice />} />
 
             <Route path="/workshop-invoice" element={<WorkshopInvoice />} />
+
+            <Route path="/stock-parts" element={<StockParts />} />
 
             {/* protegidas (ajusta según tu necesidad) */}
 

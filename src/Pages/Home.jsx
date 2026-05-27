@@ -87,8 +87,6 @@ export default function Home() {
     })();
   }, []);
 
-
-
   return (
     <>
       <KPIs />
@@ -140,10 +138,7 @@ export default function Home() {
                     >
                       Ver órdenes <ArrowRight size={15} />
                     </Link>
-                    <Link
-                      to="/workshop-invoice"
-                      className={actionLink}
-                    >
+                    <Link to="/workshop-invoice" className={actionLink}>
                       Facturar <ArrowRight size={15} />
                     </Link>
                   </div>
@@ -199,6 +194,9 @@ export default function Home() {
                     </Link>
                     <Link to="/register-supplier" className={actionLink}>
                       Ver proveedores <ArrowRight size={15} />
+                    </Link>
+                    <Link to="/stock-parts" className={actionLink}>
+                      Stock de repuestos <ArrowRight size={15} />
                     </Link>
                   </div>
                 </div>
@@ -265,52 +263,54 @@ export default function Home() {
             </div>
           )}
 
-{ordenes.length === 0 && (
-  <tr>
-    <td className="py-4 px-3 text-slate-500" colSpan={5}>
-      No hay órdenes recientes.
-    </td>
-  </tr>
-)}
+          {ordenes.length === 0 && (
+            <tr>
+              <td className="py-4 px-3 text-slate-500" colSpan={5}>
+                No hay órdenes recientes.
+              </td>
+            </tr>
+          )}
 
-{ordenesSorted.map((o) => {
-  const id = o.id ?? o.Id;
-  const fecha = o.fecha ?? o.Fecha;
-  const estado = o.estado ?? o.Estado;
-  const cliente = o.cliente ?? o.Cliente;
-  const matricula = o.matricula ?? o.Matricula;
+          {ordenesSorted.map((o) => {
+            const id = o.id ?? o.Id;
+            const fecha = o.fecha ?? o.Fecha;
+            const estado = o.estado ?? o.Estado;
+            const cliente = o.cliente ?? o.Cliente;
+            const matricula = o.matricula ?? o.Matricula;
 
-  return (
-    <tr key={id} className="hover:bg-slate-50">
-      <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-        {soloFecha(fecha)}
-      </td>
+            return (
+              <tr key={id} className="hover:bg-slate-50">
+                <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
+                  {soloFecha(fecha)}
+                </td>
 
-      <td className="py-2.5 px-3">
-        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}>
-          {estado}
-        </span>
-      </td>
+                <td className="py-2.5 px-3">
+                  <span
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
+                  >
+                    {estado}
+                  </span>
+                </td>
 
-      <td className="py-2.5 px-3 text-slate-700 truncate">
-        {cliente ?? "—"}
-      </td>
+                <td className="py-2.5 px-3 text-slate-700 truncate">
+                  {cliente ?? "—"}
+                </td>
 
-      <td className="py-2.5 px-3 font-semibold text-slate-900">
-        {matricula ?? "—"}
-      </td>
+                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                  {matricula ?? "—"}
+                </td>
 
-      <td className="py-2.5 px-3 text-right">
-        <Link
-          to="/register-work-order#ordenes-recientes"
-          className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
-        >
-          Ir a orden
-        </Link>
-      </td>
-    </tr>
-  );
-})}
+                <td className="py-2.5 px-3 text-right">
+                  <Link
+                    to="/register-work-order#ordenes-recientes"
+                    className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
+                  >
+                    Ir a orden
+                  </Link>
+                </td>
+              </tr>
+            );
+          })}
         </div>
 
         <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
@@ -318,7 +318,9 @@ export default function Home() {
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                 <tr className="text-left text-slate-600">
-                  <th className="py-2.5 px-3 font-bold w-[140px] text-center">Fecha</th>
+                  <th className="py-2.5 px-3 font-bold w-[140px] text-center">
+                    Fecha
+                  </th>
                   <th className="py-2.5 px-3 font-bold w-[160px] text-center">
                     Estado
                   </th>
@@ -326,9 +328,7 @@ export default function Home() {
                   <th className="py-2.5 px-3 font-bold w-[140px] text-center">
                     Matrícula
                   </th>
-                  <th className="py-2.5 px-3 font-semibold text-center w-[140px]">
-                    
-                  </th>
+                  <th className="py-2.5 px-3 font-semibold text-center w-[140px]"></th>
                 </tr>
               </thead>
 
