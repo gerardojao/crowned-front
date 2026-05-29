@@ -174,7 +174,6 @@ export default function RegisterCustomer() {
       setCustomer(EMPTY_CUSTOMER);
       setEditingId(null);
       await loadCustomers();
-
     } catch (err) {
       console.error(err);
 
@@ -227,7 +226,6 @@ export default function RegisterCustomer() {
   };
 
   const startEditCustomer = (c) => {
-    
     const id = c.id ?? c.Id;
     setEditingId(c.id);
     setCustomer({
@@ -456,7 +454,7 @@ export default function RegisterCustomer() {
                 <th className="text-left py-3">Matrícula</th>
                 <th className="text-left py-3">Modelo</th>
                 <th className="text-left py-3">Kilometraje</th>
-                <th className="text-left py-3">Acciones</th>
+                <th className="text-left py-3"></th>
               </tr>
             </thead>
 
@@ -485,7 +483,7 @@ export default function RegisterCustomer() {
                         <button
                           type="button"
                           onClick={() => startEditCustomer(c)}
-                          className="text-sky-600 hover:underline"
+                          className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
                         >
                           Editar
                         </button>
@@ -501,7 +499,7 @@ export default function RegisterCustomer() {
                               },
                             })
                           }
-                          className="text-rose-600 hover:underline"
+                          className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
                         >
                           Eliminar
                         </button>

@@ -455,7 +455,7 @@ export default function RegisterSupplier() {
                       <button
                         type="button"
                         onClick={() => startEditSupplier(s)}
-                        className="text-sky-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
                       >
                         Editar
                       </button>
@@ -471,7 +471,7 @@ export default function RegisterSupplier() {
                             },
                           })
                         }
-                        className="text-rose-600 hover:underline"
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
                       >
                         Eliminar
                       </button>

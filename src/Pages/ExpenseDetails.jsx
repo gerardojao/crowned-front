@@ -496,12 +496,12 @@ export default function ExpenseDetails() {
                 <table className="min-w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
                     <tr className="text-left text-slate-600">
-                      <th className="py-2.5 px-3 font-semibold">Fecha</th>
-                      <th className="py-2.5 px-3 font-semibold">Mes</th>
-                      <th className="py-2.5 px-3 font-semibold">Tipo</th>
-                      <th className="py-2.5 px-3 font-semibold">Descripción</th>
+                      <th className="py-2.5 px-3 font-semibold text-center">Fecha</th>
+                      <th className="py-2.5 px-3 font-semibold text-center"> </th>
+                      <th className="py-2.5 px-3 font-semibold text-center">Tipo</th>
+                      <th className="py-2.5 px-3 font-semibold text-center">Descripción</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Importe</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Acciones</th>
+                      <th className="py-2.5 px-3 font-semibold text-right"> </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -517,7 +517,7 @@ export default function ExpenseDetails() {
                           <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
                             {r.fecha ? soloFecha(r.fecha) : "—"}
                           </td>
-                          <td className="py-2.5 px-3">{r.mes ?? "—"}</td>
+                          <td className="py-2.5 px-3 text-right">{""}</td>
                           <td className="py-2.5 px-3">{r.tipo === 'Transporte' ? 'Gastos Casa' : r.tipo ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-rose-700 whitespace-nowrap">

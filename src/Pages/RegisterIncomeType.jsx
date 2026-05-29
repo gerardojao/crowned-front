@@ -249,7 +249,7 @@ export default function RegisterIncomeType() {
                       <button
                         type="button"
                         onClick={() => startEdit(item)}
-                        className="text-sky-600 hover:underline font-medium"
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
                       >
                         Editar
                       </button>
@@ -262,7 +262,7 @@ export default function RegisterIncomeType() {
                             item,
                           })
                         }
-                        className="text-rose-600 hover:underline font-medium"
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
                       >
                         Eliminar
                       </button>

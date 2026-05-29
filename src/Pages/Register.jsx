@@ -338,7 +338,7 @@ useEffect(() => {
             {errors.Fecha && <FieldError id="Fecha-error">{errors.Fecha}</FieldError>}
           </div>
 
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Mes">Mes</label>
             <select
               id="Mes"
@@ -354,7 +354,7 @@ useEffect(() => {
               {months.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
             {errors.Mes && <FieldError id="Mes-error">{errors.Mes}</FieldError>}
-          </div>
+          </div> */}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Descripcion">Descripción</label>

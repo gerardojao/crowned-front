@@ -8,6 +8,7 @@ import {
   ReceiptText,
   BarChart3,
   ArrowRight,
+  FileText,
 } from "lucide-react";
 import { currency } from "../utils/currency";
 import { loadStatementSummary } from "../utils/statementStore";
@@ -138,9 +139,13 @@ export default function Home() {
                     >
                       Ver órdenes <ArrowRight size={15} />
                     </Link>
-                    <Link to="/workshop-invoice" className={actionLink}>
-                      Facturar <ArrowRight size={15} />
+                    <Link
+                      to="/presupuestos"
+                      className={actionLink}
+                    >
+                      Presupuestos <ArrowRight size={15} />
                     </Link>
+    
                   </div>
                 </div>
               </div>

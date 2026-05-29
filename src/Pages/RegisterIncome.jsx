@@ -121,9 +121,7 @@ export default function RegisterIncome({ income, setIncome }) {
     let msg = "";
     switch (name) {
       case "IngresoId":
-      case "Mes":
-        if (!value) msg = REQUIRED;
-        break;
+
       case "Fecha":
         if (REQUIRE_FECHA && !value) msg = REQUIRED;
         break;
@@ -328,7 +326,7 @@ export default function RegisterIncome({ income, setIncome }) {
             {errors.Fecha && <FieldError id="Fecha-error">{errors.Fecha}</FieldError>}
           </div>
 
-          <div>
+          {/* <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Mes">Mes</label>
             <select
               id="Mes"
@@ -344,7 +342,7 @@ export default function RegisterIncome({ income, setIncome }) {
               {months.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
             {errors.Mes && <FieldError id="Mes-error">{errors.Mes}</FieldError>}
-          </div>
+          </div> */}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Descripcion">Descripción</label>
