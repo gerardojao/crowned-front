@@ -16,6 +16,7 @@ import {
 import { useAuth } from "./AuthContext";
 import TrialBanner from "./TrialBanner";
 import logo from "../assets/LogoTallerCrowned.png";
+import ClientAlertModal from "./ClienteAlertModal";
 
 const heroBtnBase =
   "group flex min-w-[240px] items-center justify-between gap-4 rounded-2xl px-5 py-5 text-white shadow-md transition hover:scale-[1.01]";
@@ -339,6 +340,7 @@ export default function Layout({ children }) {
       >
         {children}
       </main>
+          <ClientAlertModal />
 
       {!isPrintRoute && (
         <footer className="mt-auto border-t border-slate-200 bg-white/80 backdrop-blur">
