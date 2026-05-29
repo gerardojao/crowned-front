@@ -29,6 +29,9 @@ import RegisterWorkOrder from "./Pages/RegisterWorkOrder.jsx";
 import PrintWorkOrder from "./Pages/PrintWorkOrder.jsx";
 import WorkshopInvoice from "./Pages/WorkshopInvoice.jsx";
 import StockParts from "./Pages/StockParts.jsx";
+import ReprintInvoice from "./Pages/ReprintInvoice.jsx";
+import RegisterExpenseType from "./Pages/RegisterExpenseType.jsx";
+import RegisterIncomeType from "./Pages/RegisterIncomeType.jsx";
 
 function App() {
   const [income, setIncome] = useState({
@@ -71,6 +74,16 @@ function App() {
             <Route path="/workshop-invoice" element={<WorkshopInvoice />} />
 
             <Route path="/stock-parts" element={<StockParts />} />
+            <Route
+              path="/reprint-invoice/order/:idOrden"
+              element={<ReprintInvoice />}
+            />
+            <Route
+              path="/reprint-invoice/number/:numeroFactura"
+              element={<ReprintInvoice />}
+            />
+            <Route path="/register-expense-type" element={<RegisterExpenseType />} />
+            <Route path="/register-income-type" element={<RegisterIncomeType />} />
 
             {/* protegidas (ajusta según tu necesidad) */}
 

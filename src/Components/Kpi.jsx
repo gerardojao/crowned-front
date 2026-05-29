@@ -138,7 +138,7 @@ function Card({ title, value, tone, loading, extraValueClass }) {
         </div>
 
         <div>
-          <p className={`text-xl font-semibold ${t.title}`}>
+          <p className={`text-xl text-left font-semibold ${t.title}`}>
             {title}
           </p>
 

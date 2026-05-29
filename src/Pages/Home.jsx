@@ -218,12 +218,12 @@ export default function Home() {
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
-                    <Link to="/register-income" className={actionLink}>
-                      Registrar nuevo ingreso <ArrowRight size={15} />
+                    <Link to="/register-income-type" className={actionLink}>
+                      Registrar tipo de ingreso <ArrowRight size={15} />
                     </Link>
 
-                    <Link to="/register-expense" className={actionLink}>
-                      Registrar nuevo gasto <ArrowRight size={15} />
+                    <Link to="/register-expense-type" className={actionLink}>
+                      Registrar tipo de gasto <ArrowRight size={15} />
                     </Link>
 
                     <Link to="/statement" className={actionLink}>
@@ -249,7 +249,7 @@ export default function Home() {
           </div>
 
           <Link
-            to="/statement"
+            to="/register-work-order#ordenes-recientes"
             className="hidden sm:inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700"
           >
             Ver todo

@@ -48,6 +48,7 @@ export default function WorkshopInvoice() {
     km: "",
     observaciones: "",
     ivaPct: 21,
+    otros: "",
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
@@ -70,17 +71,53 @@ export default function WorkshopInvoice() {
     manoObra: Number(o.manoObra ?? o.ManoObra ?? 0),
     estado: o.estado ?? o.Estado ?? "",
     observaciones: o.observaciones ?? o.Observaciones ?? "",
+    otros: Number(o.otros ?? o.Otros ?? 0),
   });
 
+  // useEffect(() => {
+  //   if (id) {
+  //     loadOrder();
+  //   } else {
+  //     setLoading(false);
+  //   }
+  // }, [id]);
+
   useEffect(() => {
-    if (id) {
-      loadOrder();
-    } else {
-      setLoading(false);
-    }
+    loadInvoice();
   }, [id]);
 
-  const loadOrder = async () => {
+  const loadInvoice = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const previewRes = await api.get("/NumeradorFactura/preview");
+
+      const numeroFacturaPrev =
+        previewRes?.data?.data?.[0]?.numeroFactura || "";
+
+      if (id) {
+        await loadOrder(numeroFacturaPrev);
+      } else {
+        setInvoice((prev) => ({
+          ...prev,
+          numero: numeroFacturaPrev,
+        }));
+
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo generar el número de factura.",
+      );
+      setLoading(false);
+    }
+  };
+
+  const loadOrder = async (numeroFacturaPrev) => {
     try {
       setLoading(true);
       setError("");
@@ -93,12 +130,13 @@ export default function WorkshopInvoice() {
 
       setInvoice((prev) => ({
         ...prev,
-        numero: `${o.id}-${new Date().getFullYear()}`,
+        numero: numeroFacturaPrev,
         cliente: o.cliente,
         telefonoCliente: o.telefono,
         matricula: o.matricula,
         km: o.kilometraje || "",
         observaciones: o.observaciones || "",
+        otros: o.otros || "",
       }));
 
       const ivaPct = Number(invoice.ivaPct || 0) / 100;
@@ -115,7 +153,7 @@ export default function WorkshopInvoice() {
         {
           descripcion: o.trabajo || "Trabajo realizado",
           cantidad: 1,
-           importe: baseRepuestos,
+          importe: baseRepuestos,
         },
         {
           descripcion: "Mano de obra",
@@ -149,9 +187,17 @@ export default function WorkshopInvoice() {
     return round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
   }, [subtotal, invoice.ivaPct]);
 
+  const otros = useMemo(() => {
+    return round2(Number(invoice.otros || 0));
+  }, [invoice.otros]);
+
   const totalFinal = useMemo(() => {
-    return round2(subtotal + iva);
-  }, [subtotal, iva]);
+    return round2(subtotal + iva - otros);
+  }, [subtotal, iva, otros]);
+
+  // const totalFinal = useMemo(() => {
+  //   return round2(subtotal + iva);
+  // }, [subtotal, iva]);
 
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
@@ -188,9 +234,56 @@ export default function WorkshopInvoice() {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const printInvoice = () => {
-    window.print();
+const saveIssuedInvoice = async (numeroFactura) => {
+  const payload = {
+    numeroFactura,
+    idOrdenTrabajo: id ? Number(id) : null,
+    fecha: invoice.fecha,
+    cliente: invoice.cliente,
+    dni: invoice.dni || null,
+    direccionCliente: invoice.direccionCliente || null,
+    telefonoCliente: invoice.telefonoCliente || null,
+    matricula: invoice.matricula || null,
+    km: invoice.km ? String(invoice.km) : null,
+    subtotal,
+    iva,
+    otros,
+    total: totalFinal,
+    observaciones: invoice.observaciones || null,
+    itemsJson: JSON.stringify(items),
   };
+
+  await api.post("/FacturaEmitida", payload);
+};
+
+const printInvoice = async () => {
+  try {
+    const res = await api.post("/NumeradorFactura/siguiente");
+
+    const numeroFactura =
+      res?.data?.data?.[0]?.numeroFactura ||
+      res?.data?.data?.[0]?.NumeroFactura ||
+      "";
+
+    setInvoice((prev) => ({
+      ...prev,
+      numero: numeroFactura,
+    }));
+
+    // if (id) {
+    //   await api.put(`/OrdenTrabajo/${id}/facturada`);
+    // }
+     await saveIssuedInvoice(numeroFactura);
+
+    setTimeout(() => {
+      window.print();
+
+    }, 150);
+  } catch (err) {
+    console.error(err);
+    setError("No se pudo generar el número de factura.");
+  }
+};
 
   if (loading) {
     return (
@@ -379,6 +472,13 @@ export default function WorkshopInvoice() {
               value={invoice.ivaPct}
               onChange={(e) => setInvoiceField("ivaPct", e.target.value)}
             />
+            <input
+              type="number"
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              placeholder="Otros"
+              value={invoice.otros}
+              onChange={(e) => setInvoiceField("otros", e.target.value)}
+            />
           </div>
         </div>
       </section>
@@ -547,7 +647,7 @@ export default function WorkshopInvoice() {
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
             <div className="text-sm">
-              <p className="font-extrabold">GARANTÍA DE 60 DÍAS O 2000KM</p>
+              <p className="font-extrabold">GARANTÍA DE 90 DÍAS O 2000KM</p>
 
               <p className="mt-2 italic font-semibold leading-5">
                 Todo repuesto usado o nuevo suministrado e instalado a solicitud
@@ -578,7 +678,7 @@ export default function WorkshopInvoice() {
               <Row label="SUBTOTAL" value={formatMoney(subtotal)} />
               <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
               <Row label="IVA" value={formatMoney(iva)} />
-
+              <Row label="OTROS" value={`- ${formatMoney(otros)}`} />
               <Row label="TOTAL" value={formatMoney(totalFinal)} strong />
             </div>
           </div>

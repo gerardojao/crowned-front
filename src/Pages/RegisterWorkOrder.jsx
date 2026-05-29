@@ -61,6 +61,8 @@ export default function RegisterWorkOrder() {
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   const setField = (name, value) => {
     setOrder((prev) => ({
@@ -94,6 +96,7 @@ export default function RegisterWorkOrder() {
       o.Total ??
       Number(o.repuestos ?? o.Repuestos ?? 0) +
         Number(o.manoObra ?? o.ManoObra ?? 0),
+    Facturada: o.facturada ?? o.Facturada ?? false,
   });
 
   const getItemsFromResponse = (res) => {
@@ -117,12 +120,16 @@ export default function RegisterWorkOrder() {
 
       const search = plateSearch.trim();
 
-      const res = search
+      const hasFilters = search || dateFrom || dateTo;
+
+      const res = hasFilters
         ? await api.get("/OrdenTrabajo", {
             params: {
-              matricula: search,
+              matricula: search || null,
+              fechaDesde: dateFrom || null,
+              fechaHasta: dateTo || null,
               page: 1,
-              pageSize: 10,
+              pageSize: 20,
             },
           })
         : await api.get("/OrdenTrabajo/ultimas", {
@@ -158,7 +165,7 @@ export default function RegisterWorkOrder() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateSearch]);
+  }, [plateSearch, dateFrom, dateTo]);
 
   useEffect(() => {
     if (window.location.hash) {
@@ -497,6 +504,32 @@ export default function RegisterWorkOrder() {
             placeholder="Buscar matrícula..."
             className="w-full md:w-80 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
+
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+          />
+          {(plateSearch || dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={() => {
+                setPlateSearch("");
+                setDateFrom("");
+                setDateTo("");
+              }}
+              className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+            >
+              Limpiar
+            </button>
+          )}
         </div>
 
         <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
@@ -612,14 +645,30 @@ export default function RegisterWorkOrder() {
                     Editar
                   </button>
 
-                  <Link
-                    to={`/workshop-invoice/${o.Id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
-                  >
-                    Facturar
-                  </Link>
+                  {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
+                    <Link
+                      to={`/workshop-invoice/${o.Id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
+                    >
+                      Facturar
+                    </Link>
+                  )}
+
+                  {(o.Facturada || o.facturada) && (
+                    // <span className="rounded-xl px-3 py-2 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium">
+                    //   Orden facturada
+                    // </span>
+                    <Link
+                      to={`/reprint-invoice/order/${o.Id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition"
+                    >
+                      Reimprimir factura
+                    </Link>
+                  )}
                 </div>
               </div>
             </article>
@@ -632,7 +681,7 @@ export default function RegisterWorkOrder() {
               </div>
 
               <h4 className="mt-4 text-lg font-semibold text-slate-800">
-                {plateSearch
+                {plateSearch || dateFrom || dateTo
                   ? "No se encontraron órdenes"
                   : "No hay órdenes registradas"}
               </h4>
