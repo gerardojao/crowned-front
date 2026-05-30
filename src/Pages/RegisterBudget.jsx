@@ -534,6 +534,15 @@ export default function RegisterBudget() {
               Orden creada #{p.IdOrdenTrabajo}
             </Link>
           )}
+          
+          <Link
+  to={`/print-budget/${p.Id}`}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-violet-600 text-white hover:bg-violet-700"
+>
+  Imprimir presupuesto
+</Link>
 
           <button
             type="button"

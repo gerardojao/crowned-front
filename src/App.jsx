@@ -33,6 +33,7 @@ import ReprintInvoice from "./Pages/ReprintInvoice.jsx";
 import RegisterExpenseType from "./Pages/RegisterExpenseType.jsx";
 import RegisterIncomeType from "./Pages/RegisterIncomeType.jsx";
 import RegisterBudget from "./Pages/RegisterBudget.jsx";
+import PrintBudget from "./Pages/PrintBudget.jsx";
 
 function App() {
   const [income, setIncome] = useState({
@@ -86,6 +87,7 @@ function App() {
             <Route path="/register-expense-type" element={<RegisterExpenseType />} />
             <Route path="/register-income-type" element={<RegisterIncomeType />} />
             <Route path="/presupuestos" element={<RegisterBudget />} />
+            <Route path="/print-budget/:id" element={<PrintBudget />} />
 
             {/* protegidas (ajusta según tu necesidad) */}
 
