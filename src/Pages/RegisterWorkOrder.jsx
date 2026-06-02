@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
+import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const EMPTY_ORDER = {
   Cliente: "",
@@ -25,6 +26,15 @@ const states = [
   "Esperando repuesto",
   "Listo",
   "Entregado",
+];
+
+const DEFAULT_FREQUENT_SERVICES = [
+  "Servicio cambio de aceite y filtro",
+  "Cambio de pastillas de frenos",
+  "Cambio de rodamientos delanteros",
+  "Cambio de amortiguadores",
+  "Mano de obra",
+  "Repuestos",
 ];
 
 const getStateStyles = (estado) => {
@@ -52,7 +62,19 @@ const getStateStyles = (estado) => {
   }
 };
 
+const ensureOk = (res) => {
+  const data = res?.data;
+  if (data?.ok === 0 || data?.Ok === 0) {
+    throw new Error(data?.message || data?.Message || "La operacion no se pudo completar.");
+  }
+  return data;
+};
+
+const isOrderEditLocked = (estado) =>
+  ["Reparando", "Esperando repuesto", "Listo", "Entregado"].includes(estado);
+
 export default function RegisterWorkOrder() {
+  const labels = useBusinessTerminology();
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [orders, setOrders] = useState([]);
   const [notice, setNotice] = useState("");
@@ -63,6 +85,18 @@ export default function RegisterWorkOrder() {
   const [editingId, setEditingId] = useState(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerMatches, setCustomerMatches] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [showOrders, setShowOrders] = useState(false);
+  const [orderPage, setOrderPage] = useState(1);
+  const [orderTotal, setOrderTotal] = useState(0);
+  const [frequentServices, setFrequentServices] = useState([]);
+  const [newServiceName, setNewServiceName] = useState("");
+  const [savingService, setSavingService] = useState(false);
+  const orderPageSize = 10;
 
   const setField = (name, value) => {
     setOrder((prev) => ({
@@ -73,6 +107,56 @@ export default function RegisterWorkOrder() {
 
   const handleChange = (e) => {
     setField(e.target.name, e.target.value);
+  };
+
+  const loadFrequentServices = async () => {
+    try {
+      const res = await api.get("/ServicioFrecuente");
+      const list = res?.data?.data?.[0] || [];
+      const names = list
+        .map((x) => x.nombre ?? x.Nombre)
+        .filter(Boolean);
+      setFrequentServices(names.length ? names : DEFAULT_FREQUENT_SERVICES);
+    } catch (err) {
+      console.error(err);
+      setFrequentServices(DEFAULT_FREQUENT_SERVICES);
+    }
+  };
+
+  const appendServiceToTrabajo = (service) => {
+    const value = service?.trim();
+    if (!value) return;
+    setOrder((prev) => ({
+      ...prev,
+      Trabajo: prev.Trabajo?.trim()
+        ? `${prev.Trabajo.trim()}\n${value}`
+        : value,
+    }));
+  };
+
+  const createFrequentService = async () => {
+    const nombre = newServiceName.trim();
+    if (!nombre) return;
+
+    try {
+      setSavingService(true);
+      setError("");
+      const res = await api.post("/ServicioFrecuente", { nombre });
+      ensureOk(res);
+      await loadFrequentServices();
+      appendServiceToTrabajo(nombre);
+      setNewServiceName("");
+      setNotice("Servicio frecuente agregado.");
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo registrar el servicio.",
+      );
+    } finally {
+      setSavingService(false);
+    }
   };
 
   const total = Number(order.Repuestos || 0) + Number(order.ManoObra || 0);
@@ -99,6 +183,138 @@ export default function RegisterWorkOrder() {
     Facturada: o.facturada ?? o.Facturada ?? false,
   });
 
+  const normalizeCustomer = (c) => ({
+    Id: c.id ?? c.Id,
+    Nombre: c.nombre ?? c.Nombre ?? "",
+    Telefono: c.telefono ?? c.Telefono ?? "",
+    Matricula: c.matricula ?? c.Matricula ?? "",
+    Marca: c.marca ?? c.Marca ?? "",
+    Modelo: c.modelo ?? c.Modelo ?? "",
+    Kilometraje: c.kilometraje ?? c.Kilometraje ?? "",
+    Email: c.email ?? c.Email ?? "",
+    Direccion: c.direccion ?? c.Direccion ?? "",
+    Observaciones: c.observaciones ?? c.Observaciones ?? "",
+  });
+
+  const fillOrderFromCustomer = (customer) => {
+    setOrder((prev) => ({
+      ...prev,
+      Cliente: customer.Nombre || prev.Cliente,
+      Telefono: customer.Telefono || prev.Telefono,
+      Matricula: customer.Matricula || prev.Matricula,
+      Marca: customer.Marca || prev.Marca,
+      Modelo: customer.Modelo || prev.Modelo,
+      Kilometraje: customer.Kilometraje ? String(customer.Kilometraje) : prev.Kilometraje,
+    }));
+    setCustomerSearch("");
+    setCustomerMatches([]);
+    setShowNewCustomer(false);
+  };
+
+  const loadCustomers = async (searchText) => {
+    const search = searchText.trim();
+    if (search.length < 2) {
+      setCustomerMatches([]);
+      return;
+    }
+
+    try {
+      setLoadingCustomers(true);
+      const res = await api.get("/Cliente", {
+        params: {
+          search,
+          page: 1,
+          pageSize: 6,
+        },
+      });
+      const pack = res?.data?.data?.[0];
+      const items = Array.isArray(pack?.items) ? pack.items : [];
+      setCustomerMatches(items.map(normalizeCustomer));
+    } catch (err) {
+      console.error(err);
+      setCustomerMatches([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  const findExistingCustomerByPlate = async (plate) => {
+    const matricula = plate?.trim();
+    if (!matricula) return null;
+
+    const res = await api.get("/Cliente", {
+      params: {
+        matricula,
+        page: 1,
+        pageSize: 5,
+      },
+    });
+    const pack = res?.data?.data?.[0];
+    const items = Array.isArray(pack?.items) ? pack.items.map(normalizeCustomer) : [];
+    return items.find(
+      (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
+    ) || null;
+  };
+
+  const createCustomerFromOrder = async () => {
+    if (savingCustomer) return;
+
+    const payload = {
+      nombre: order.Cliente,
+      telefono: order.Telefono,
+      email: null,
+      direccion: null,
+      matricula: order.Matricula,
+      marca: order.Marca || null,
+      modelo: order.Modelo,
+      kilometraje: order.Kilometraje ? Number(order.Kilometraje) : null,
+      observaciones: order.Observaciones || null,
+    };
+
+    if (!payload.nombre?.trim()) {
+      setError("Indica el nombre del cliente para registrarlo.");
+      return;
+    }
+    if (!payload.telefono?.trim()) {
+      setError("Indica el telefono del cliente para registrarlo.");
+      return;
+    }
+    if (!payload.matricula?.trim()) {
+      setError(labels.referenceRequiredMessage);
+      return;
+    }
+    if (!payload.modelo?.trim()) {
+      setError(labels.modelRequiredMessage);
+      return;
+    }
+
+    try {
+      setSavingCustomer(true);
+      setError("");
+      const existing = await findExistingCustomerByPlate(payload.matricula);
+      if (existing) {
+        fillOrderFromCustomer(existing);
+        setNotice("Cliente ya registrado; se cargaron sus datos en la orden.");
+        return;
+      }
+
+      ensureOk(await api.post("/Cliente", payload));
+      setNotice("Cliente registrado y cargado en la orden.");
+      setShowNewCustomer(false);
+      setCustomerSearch("");
+      setCustomerMatches([]);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo registrar el cliente.",
+      );
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
   const getItemsFromResponse = (res) => {
     const pack = res?.data?.data?.[0] ?? [];
 
@@ -113,33 +329,37 @@ export default function RegisterWorkOrder() {
     return [];
   };
 
-  const loadOrders = async () => {
+  const getPagingFromResponse = (res) => {
+    const pack = res?.data?.data?.[0] ?? {};
+    return {
+      total: Number(pack.total ?? pack.Total ?? 0),
+      page: Number(pack.page ?? pack.Page ?? orderPage),
+      pageSize: Number(pack.pageSize ?? pack.PageSize ?? orderPageSize),
+    };
+  };
+
+  const loadOrders = async (page = orderPage) => {
     try {
       setLoadingOrders(true);
       setError("");
 
       const search = plateSearch.trim();
 
-      const hasFilters = search || dateFrom || dateTo;
-
-      const res = hasFilters
-        ? await api.get("/OrdenTrabajo", {
-            params: {
-              matricula: search || null,
-              fechaDesde: dateFrom || null,
-              fechaHasta: dateTo || null,
-              page: 1,
-              pageSize: 20,
-            },
-          })
-        : await api.get("/OrdenTrabajo/ultimas", {
-            params: {
-              take: 10,
-            },
-          });
+      const res = await api.get("/OrdenTrabajo", {
+        params: {
+          matricula: search || null,
+          fechaDesde: dateFrom || null,
+          fechaHasta: dateTo || null,
+          page,
+          pageSize: orderPageSize,
+        },
+      });
 
       const items = getItemsFromResponse(res).map(normalizeOrder);
+      const paging = getPagingFromResponse(res);
       setOrders(items);
+      setOrderTotal(paging.total);
+      setOrderPage(paging.page);
     } catch (err) {
       console.error(err);
       setOrders([]);
@@ -154,18 +374,67 @@ export default function RegisterWorkOrder() {
   };
 
   useEffect(() => {
-    loadOrders();
+    if (window.location.hash === "#ordenes-recientes") {
+      setShowOrders(true);
+    }
+    loadFrequentServices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadOrders();
+      loadCustomers(customerSearch);
+    }, 300);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerSearch]);
+
+  useEffect(() => {
+    const refreshOrders = () => {
+      if (showOrders) loadOrders();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshOrders();
+      }
+    };
+
+    const onStorage = (event) => {
+      if (event.key === "tc:invoice-issued") {
+        refreshOrders();
+      }
+    };
+
+    const onMessage = (event) => {
+      if (event?.data?.type === "tc:invoice-issued") {
+        refreshOrders();
+      }
+    };
+
+    window.addEventListener("focus", refreshOrders);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("message", onMessage);
+
+    return () => {
+      window.removeEventListener("focus", refreshOrders);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("message", onMessage);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showOrders]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (showOrders) loadOrders(1);
     }, 400);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateSearch, dateFrom, dateTo]);
+  }, [plateSearch, dateFrom, dateTo, showOrders]);
 
   useEffect(() => {
     if (window.location.hash) {
@@ -183,6 +452,11 @@ export default function RegisterWorkOrder() {
   }, []);
 
   const startEdit = (o) => {
+    if (isOrderEditLocked(o.Estado)) {
+      setError("No se puede editar una orden en reparacion, lista o entregada.");
+      return;
+    }
+
     setEditingId(o.Id);
 
     setOrder({
@@ -234,17 +508,20 @@ export default function RegisterWorkOrder() {
       };
 
       if (editingId) {
-        await api.put(`/OrdenTrabajo/${editingId}`, payload);
+        ensureOk(await api.put(`/OrdenTrabajo/${editingId}`, payload));
         setNotice("Orden actualizada correctamente.");
       } else {
-        await api.post("/OrdenTrabajo", payload);
+        ensureOk(await api.post("/OrdenTrabajo", payload));
         setNotice("Orden registrada correctamente.");
       }
 
       setOrder(EMPTY_ORDER);
       setEditingId(null);
+      setCustomerSearch("");
+      setCustomerMatches([]);
+      setShowNewCustomer(false);
 
-      await loadOrders();
+      if (showOrders) await loadOrders();
     } catch (err) {
       console.error(err);
       setError(
@@ -260,11 +537,8 @@ export default function RegisterWorkOrder() {
   const cls =
     "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
 
-  const filteredOrders = orders.filter((o) =>
-    (o.Matricula || "")
-      .toLowerCase()
-      .includes(plateSearch.trim().toLowerCase()),
-  );
+  const filteredOrders = orders;
+  const orderTotalPages = Math.max(1, Math.ceil(orderTotal / orderPageSize));
 
   useEffect(() => {
     if (window.location.hash) {
@@ -286,10 +560,10 @@ export default function RegisterWorkOrder() {
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Nueva orden de trabajo
+            {labels.orderTitle}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Registra trabajos, vehículo, estado y costes del servicio.
+            {labels.orderSubtitle}
           </p>
         </div>
 
@@ -320,8 +594,104 @@ export default function RegisterWorkOrder() {
       >
         <div>
           <h3 className="text-lg font-semibold text-slate-800 mb-4">
-            Datos del cliente y vehículo
+            {labels.customerAndAssetTitle}
           </h3>
+
+          <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-end">
+              <div className="flex-1">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Buscar cliente registrado
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className={`${cls} pl-10`}
+                    placeholder="Nombre, telefono, matricula, modelo o email"
+                  />
+                  <Search
+                    size={16}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  {customerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerSearch("");
+                        setCustomerMatches([]);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      aria-label="Limpiar busqueda"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowNewCustomer((v) => !v)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+              >
+                <UserPlus size={17} />
+                {showNewCustomer ? "Ocultar alta rapida" : "Registrar nuevo"}
+              </button>
+            </div>
+
+            {loadingCustomers && (
+              <p className="mt-3 text-sm text-slate-500">Buscando clientes...</p>
+            )}
+
+            {!loadingCustomers && customerSearch.trim().length >= 2 && customerMatches.length === 0 && (
+              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+                No encontramos ese cliente. Puedes completar los campos y usar "Registrar nuevo".
+              </div>
+            )}
+
+            {customerMatches.length > 0 && (
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                {customerMatches.map((customer) => (
+                  <button
+                    key={customer.Id}
+                    type="button"
+                    onClick={() => fillOrderFromCustomer(customer)}
+                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
+                  >
+                    <span className="block font-semibold text-slate-900">
+                      {customer.Nombre}
+                    </span>
+                    <span className="mt-1 block text-slate-600">
+                      {customer.Matricula || `Sin ${labels.referenceLabel.toLowerCase()}`} · {customer.Marca} {customer.Modelo}
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500">
+                      {customer.Telefono || "Sin telefono"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {showNewCustomer && (
+              <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600 ring-1 ring-slate-200">
+                <p>
+                  Completa nombre, telefono, matricula y modelo en los campos de abajo.
+                  Luego pulsa este boton para guardar el cliente en la base de datos.
+                </p>
+                <button
+                  type="button"
+                  onClick={createCustomerFromOrder}
+                  disabled={savingCustomer}
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <UserPlus size={17} />
+                  {savingCustomer ? "Guardando cliente..." : "Guardar cliente nuevo"}
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input
@@ -346,7 +716,7 @@ export default function RegisterWorkOrder() {
               value={order.Matricula}
               onChange={handleChange}
               className={cls}
-              placeholder="Matrícula *"
+              placeholder={labels.referencePlaceholder}
               required
             />
 
@@ -356,7 +726,7 @@ export default function RegisterWorkOrder() {
               value={order.Kilometraje}
               onChange={handleChange}
               className={cls}
-              placeholder="Kilometraje"
+              placeholder={labels.metricPlaceholder}
             />
 
             <input
@@ -364,7 +734,7 @@ export default function RegisterWorkOrder() {
               value={order.Marca}
               onChange={handleChange}
               className={cls}
-              placeholder="Marca"
+              placeholder={labels.makeLabel}
             />
 
             <input
@@ -372,7 +742,7 @@ export default function RegisterWorkOrder() {
               value={order.Modelo}
               onChange={handleChange}
               className={cls}
-              placeholder="Modelo *"
+              placeholder={`${labels.modelLabel} *`}
               required
             />
 
@@ -404,6 +774,55 @@ export default function RegisterWorkOrder() {
             Trabajo y costes
           </h3>
 
+          <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 lg:grid-cols-[1fr_1fr_auto]">
+            <div className="relative">
+              <Wrench
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  appendServiceToTrabajo(e.target.value);
+                  e.target.value = "";
+                }}
+                className={`${cls} pl-9`}
+                aria-label="Agregar servicio frecuente"
+              >
+                <option value="" disabled>
+                  Agregar servicio frecuente
+                </option>
+                {frequentServices.map((service) => (
+                  <option key={service} value={service}>
+                    {service}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <input
+              className={cls}
+              placeholder="Nuevo servicio frecuente"
+              value={newServiceName}
+              onChange={(e) => setNewServiceName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  createFrequentService();
+                }
+              }}
+            />
+
+            <button
+              type="button"
+              onClick={createFrequentService}
+              disabled={savingService || !newServiceName.trim()}
+              className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {savingService ? "Guardando..." : "Guardar servicio"}
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <textarea
               name="Trabajo"
@@ -422,7 +841,7 @@ export default function RegisterWorkOrder() {
               value={order.Repuestos}
               onChange={handleChange}
               className={cls}
-              placeholder="Repuestos €"
+              placeholder={labels.partsPlaceholder}
             />
 
             <input
@@ -474,6 +893,9 @@ export default function RegisterWorkOrder() {
             onClick={() => {
               setOrder(EMPTY_ORDER);
               setEditingId(null);
+              setCustomerSearch("");
+              setCustomerMatches([]);
+              setShowNewCustomer(false);
             }}
             className="inline-flex items-center rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
           >
@@ -482,10 +904,28 @@ export default function RegisterWorkOrder() {
         </div>
       </form>
 
-      <section
-        id="ordenes-recientes"
-        className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6"
-      >
+      <div className="mt-8 flex justify-center">
+        <button
+          type="button"
+          onClick={() => {
+            const next = !showOrders;
+            setShowOrders(next);
+            if (next) {
+              setOrderPage(1);
+              setTimeout(() => loadOrders(1), 0);
+            }
+          }}
+          className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
+        >
+          {showOrders ? "Ocultar ordenes" : "Ver ordenes"}
+        </button>
+      </div>
+
+      {showOrders && (
+        <section
+          id="ordenes-recientes"
+          className="mt-4 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6"
+        >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-slate-800">
@@ -501,7 +941,7 @@ export default function RegisterWorkOrder() {
             type="text"
             value={plateSearch}
             onChange={(e) => setPlateSearch(e.target.value)}
-            placeholder="Buscar matrícula..."
+            placeholder={labels.referenceSearchPlaceholder}
             className="w-full md:w-80 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
           <input
@@ -524,6 +964,7 @@ export default function RegisterWorkOrder() {
                 setPlateSearch("");
                 setDateFrom("");
                 setDateTo("");
+                setOrderPage(1);
               }}
               className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
             >
@@ -533,6 +974,12 @@ export default function RegisterWorkOrder() {
         </div>
 
         <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
+          {loadingOrders && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
+              Cargando ordenes...
+            </div>
+          )}
+
           {filteredOrders.map((o) => (
             <article
               key={o.Id}
@@ -637,13 +1084,15 @@ export default function RegisterWorkOrder() {
                     Imprimir
                   </a>
 
-                  <button
-                    type="button"
-                    onClick={() => startEdit(o)}
-                    className="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
-                  >
-                    Editar
-                  </button>
+                  {!isOrderEditLocked(o.Estado) && (
+                    <button
+                      type="button"
+                      onClick={() => startEdit(o)}
+                      className="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+                    >
+                      Editar
+                    </button>
+                  )}
 
                   {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
                     <Link
@@ -674,7 +1123,7 @@ export default function RegisterWorkOrder() {
             </article>
           ))}
 
-          {filteredOrders.length === 0 && (
+          {!loadingOrders && filteredOrders.length === 0 && (
             <div className="lg:col-span-2 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 text-2xl">
                 🚗
@@ -694,7 +1143,30 @@ export default function RegisterWorkOrder() {
             </div>
           )}
         </div>
-      </section>
+
+        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+          <button
+            type="button"
+            disabled={orderPage <= 1 || loadingOrders}
+            onClick={() => loadOrders(orderPage - 1)}
+            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-slate-600">
+            Pagina {orderPage} de {orderTotalPages} · {orderTotal} ordenes
+          </span>
+          <button
+            type="button"
+            disabled={orderPage >= orderTotalPages || loadingOrders}
+            onClick={() => loadOrders(orderPage + 1)}
+            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Siguiente
+          </button>
+        </div>
+        </section>
+      )}
     </>
   );
 }

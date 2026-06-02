@@ -1,26 +1,41 @@
+import { useEffect, useState } from "react";
+import api from "../Components/api";
+import { useAuth } from "../Components/AuthContext";
+
+const DEFAULT_TEXT =
+  "Tratamos datos necesarios para la gestion del taller: usuarios, clientes, vehiculos, matriculas, telefonos, presupuestos, ordenes de trabajo, facturas, ingresos y gastos. Estos datos se usan para prestar el servicio, mantener la seguridad de la cuenta, generar documentos operativos y conservar la informacion fiscal que corresponda.";
+
 export default function Privacy() {
+  const { isAuthed } = useAuth();
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    if (!isAuthed) return;
+    api.get("/WorkshopSettings").then((res) => setSettings(res.data)).catch(() => {});
+  }, [isAuthed]);
+
+  const workshopName = settings?.nombre ?? settings?.Nombre ?? "App Multitaller";
+  const text = settings?.privacyPolicyText ?? settings?.PrivacyPolicyText ?? DEFAULT_TEXT;
+  const email = settings?.email ?? settings?.Email ?? "soporte@tallercrowned.store";
+
   return (
     <div className="max-w-3xl mx-auto py-10 px-4 text-slate-700 space-y-4">
-      <h1 className="text-3xl font-bold text-slate-900 mb-4">Política de Privacidad</h1>
+      <h1 className="text-3xl font-bold text-slate-900 mb-4">Politica de privacidad</h1>
 
       <p>
-        En <strong>FamilyApp</strong> valoramos tu privacidad. Los datos que registras en la aplicación
-        (como ingresos, gastos o correo electrónico) se almacenan de forma segura y nunca se comparten con terceros.
+        En <strong>{workshopName}</strong>:
       </p>
 
-      <p>
-        Usamos tu correo únicamente para funciones dentro de la app, como recuperación de contraseña o avisos importantes.
-        No enviamos publicidad ni cedemos información a otras empresas.
-      </p>
+      <p className="whitespace-pre-line">{text}</p>
 
       <p>
-        Puedes solicitar la eliminación de tu cuenta y tus datos escribiendo a{" "}
-        <a href="mailto:soporte@familyapp.store" className="text-sky-600 hover:underline">
-          soporte@familyapp.store
+        Puedes solicitar informacion, rectificacion o eliminacion cuando proceda escribiendo a{" "}
+        <a href={`mailto:${email}`} className="text-sky-600 hover:underline">
+          {email}
         </a>.
       </p>
 
-      <p>Última actualización: {new Date().toLocaleDateString("es-ES")}</p>
+      <p>Ultima actualizacion: {new Date().toLocaleDateString("es-ES")}</p>
     </div>
   );
 }

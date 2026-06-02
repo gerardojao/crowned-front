@@ -9,11 +9,15 @@ import {
   BarChart3,
   ArrowRight,
   FileText,
+  LogIn,
+  Sparkles,
 } from "lucide-react";
 import { currency } from "../utils/currency";
 import { loadStatementSummary } from "../utils/statementStore";
 import api from "../Components/api";
 import KPIs from "../Components/Kpi";
+import { useAuth } from "../Components/AuthContext";
+import { useBusinessTerminology } from "../utils/businessTerminology";
 
 function soloFecha(value) {
   if (!value) return "";
@@ -57,6 +61,8 @@ const getEstadoBadge = (estado) => {
 };
 
 export default function Home() {
+  const { isAuthed } = useAuth();
+  const labels = useBusinessTerminology();
   const [ordenes, setOrdenes] = useState([]);
   const [lastStatement, setLastStatement] = useState(null);
 
@@ -71,6 +77,12 @@ export default function Home() {
   );
 
   useEffect(() => {
+    if (!isAuthed) {
+      setOrdenes([]);
+      setLastStatement(null);
+      return;
+    }
+
     (async () => {
       try {
         const [movRes] = await Promise.all([
@@ -86,7 +98,37 @@ export default function Home() {
         setLastStatement(loadStatementSummary());
       }
     })();
-  }, []);
+  }, [isAuthed]);
+
+  if (!isAuthed) {
+    return (
+      <div className="flex min-h-[calc(100dvh-24rem)] items-center justify-center py-3 md:min-h-[calc(100dvh-25rem)]">
+      <section className="mx-auto w-full max-w-3xl rounded-3xl bg-white/90 p-6 text-center shadow-sm ring-1 ring-cyan-100 md:p-10">
+
+
+        <p className="mt-5 text-lg font-semibold uppercase tracking-[0.18em] text-orange-700">
+          PLATAFORMA CENTRALIZADA
+        </p>
+        <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
+          Una plataforma lista para impulsar tu negocio
+        </h2>
+        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+          Gestiona clientes, documentos, facturación y operaciones desde un solo lugar. Una solución diseñada para el éxito de tu negocio.
+        </p>
+
+        <div className="mt-7 flex justify-center">
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white hover:bg-orange-700"
+          >
+            <LogIn size={18} />
+            Iniciar sesion
+          </Link>
+        </div>
+      </section>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -97,10 +139,10 @@ export default function Home() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-5">
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
-                Gestión del taller
+                {labels.managementTitle}
               </h2>
               <p className="text-sm text-slate-500 mt-1">
-                Accede rápido a las operaciones principales del día.
+                {labels.managementSubtitle}
               </p>
             </div>
 
@@ -126,7 +168,7 @@ export default function Home() {
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
                     Crea órdenes, registra trabajos y controla el estado del
-                    vehículo.
+                    {labels.assetSingular}.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -139,13 +181,9 @@ export default function Home() {
                     >
                       Ver órdenes <ArrowRight size={15} />
                     </Link>
-                    <Link
-                      to="/presupuestos"
-                      className={actionLink}
-                    >
+                    <Link to="/presupuestos" className={actionLink}>
                       Presupuestos <ArrowRight size={15} />
                     </Link>
-    
                   </div>
                 </div>
               </div>
@@ -163,7 +201,7 @@ export default function Home() {
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
                     Registra clientes con matrícula, modelo y datos del
-                    vehículo.
+                    {labels.assetSingular}.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -189,8 +227,7 @@ export default function Home() {
                     Proveedores
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Administra proveedores de repuestos, pintura, neumáticos y
-                    servicios.
+                    Administra proveedores de materiales, servicios y suministros.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -201,7 +238,7 @@ export default function Home() {
                       Ver proveedores <ArrowRight size={15} />
                     </Link>
                     <Link to="/stock-parts" className={actionLink}>
-                      Stock de repuestos <ArrowRight size={15} />
+                      {labels.stockTitle} <ArrowRight size={15} />
                     </Link>
                   </div>
                 </div>
@@ -219,7 +256,7 @@ export default function Home() {
                     Finanzas
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Controla ingresos, gastos y balance general del taller.
+                    Controla ingresos, gastos y balance general de la {labels.businessSingular}.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -331,7 +368,7 @@ export default function Home() {
                   </th>
                   <th className="py-2.5 px-3 text-center font-bold">Cliente</th>
                   <th className="py-2.5 px-3 font-bold w-[140px] text-center">
-                    Matrícula
+                    {labels.referenceLabel}
                   </th>
                   <th className="py-2.5 px-3 font-semibold text-center w-[140px]"></th>
                 </tr>

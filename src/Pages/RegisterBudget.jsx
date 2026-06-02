@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Search, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
+import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const EMPTY_BUDGET = {
   NumeroPresupuesto: "",
@@ -21,7 +22,25 @@ const EMPTY_BUDGET = {
 
 const states = ["Pendiente", "Aprobado", "Rechazado", "Convertido"];
 
+const DEFAULT_FREQUENT_SERVICES = [
+  "Servicio cambio de aceite y filtro",
+  "Cambio de pastillas de frenos",
+  "Cambio de rodamientos delanteros",
+  "Cambio de amortiguadores",
+  "Mano de obra",
+  "Repuestos",
+];
+
+const ensureOk = (res) => {
+  const data = res?.data;
+  if (data?.ok === 0 || data?.Ok === 0) {
+    throw new Error(data?.message || data?.Message || "La operacion no se pudo completar.");
+  }
+  return data;
+};
+
 export default function RegisterBudget() {
+  const labels = useBusinessTerminology();
   const [budget, setBudget] = useState(EMPTY_BUDGET);
   const [budgets, setBudgets] = useState([]);
   const [editingId, setEditingId] = useState(null);
@@ -31,6 +50,17 @@ export default function RegisterBudget() {
   const [submitting, setSubmitting] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [customerMatches, setCustomerMatches] = useState([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [budgetPage, setBudgetPage] = useState(1);
+  const [budgetTotal, setBudgetTotal] = useState(0);
+  const [frequentServices, setFrequentServices] = useState([]);
+  const [newServiceName, setNewServiceName] = useState("");
+  const [savingService, setSavingService] = useState(false);
+  const budgetPageSize = 10;
 
   const total = Number(budget.Repuestos || 0) + Number(budget.ManoObra || 0);
 
@@ -43,6 +73,56 @@ export default function RegisterBudget() {
 
   const handleChange = (e) => {
     setField(e.target.name, e.target.value);
+  };
+
+  const loadFrequentServices = async () => {
+    try {
+      const res = await api.get("/ServicioFrecuente");
+      const list = res?.data?.data?.[0] || [];
+      const names = list
+        .map((x) => x.nombre ?? x.Nombre)
+        .filter(Boolean);
+      setFrequentServices(names.length ? names : DEFAULT_FREQUENT_SERVICES);
+    } catch (err) {
+      console.error(err);
+      setFrequentServices(DEFAULT_FREQUENT_SERVICES);
+    }
+  };
+
+  const appendServiceToTrabajo = (service) => {
+    const value = service?.trim();
+    if (!value) return;
+    setBudget((prev) => ({
+      ...prev,
+      Trabajo: prev.Trabajo?.trim()
+        ? `${prev.Trabajo.trim()}\n${value}`
+        : value,
+    }));
+  };
+
+  const createFrequentService = async () => {
+    const nombre = newServiceName.trim();
+    if (!nombre) return;
+
+    try {
+      setSavingService(true);
+      setError("");
+      const res = await api.post("/ServicioFrecuente", { nombre });
+      ensureOk(res);
+      await loadFrequentServices();
+      appendServiceToTrabajo(nombre);
+      setNewServiceName("");
+      setNotice("Servicio frecuente agregado.");
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo registrar el servicio.",
+      );
+    } finally {
+      setSavingService(false);
+    }
   };
 
   const normalizeBudget = (x) => ({
@@ -64,25 +144,156 @@ export default function RegisterBudget() {
     IdOrdenTrabajo: x.idOrdenTrabajo ?? x.IdOrdenTrabajo ?? null,
   });
 
-  const loadBudgets = async () => {
+  const normalizeCustomer = (c) => ({
+    Id: c.id ?? c.Id,
+    Nombre: c.nombre ?? c.Nombre ?? "",
+    Telefono: c.telefono ?? c.Telefono ?? "",
+    Matricula: c.matricula ?? c.Matricula ?? "",
+    Marca: c.marca ?? c.Marca ?? "",
+    Modelo: c.modelo ?? c.Modelo ?? "",
+    Kilometraje: c.kilometraje ?? c.Kilometraje ?? "",
+    Email: c.email ?? c.Email ?? "",
+    Direccion: c.direccion ?? c.Direccion ?? "",
+    Observaciones: c.observaciones ?? c.Observaciones ?? "",
+  });
+
+  const fillBudgetFromCustomer = (customer) => {
+    setBudget((prev) => ({
+      ...prev,
+      Cliente: customer.Nombre || prev.Cliente,
+      Telefono: customer.Telefono || prev.Telefono,
+      Matricula: customer.Matricula || prev.Matricula,
+      Marca: customer.Marca || prev.Marca,
+      Modelo: customer.Modelo || prev.Modelo,
+      Kilometraje: customer.Kilometraje ? String(customer.Kilometraje) : prev.Kilometraje,
+    }));
+    setCustomerSearch("");
+    setCustomerMatches([]);
+    setShowNewCustomer(false);
+  };
+
+  const loadCustomers = async (searchText) => {
+    const search = searchText.trim();
+    if (search.length < 2) {
+      setCustomerMatches([]);
+      return;
+    }
+
+    try {
+      setLoadingCustomers(true);
+      const res = await api.get("/Cliente", {
+        params: {
+          search,
+          page: 1,
+          pageSize: 6,
+        },
+      });
+      const pack = res?.data?.data?.[0];
+      const items = Array.isArray(pack?.items) ? pack.items : [];
+      setCustomerMatches(items.map(normalizeCustomer));
+    } catch (err) {
+      console.error(err);
+      setCustomerMatches([]);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  const findExistingCustomerByPlate = async (plate) => {
+    const matricula = plate?.trim();
+    if (!matricula) return null;
+
+    const res = await api.get("/Cliente", {
+      params: {
+        matricula,
+        page: 1,
+        pageSize: 5,
+      },
+    });
+    const pack = res?.data?.data?.[0];
+    const items = Array.isArray(pack?.items) ? pack.items.map(normalizeCustomer) : [];
+    return items.find(
+      (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
+    ) || null;
+  };
+
+  const createCustomerFromBudget = async () => {
+    if (savingCustomer) return;
+
+    const payload = {
+      nombre: budget.Cliente,
+      telefono: budget.Telefono,
+      email: null,
+      direccion: null,
+      matricula: budget.Matricula,
+      marca: budget.Marca || null,
+      modelo: budget.Modelo,
+      kilometraje: budget.Kilometraje ? Number(budget.Kilometraje) : null,
+      observaciones: budget.Observaciones || null,
+    };
+
+    if (!payload.nombre?.trim()) {
+      setError("Indica el nombre del cliente para registrarlo.");
+      return;
+    }
+    if (!payload.telefono?.trim()) {
+      setError("Indica el telefono del cliente para registrarlo.");
+      return;
+    }
+    if (!payload.matricula?.trim()) {
+      setError(labels.referenceRequiredMessage);
+      return;
+    }
+    if (!payload.modelo?.trim()) {
+      setError(labels.modelRequiredMessage);
+      return;
+    }
+
+    try {
+      setSavingCustomer(true);
+      setError("");
+      const existing = await findExistingCustomerByPlate(payload.matricula);
+      if (existing) {
+        fillBudgetFromCustomer(existing);
+        setNotice("Cliente ya registrado; se cargaron sus datos en el presupuesto.");
+        return;
+      }
+
+      ensureOk(await api.post("/Cliente", payload));
+      setNotice("Cliente registrado y cargado en el presupuesto.");
+      setShowNewCustomer(false);
+      setCustomerSearch("");
+      setCustomerMatches([]);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo registrar el cliente.",
+      );
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
+  const loadBudgets = async (page = budgetPage) => {
     try {
       setError("");
 
-      const hasFilters = dateFrom || dateTo;
+      const res = await api.get("/Presupuesto", {
+        params: {
+          fechaDesde: dateFrom || null,
+          fechaHasta: dateTo || null,
+          page,
+          pageSize: budgetPageSize,
+        },
+      });
 
-      const res = hasFilters
-        ? await api.get("/Presupuesto", {
-            params: {
-              fechaDesde: dateFrom || null,
-              fechaHasta: dateTo || null,
-            },
-          })
-        : await api.get("/Presupuesto/ultimos", {
-            params: { take: 20 },
-          });
-
-      const data = res?.data?.data?.[0] || [];
-      setBudgets(data.map(normalizeBudget));
+      const pack = res?.data?.data?.[0] || {};
+      const items = Array.isArray(pack) ? pack : pack.items || [];
+      setBudgets(items.map(normalizeBudget));
+      setBudgetTotal(Number(pack.total ?? items.length));
+      setBudgetPage(Number(pack.page ?? page));
     } catch (err) {
       console.error(err);
       setError("No se pudieron cargar los presupuestos.");
@@ -90,12 +301,26 @@ export default function RegisterBudget() {
   };
 
   useEffect(() => {
+    loadFrequentServices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
-      loadBudgets();
+      loadBudgets(1);
     }, 400);
 
     return () => clearTimeout(timer);
   }, [dateFrom, dateTo]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      loadCustomers(customerSearch);
+    }, 300);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customerSearch]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -124,16 +349,19 @@ export default function RegisterBudget() {
       };
 
       if (editingId) {
-        await api.put(`/Presupuesto/${editingId}`, payload);
+        ensureOk(await api.put(`/Presupuesto/${editingId}`, payload));
         setNotice("Presupuesto actualizado correctamente.");
       } else {
-        await api.post("/Presupuesto", payload);
+        ensureOk(await api.post("/Presupuesto", payload));
         setNotice("Presupuesto registrado correctamente.");
       }
 
       setBudget(EMPTY_BUDGET);
       setEditingId(null);
-      await loadBudgets();
+      setCustomerSearch("");
+      setCustomerMatches([]);
+      setShowNewCustomer(false);
+      await loadBudgets(1);
     } catch (err) {
       console.error(err);
       setError(
@@ -214,6 +442,8 @@ export default function RegisterBudget() {
   const cls =
     "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
 
+  const budgetTotalPages = Math.max(1, Math.ceil(budgetTotal / budgetPageSize));
+
   return (
     <>
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
@@ -256,6 +486,102 @@ export default function RegisterBudget() {
           {editingId ? "Actualizar presupuesto" : "Nuevo presupuesto"}
         </h3>
 
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Buscar cliente registrado
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                  className={`${cls} pl-10`}
+                  placeholder="Nombre, telefono, matricula, modelo o email"
+                />
+                <Search
+                  size={16}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                {customerSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerSearch("");
+                      setCustomerMatches([]);
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    aria-label="Limpiar busqueda"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowNewCustomer((v) => !v)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              <UserPlus size={17} />
+              {showNewCustomer ? "Ocultar alta rapida" : "Registrar nuevo"}
+            </button>
+          </div>
+
+          {loadingCustomers && (
+            <p className="mt-3 text-sm text-slate-500">Buscando clientes...</p>
+          )}
+
+          {!loadingCustomers && customerSearch.trim().length >= 2 && customerMatches.length === 0 && (
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+              No encontramos ese cliente. Puedes completar los campos y usar "Registrar nuevo".
+            </div>
+          )}
+
+          {customerMatches.length > 0 && (
+            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+              {customerMatches.map((customer) => (
+                <button
+                  key={customer.Id}
+                  type="button"
+                  onClick={() => fillBudgetFromCustomer(customer)}
+                  className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-violet-300 hover:bg-violet-50"
+                >
+                  <span className="block font-semibold text-slate-900">
+                    {customer.Nombre}
+                  </span>
+                  <span className="mt-1 block text-slate-600">
+                    {customer.Matricula || `Sin ${labels.referenceLabel.toLowerCase()}`} · {customer.Marca} {customer.Modelo}
+                  </span>
+                  <span className="mt-1 block text-xs text-slate-500">
+                    {customer.Telefono || "Sin telefono"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {showNewCustomer && (
+            <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600 ring-1 ring-slate-200">
+              <p>
+                Completa nombre, telefono, matricula y modelo en los campos del presupuesto.
+                Luego pulsa este boton para guardar el cliente en la base de datos.
+              </p>
+              <button
+                type="button"
+                onClick={createCustomerFromBudget}
+                disabled={savingCustomer}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                <UserPlus size={17} />
+                {savingCustomer ? "Guardando cliente..." : "Guardar cliente nuevo"}
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <input
             name="NumeroPresupuesto"
@@ -289,7 +615,7 @@ export default function RegisterBudget() {
               setField("Matricula", e.target.value.toUpperCase())
             }
             className={cls}
-            placeholder="Matrícula *"
+            placeholder={labels.referencePlaceholder}
             required
           />
 
@@ -298,7 +624,7 @@ export default function RegisterBudget() {
             value={budget.Marca}
             onChange={handleChange}
             className={cls}
-            placeholder="Marca"
+            placeholder={labels.makeLabel}
           />
 
           <input
@@ -306,7 +632,7 @@ export default function RegisterBudget() {
             value={budget.Modelo}
             onChange={handleChange}
             className={cls}
-            placeholder="Modelo *"
+            placeholder={`${labels.modelLabel} *`}
             required
           />
 
@@ -316,7 +642,7 @@ export default function RegisterBudget() {
             value={budget.Kilometraje}
             onChange={handleChange}
             className={cls}
-            placeholder="Kilometraje"
+            placeholder={labels.metricPlaceholder}
           />
 
           <input
@@ -342,6 +668,57 @@ export default function RegisterBudget() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-3">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
+              <div className="relative">
+                <Wrench
+                  size={16}
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                />
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    appendServiceToTrabajo(e.target.value);
+                    e.target.value = "";
+                  }}
+                  className={`${cls} pl-9`}
+                  aria-label="Agregar servicio frecuente"
+                >
+                  <option value="" disabled>
+                    Agregar servicio frecuente
+                  </option>
+                  {frequentServices.map((service) => (
+                    <option key={service} value={service}>
+                      {service}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <input
+                className={cls}
+                placeholder="Nuevo servicio frecuente"
+                value={newServiceName}
+                onChange={(e) => setNewServiceName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    createFrequentService();
+                  }
+                }}
+              />
+
+              <button
+                type="button"
+                onClick={createFrequentService}
+                disabled={savingService || !newServiceName.trim()}
+                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {savingService ? "Guardando..." : "Guardar servicio"}
+              </button>
+            </div>
+          </div>
+
           <textarea
             name="Trabajo"
             value={budget.Trabajo}
@@ -359,7 +736,7 @@ export default function RegisterBudget() {
             value={budget.Repuestos}
             onChange={handleChange}
             className={cls}
-            placeholder="Repuestos €"
+            placeholder={labels.partsPlaceholder}
           />
 
           <input
@@ -410,6 +787,9 @@ export default function RegisterBudget() {
             onClick={() => {
               setBudget(EMPTY_BUDGET);
               setEditingId(null);
+              setCustomerSearch("");
+              setCustomerMatches([]);
+              setShowNewCustomer(false);
             }}
             className="rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
           >
@@ -428,14 +808,20 @@ export default function RegisterBudget() {
       <input
         type="date"
         value={dateFrom}
-        onChange={(e) => setDateFrom(e.target.value)}
+        onChange={(e) => {
+          setDateFrom(e.target.value);
+          setBudgetPage(1);
+        }}
         className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
       />
 
       <input
         type="date"
         value={dateTo}
-        onChange={(e) => setDateTo(e.target.value)}
+        onChange={(e) => {
+          setDateTo(e.target.value);
+          setBudgetPage(1);
+        }}
         className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
       />
 
@@ -445,6 +831,7 @@ export default function RegisterBudget() {
           onClick={() => {
             setDateFrom("");
             setDateTo("");
+            setBudgetPage(1);
           }}
           className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
         >
@@ -564,6 +951,28 @@ export default function RegisterBudget() {
         </h4>
       </div>
     )}
+  </div>
+
+  <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+    <button
+      type="button"
+      disabled={budgetPage <= 1}
+      onClick={() => loadBudgets(budgetPage - 1)}
+      className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+    >
+      Anterior
+    </button>
+    <span className="text-slate-600">
+      Pagina {budgetPage} de {budgetTotalPages} · {budgetTotal} presupuestos
+    </span>
+    <button
+      type="button"
+      disabled={budgetPage >= budgetTotalPages}
+      onClick={() => loadBudgets(budgetPage + 1)}
+      className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+    >
+      Siguiente
+    </button>
   </div>
 </section>
     </>

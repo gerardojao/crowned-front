@@ -1,16 +1,17 @@
-import { defineConfig } from 'vite'
+﻿import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa';
 import mkcert from 'vite-plugin-mkcert'
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  plugins: [react(), 
+export default defineConfig(({ command }) => {
+  const mkcertFactory = typeof mkcert === 'function' ? mkcert : mkcert?.default;
+  const plugins = [react(),
     VitePWA({
     manifest: {
-      name: 'Family App',
-      short_name: 'FamilyApp',
-      description: 'A PWA for family management',
+      name: 'TallerCrowned',
+      short_name: 'TallerCrowned',
+      description: 'Gestion de taller, ordenes, presupuestos y facturas',
       theme_color: '#ffffff',
       icons: [
         {
@@ -25,5 +26,14 @@ export default defineConfig({
         },
       ],
     },
-  }), mkcert()],
+  })];
+
+  if (command === 'serve' && typeof mkcertFactory === 'function') {
+    plugins.push(mkcertFactory());
+  }
+
+  return {
+    plugins,
+  };
 })
+

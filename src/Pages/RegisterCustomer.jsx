@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import api from "../Components/api";
-import { soloFecha } from "../utils/date";
+import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const EMPTY_CUSTOMER = {
   Id: "",
@@ -64,6 +64,7 @@ const workOrderBtn =
   "inline-flex items-center rounded-xl px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-700 transition shadow-md font-semibold";
 
 export default function RegisterCustomer() {
+  const labels = useBusinessTerminology();
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [customers, setCustomers] = useState([]);
 
@@ -258,7 +259,7 @@ export default function RegisterCustomer() {
             Registro de cliente
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Gestiona clientes y vehículos del taller.
+            {labels.customerPageSubtitle}
           </p>
         </div>
 
@@ -340,13 +341,13 @@ export default function RegisterCustomer() {
         {/* VEHÍCULO */}
         <div>
           <h3 className="text-lg font-semibold text-slate-800 mb-4">
-            Vehículo
+            {labels.assetHeader}
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Matrícula *
+                {labels.referenceLabel} *
               </label>
 
               <input
@@ -355,13 +356,13 @@ export default function RegisterCustomer() {
                 value={customer.Matricula}
                 onChange={handleChange}
                 className={cls("Matricula")}
-                placeholder="1234ABC"
+                placeholder={labels.kind === "service" ? "CH-AC-001" : "1234ABC"}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Marca
+                {labels.makeLabel}
               </label>
 
               <input
@@ -376,7 +377,7 @@ export default function RegisterCustomer() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Modelo *
+                {labels.modelLabel} *
               </label>
 
               <input
@@ -385,13 +386,13 @@ export default function RegisterCustomer() {
                 value={customer.Modelo}
                 onChange={handleChange}
                 className={cls("Modelo")}
-                placeholder="Corolla"
+                placeholder={labels.kind === "service" ? "Split, termo, caldera..." : "Corolla"}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Kilometraje
+                {labels.metricLabel}
               </label>
 
               <input
@@ -400,7 +401,7 @@ export default function RegisterCustomer() {
                 value={customer.Kilometraje}
                 onChange={handleChange}
                 className={cls("Kilometraje")}
-                placeholder="120000"
+                placeholder={labels.kind === "service" ? "4" : "120000"}
               />
             </div>
           </div>
@@ -451,9 +452,9 @@ export default function RegisterCustomer() {
               <tr className="border-b border-slate-200 text-slate-600">
                 <th className="text-left py-3">Cliente</th>
                 <th className="text-left py-3">Teléfono</th>
-                <th className="text-left py-3">Matrícula</th>
-                <th className="text-left py-3">Modelo</th>
-                <th className="text-left py-3">Kilometraje</th>
+                <th className="text-left py-3">{labels.referenceLabel}</th>
+                <th className="text-left py-3">{labels.modelLabel}</th>
+                <th className="text-left py-3">{labels.metricLabel}</th>
                 <th className="text-left py-3"></th>
               </tr>
             </thead>

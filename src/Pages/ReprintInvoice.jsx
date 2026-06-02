@@ -1,17 +1,18 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
-import api from "../Components/api";
+import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
-  razonSocial: "JUAN CARLOS FERNÁNDEZ SILVA",
+  razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: "61407055E",
-  direccion: "CALLE ALCÁCER 63 D, Albal, 46470",
+  direccion: "CALLE ALCACER 63 D, Albal, 46470",
   telefono: "960057935/655042253",
   email: "multiservicioscrower@gmail.com",
   iban: "ES69 2100 4014 9122 0012 3843",
+  logoUrl: "",
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -25,7 +26,7 @@ export default function ReprintInvoice() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [taller] = useState(DEFAULT_TALLER);
+  const [taller, setTaller] = useState(DEFAULT_TALLER);
 
   const [invoice, setInvoice] = useState({
     numero: "",
@@ -50,8 +51,29 @@ export default function ReprintInvoice() {
   });
 
   useEffect(() => {
+    loadWorkshopSettings();
     loadInvoice();
   }, [idOrden, numeroFactura]);
+
+  const loadWorkshopSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      const data = res?.data || {};
+
+      setTaller({
+        nombre: data.nombre ?? data.Nombre ?? DEFAULT_TALLER.nombre,
+        razonSocial: data.razonSocial ?? data.RazonSocial ?? DEFAULT_TALLER.razonSocial,
+        nif: data.nif ?? data.Nif ?? DEFAULT_TALLER.nif,
+        direccion: data.direccion ?? data.Direccion ?? DEFAULT_TALLER.direccion,
+        telefono: data.telefono ?? data.Telefono ?? DEFAULT_TALLER.telefono,
+        email: data.email ?? data.Email ?? DEFAULT_TALLER.email,
+        iban: data.iban ?? data.Iban ?? DEFAULT_TALLER.iban,
+        logoUrl: data.logoUrl ?? data.LogoUrl ?? DEFAULT_TALLER.logoUrl,
+      });
+    } catch {
+      setTaller(DEFAULT_TALLER);
+    }
+  };
 
   const loadInvoice = async () => {
     try {
@@ -65,7 +87,7 @@ export default function ReprintInvoice() {
       const f = res?.data?.data?.[0];
 
       if (!f) {
-        setError("No se encontró la factura.");
+        setError("No se encontro la factura.");
         return;
       }
 
@@ -168,35 +190,35 @@ export default function ReprintInvoice() {
       {!error && (
         <section className="invoice-print bg-white text-black">
           <div className="invoice-sheet mx-auto max-w-5xl">
-            <div className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
-              <div className="flex items-start gap-5">
+            <div className="grid grid-cols-[150px_1fr_310px] items-start gap-6 border-b-2 border-black pb-4">
+              <div className="flex h-32 items-center justify-center">
                 <img
-                  src={logoTaller}
+                  src={resolveApiAssetUrl(taller.logoUrl) || logoTaller}
                   alt="Logo taller"
-                  className="h-50 w-50 object-contain"
+                  className="max-h-28 max-w-36 object-contain"
                 />
+              </div>
 
-                <div className="text-center min-w-[280px]">
-                  <h1 className="text-3xl font-extrabold tracking-wide uppercase mt-8">
-                    {taller.nombre}
-                  </h1>
+              <div className="min-w-0 text-center">
+                <h1 className="mt-3 text-3xl font-extrabold tracking-wide uppercase leading-tight">
+                  {taller.nombre}
+                </h1>
 
-                  <div className="mt-4 text-sm leading-5">
-                    <p>{taller.razonSocial}</p>
-                    <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
-                    <p>{taller.direccion}</p>
-                    <p>{taller.telefono}</p>
-                    <p>{taller.email}</p>
-                  </div>
+                <div className="mt-3 text-sm leading-5">
+                  <p className="font-semibold">{taller.razonSocial}</p>
+                  <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
+                  <p>{taller.direccion}</p>
+                  <p>{taller.telefono}</p>
+                  <p>{taller.email}</p>
                 </div>
               </div>
 
-              <div className="text-sm mt-8 min-w-[320px]">
-                <div className="grid grid-cols-[120px_1fr] gap-y-1">
+              <div className="text-sm">
+                <div className="grid grid-cols-[112px_1fr] gap-x-2 gap-y-1">
                   <p className="font-bold">FECHA:</p>
                   <p>{formatDate(invoice.fecha)}</p>
 
-                  <p className="font-bold">N.º FACTURA:</p>
+                  <p className="font-bold">N. FACTURA:</p>
                   <p className="text-xl font-extrabold">{invoice.numero}</p>
 
                   <p className="font-bold">FACTURAR A:</p>
@@ -205,13 +227,13 @@ export default function ReprintInvoice() {
                   <p className="font-bold">DNI/NIE/NIF:</p>
                   <p>{invoice.dni}</p>
 
-                  <p className="font-bold">DIRECCIÓN:</p>
+                  <p className="font-bold">DIRECCION:</p>
                   <p>{invoice.direccionCliente}</p>
 
-                  <p className="font-bold">TELÉFONO:</p>
+                  <p className="font-bold">TELEFONO:</p>
                   <p>{invoice.telefonoCliente}</p>
 
-                  <p className="font-bold">MATRÍCULA:</p>
+                  <p className="font-bold">MATRICULA:</p>
                   <p className="font-bold">{invoice.matricula}</p>
 
                   <p className="font-bold">KM.:</p>
@@ -231,7 +253,7 @@ export default function ReprintInvoice() {
               <thead>
                 <tr style={{ backgroundColor: "#e2e8f0" }}>
                   <th className="border border-black px-2 py-2 text-center">
-                    DESCRIPCIÓN
+                    DESCRIPCION
                   </th>
                   <th className="border border-black px-2 py-2 w-28 text-center">
                     CANTIDAD
@@ -261,18 +283,18 @@ export default function ReprintInvoice() {
 
             <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
               <div className="text-sm">
-                <p className="font-extrabold">GARANTÍA DE 90 DÍAS O 2000KM</p>
+                <p className="font-extrabold">GARANTIA DE 90 DIAS O 2000KM</p>
 
                 <p className="mt-2 italic font-semibold leading-5">
                   Todo repuesto usado o nuevo suministrado e instalado a
-                  solicitud del cliente, NO SE LE BRINDARÁ GARANTÍA. Las
-                  reparaciones tienen garantía cuando sean repuestos nuevos
+                  solicitud del cliente, NO SE LE BRINDARA GARANTIA. Las
+                  reparaciones tienen garantia cuando sean repuestos nuevos
                   suministrados por el taller.
                 </p>
 
                 <p className="mt-4">
                   Si tiene cualquier tipo de pregunta sobre esta factura,
-                  póngase en contacto con nosotros.
+                  pongase en contacto con nosotros.
                 </p>
 
                 <p className="mt-4 text-center font-extrabold italic">
@@ -299,7 +321,7 @@ export default function ReprintInvoice() {
 
             <div className="mt-8 border-t border-black pt-2 text-xs">
               <p>
-                RAZÓN SOCIAL: {taller.razonSocial}
+                RAZON SOCIAL: {taller.razonSocial}
                 {taller.nif ? ` / NIF: ${taller.nif}` : ""}
                 {taller.direccion
                   ? ` / DOMICILIO FISCAL: ${taller.direccion}`

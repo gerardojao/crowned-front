@@ -1,22 +1,28 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   Menu,
   X,
   LogOut,
   LogIn,
-  UserPlus,
   ClipboardList,
   Users,
   FileText,
   BarChart3,
   Truck,
   ArrowRight,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
+import api, {
+  getCurrentWorkshopId,
+  resolveApiAssetUrl,
+  setCurrentWorkshopId,
+} from "./api";
 import TrialBanner from "./TrialBanner";
-import logo from "../assets/LogoTallerCrowned.png";
+import zagaProLogo from "../assets/logozagapro.png";
 import ClientAlertModal from "./ClienteAlertModal";
+import { getBusinessTerminology } from "../utils/businessTerminology";
 
 const heroBtnBase =
   "group flex min-w-[240px] items-center justify-between gap-4 rounded-2xl px-5 py-5 text-white shadow-md transition hover:scale-[1.01]";
@@ -31,18 +37,85 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthed, user, logout } = useAuth();
+  const [workshops, setWorkshops] = useState([]);
+  const [activeWorkshopId, setActiveWorkshopId] = useState(getCurrentWorkshopId());
+  const [alertCount, setAlertCount] = useState(0);
 
   const isAuthRoute = /^\/(login|register)(\/|$)?/.test(location.pathname);
   const isPrintRoute = /^\/print-order\/.+/.test(location.pathname);
 
   const onLogout = () => {
     logout();
+    setCurrentWorkshopId("");
     setOpen(false);
     navigate("/login");
   };
 
+  useEffect(() => {
+    if (!isAuthed) {
+      setWorkshops([]);
+      setActiveWorkshopId("");
+      return;
+    }
+
+    let alive = true;
+    api
+      .get("/WorkshopSettings/mine")
+      .then((res) => {
+        if (!alive) return;
+        const list = Array.isArray(res?.data) ? res.data : [];
+        setWorkshops(list);
+
+        const stored = getCurrentWorkshopId();
+        const exists = list.some((x) => String(x.id ?? x.Id) === String(stored));
+        const nextId = exists ? stored : String(list[0]?.id ?? list[0]?.Id ?? "");
+
+        if (nextId && nextId !== stored) {
+          setCurrentWorkshopId(nextId);
+        }
+        setActiveWorkshopId(nextId);
+      })
+      .catch(() => {
+        if (alive) setWorkshops([]);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [isAuthed]);
+
+  useEffect(() => {
+    const onWorkshopChanged = () => setActiveWorkshopId(getCurrentWorkshopId());
+    window.addEventListener("tc:workshop-changed", onWorkshopChanged);
+    return () => window.removeEventListener("tc:workshop-changed", onWorkshopChanged);
+  }, []);
+
+  useEffect(() => {
+    const onClientAlerts = (ev) => {
+      setAlertCount(Number(ev?.detail?.count || 0));
+    };
+    window.addEventListener("tc:client-alerts", onClientAlerts);
+    return () => window.removeEventListener("tc:client-alerts", onClientAlerts);
+  }, []);
+
+  const onWorkshopChange = (ev) => {
+    const nextId = ev.target.value;
+    setCurrentWorkshopId(nextId);
+    setActiveWorkshopId(nextId);
+    window.location.reload();
+  };
+
+  const activeWorkshop = workshops.find(
+    (x) => String(x.id ?? x.Id) === String(activeWorkshopId),
+  );
+  const labels = getBusinessTerminology(activeWorkshop);
+  const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
+  const openClientAlerts = () => {
+    window.dispatchEvent(new Event("tc:client-alerts:open"));
+  };
+
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-emerald-50 via-sky-50 to-white">
+    <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-cyan-50 via-white to-amber-50">
       {!isPrintRoute && (
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-3 flex items-center">
@@ -51,9 +124,9 @@ export default function Layout({ children }) {
               className="font-extrabold tracking-tight text-slate-900 text-lg sm:text-xl"
             >
               <img
-                src={logo}
-                alt="Multiservicios Crower"
-                className="h-20 w-auto object-contain"
+                src={zagaProLogo}
+                alt="ZagaPro - Gestion inteligente de negocios"
+                className="h-20 w-auto max-w-[220px] rounded-2xl bg-white object-contain p-2 shadow-sm ring-1 ring-slate-200 sm:h-24 sm:max-w-[280px]"
               />
             </Link>
 
@@ -66,30 +139,62 @@ export default function Layout({ children }) {
                         {user?.email}
                       </span>
                       <button
+                        type="button"
+                        onClick={openClientAlerts}
+                        className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        aria-label={`Alertas pendientes: ${alertCount}`}
+                        title={`Alertas pendientes: ${alertCount}`}
+                      >
+                        <Bell size={18} />
+                        {alertCount > 0 && (
+                          <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white ring-2 ring-white">
+                            {alertCount > 99 ? "99+" : alertCount}
+                          </span>
+                        )}
+                      </button>
+                      {workshops.length > 1 && (
+                        <select
+                          value={activeWorkshopId}
+                          onChange={onWorkshopChange}
+                          className="max-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                          aria-label="Taller activo"
+                        >
+                          {workshops.map((workshop) => (
+                            <option
+                              key={workshop.id ?? workshop.Id}
+                              value={workshop.id ?? workshop.Id}
+                            >
+                              {workshop.nombre ?? workshop.Nombre}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      <button
                         onClick={onLogout}
                         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
                       >
                         <LogOut size={16} />
                         Salir
                       </button>
+                      {isSuperAdmin && (
+                        <NavLink
+                          to="/admin/workshops"
+                          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                        >
+                          Talleres
+                        </NavLink>
+                      )}
                     </>
                   ) : (
                     <>
                       <NavLink
                         to="/login"
-                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-800 text-white hover:bg-slate-900"
+                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-700"
                       >
                         <LogIn size={16} />
                         Iniciar sesión
                       </NavLink>
 
-                      <NavLink
-                        to="/register"
-                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                      >
-                        <UserPlus size={16} />
-                        Crear cuenta
-                      </NavLink>
                     </>
                   )}
                 </nav>
@@ -160,6 +265,33 @@ export default function Layout({ children }) {
                       >
                         Facturar
                       </Link>
+                      {isSuperAdmin && (
+                        <NavLink
+                          to="/admin/workshops"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          Administrar negocios
+                        </NavLink>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          openClientAlerts();
+                          setOpen(false);
+                        }}
+                        className="px-3 py-2 rounded-lg hover:bg-orange-50 text-left"
+                      >
+                        <span className="inline-flex items-center gap-2">
+                          <Bell size={16} />
+                          Alertas clientes
+                          {alertCount > 0 && (
+                            <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs font-bold text-white">
+                              {alertCount}
+                            </span>
+                          )}
+                        </span>
+                      </button>
 
                       <button
                         onClick={onLogout}
@@ -184,16 +316,6 @@ export default function Layout({ children }) {
                         </span>
                       </NavLink>
 
-                      <NavLink
-                        to="/register"
-                        className={mobileLink}
-                        onClick={() => setOpen(false)}
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <UserPlus size={16} />
-                          Crear cuenta
-                        </span>
-                      </NavLink>
                     </>
                   )}
                 </div>
@@ -204,7 +326,11 @@ export default function Layout({ children }) {
       )}
 
       {!isAuthRoute && (
-        <div className="relative mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-4 md:pb-6">
+        <div
+          className={`relative mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 ${
+            isAuthed ? "pt-6 md:pt-8 pb-4 md:pb-6" : "pt-10 md:pt-14 pb-2 md:pb-3"
+          }`}
+        >
           <div className="relative overflow-hidden rounded-3xl bg-white/70 p-5 md:p-7 ring-1 ring-slate-200 shadow-sm">
             <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-emerald-200/30 blur-3xl" />
             <div className="pointer-events-none absolute -left-12 -bottom-20 h-64 w-64 rounded-full bg-sky-200/30 blur-3xl" />
@@ -213,14 +339,27 @@ export default function Layout({ children }) {
               {!isPrintRoute && (
                 <div className="text-center">
                   <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900">
-                    <span className="bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
-                      Multiservicios
-                    </span>{" "}
-                    Crower
+                    {isAuthed ? (
+                      <>
+                        <span className="bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
+                          {activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "Tu taller"}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <img
+                          src={zagaProLogo}
+                          alt="ZagaPro"
+                          className="mx-auto h-36 w-auto max-w-full rounded-2xl bg-white object-contain p-3 shadow-sm ring-1 ring-slate-200 md:h-44"
+                        />
+                      </>
+                    )}
                   </h1>
 
                   <p className="mt-2 text-slate-600 text-sm md:text-base font-medium">
-                    Gestión inteligente para talleres mecánicos.
+                    {isAuthed
+                      ? `Gestion inteligente para ${labels.businessPlural}.`
+                      : "Una entrada profesional para gestionar clientes, documentos y operaciones."}
                   </p>
                 </div>
               )}
@@ -284,7 +423,7 @@ export default function Layout({ children }) {
                         </span>
 
                         <span className="block text-xs text-white/90">
-                          Gestión de repuestos
+                          {labels.stockTitle}
                         </span>
                       </span>
 
@@ -316,7 +455,7 @@ export default function Layout({ children }) {
                   <div className="xl:col-span-4 flex justify-center">
                     <Link
                       to="/login"
-                      className="inline-flex items-center gap-2 rounded-xl px-5 py-3 bg-slate-800 text-white hover:bg-slate-900"
+                      className="inline-flex items-center gap-2 rounded-xl px-5 py-3 bg-orange-600 text-white hover:bg-orange-700"
                     >
                       <LogIn size={16} />
                       Iniciar sesión
@@ -347,8 +486,11 @@ export default function Layout({ children }) {
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center justify-center gap-3 py-4 md:py-6 text-sm text-slate-500 md:flex-row md:justify-between">
               <div className="order-2 md:order-1 text-center md:text-left">
-                © {new Date().getFullYear()} Multiservicios Crower. Todos los
-                derechos reservados.
+                {isAuthed
+                  ? activeWorkshop?.footerText ??
+                    activeWorkshop?.FooterText ??
+                    `© ${new Date().getFullYear()} ${activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "ZagaPro"}. Todos los derechos reservados.`
+                  : `© ${new Date().getFullYear()} ZagaPro. Todos los derechos reservados.`}
               </div>
 
               <nav className="order-1 md:order-2 w-full md:w-auto">

@@ -17,7 +17,7 @@ const AuthCtx = createContext({
       localStorage.setItem("fa_user", JSON.stringify(_usr));
       setUser(_usr);
     } else {
-      // sesión temporal sin user en localStorage
+      // Sesion temporal sin user en localStorage.
       localStorage.removeItem("fa_user");
       setUser(null);
     }
@@ -62,7 +62,7 @@ export default function AuthProvider({ children }) {
   // Consideramos trial cuando hay fecha de fin de trial.
   const isTrial = !!trialEndsAt;
 
-  // Aplica/quita Authorization cuando cambie el token
+  // Aplica/quita Authorization cuando cambie el token.
   useEffect(() => {
     if (token) {
       api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -79,7 +79,7 @@ export default function AuthProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Si hay usuario y NO es trial → apaga rastro de prueba
+  // Si hay usuario y no es trial, apaga el rastro de prueba.
   useEffect(() => {
     if (user && roleLower !== "trial") {
       setTrialEndsAt(null);
@@ -87,7 +87,7 @@ export default function AuthProvider({ children }) {
     }
   }, [user, roleLower]);
 
-  // Listener global para 401
+  // Listener global para 401.
   useEffect(() => {
     const onUnauthorized = () => {
       setToken(null);
@@ -99,7 +99,7 @@ export default function AuthProvider({ children }) {
     return () => window.removeEventListener("fa:unauthorized", onUnauthorized);
   }, []);
 
-  // ✅ Listener para “adoptar” token vía evento global (plan B para HMR/timing)
+  // Listener para adoptar token via evento global.
   useEffect(() => {
     const onTokenSet = (e) => {
       const { token: tok, user: usr, trialExp } = e.detail || {};
@@ -110,6 +110,7 @@ export default function AuthProvider({ children }) {
       localStorage.removeItem("fa_token");
       localStorage.removeItem("fa_user");
       localStorage.removeItem("fa_trial_exp");
+      localStorage.removeItem("tc_workshop_id");
       setToken(null);
       setUser(null);
       setTrialEndsAt(null);
@@ -124,7 +125,7 @@ export default function AuthProvider({ children }) {
     };
   }, []); // una vez
 
-  // Permite “inyectar” token (y user/exp)
+  // Permite inyectar token y user/exp.
   const adoptToken = (tok, usr = null, trialExp = null) => {
     localStorage.setItem("fa_token", tok);
     setToken(tok);
@@ -133,7 +134,7 @@ export default function AuthProvider({ children }) {
       localStorage.setItem("fa_user", JSON.stringify(usr));
       setUser(usr);
     } else {
-      // sesión temporal sin user en localStorage
+      // Sesion temporal sin user en localStorage.
       localStorage.removeItem("fa_user");
       setUser(null);
     }
@@ -150,15 +151,13 @@ export default function AuthProvider({ children }) {
     }
   };
 
-  // Login normal => NO trial
+  // Login normal => no trial.
   const login = async (email, password) => {
     const res = await api.post("/Auth/login", { email, password });
 
     const tok = res.data?.token ?? res.data?.Token;
-    console.log(tok);
-    
     const usr = res.data?.user  ?? res.data?.User;
-    if (!tok) throw new Error(res?.data?.message || "No se recibió token.");
+    if (!tok) throw new Error(res?.data?.message || "No se recibio token.");
 
     localStorage.setItem("fa_token", tok);
     if (usr) localStorage.setItem("fa_user", JSON.stringify(usr));
@@ -174,7 +173,7 @@ export default function AuthProvider({ children }) {
       } catch { /* ignore */ }
     }
 
-    // apagar trial en login normal
+    // Apagar trial en login normal.
     setTrialEndsAt(null);
     localStorage.removeItem("fa_trial_exp");
 
@@ -186,6 +185,7 @@ export default function AuthProvider({ children }) {
     localStorage.removeItem("fa_token");
     localStorage.removeItem("fa_user");
     localStorage.removeItem("fa_trial_exp");
+    localStorage.removeItem("tc_workshop_id");
     setToken(null);
     setUser(null);
     setTrialEndsAt(null);
@@ -199,5 +199,4 @@ export default function AuthProvider({ children }) {
 
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
-// (Opcional) debug rápido:
 

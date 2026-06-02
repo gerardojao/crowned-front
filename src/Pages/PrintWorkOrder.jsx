@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../Components/api";
 
@@ -6,10 +6,21 @@ export default function PrintWorkOrder() {
   const { id } = useParams();
 
   const [order, setOrder] = useState(null);
+  const [workshopName, setWorkshopName] = useState("Multiservicios Crower");
 
   useEffect(() => {
+    loadWorkshopSettings();
     loadOrder();
   }, []);
+
+  const loadWorkshopSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      setWorkshopName(res?.data?.nombre ?? res?.data?.Nombre ?? "Multiservicios Crower");
+    } catch {
+      setWorkshopName("Multiservicios Crower");
+    }
+  };
 
   const loadOrder = async () => {
     try {
@@ -37,7 +48,7 @@ export default function PrintWorkOrder() {
     <div className="bg-white text-black print-page">
       <div className="max-w-2xl mx-auto border border-black p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold">Multiservicios Crower</h1>
+          <h1 className="text-3xl font-bold">{workshopName}</h1>
 
           <p className="text-lg mt-2">Orden #{order.id || order.Id}</p>
         </div>
@@ -49,7 +60,7 @@ export default function PrintWorkOrder() {
           </div> */}
 
           <div>
-            <p className="font-bold">Vehículo</p>
+            <p className="font-bold">Vehiculo</p>
             <p>
               {order.marca || order.Marca} {order.modelo || order.Modelo}
             </p>
@@ -57,7 +68,7 @@ export default function PrintWorkOrder() {
 
           <div className="text-center border-2 border-black py-4 px-6">
             <p className="text-sm font-bold uppercase tracking-widest">
-              Matrícula
+              Matricula
             </p>
 
             <p className="text-4xl font-extrabold tracking-wider mt-2">
@@ -91,3 +102,4 @@ export default function PrintWorkOrder() {
     </div>
   );
 }
+

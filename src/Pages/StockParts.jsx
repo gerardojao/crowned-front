@@ -96,7 +96,9 @@ export default function StockParts() {
   const stockSummary = useMemo(() => {
     const total = parts.length;
     const bajos = parts.filter(
-      (x) => Number(x.cantidad ?? x.Cantidad) <= Number(x.stockMinimo ?? x.StockMinimo)
+      (x) =>
+        Number(x.cantidad ?? x.Cantidad) <=
+        Number(x.stockMinimo ?? x.StockMinimo),
     ).length;
 
     return { total, bajos };
@@ -126,10 +128,16 @@ export default function StockParts() {
 
       if (editingId) {
         await api.put(`/RepuestoStock/${editingId}`, payload);
-        setNotice({ type: "success", text: "Repuesto actualizado correctamente." });
+        setNotice({
+          type: "success",
+          text: "Repuesto actualizado correctamente.",
+        });
       } else {
         await api.post("/RepuestoStock", payload);
-        setNotice({ type: "success", text: "Repuesto registrado correctamente." });
+        setNotice({
+          type: "success",
+          text: "Repuesto registrado correctamente.",
+        });
       }
 
       setPart(EMPTY_PART);
@@ -344,8 +352,8 @@ export default function StockParts() {
             {submitting
               ? "Guardando..."
               : editingId
-              ? "Actualizar repuesto"
-              : "Registrar repuesto"}
+                ? "Actualizar repuesto"
+                : "Registrar repuesto"}
           </button>
 
           <button
@@ -390,7 +398,7 @@ export default function StockParts() {
                 <th className="text-center py-3 px-3">Compra</th>
                 <th className="text-center py-3 px-3">Venta</th>
                 <th className="text-center py-3 px-3">Estado</th>
-                <th className="text-center py-3 px-3">Acciones</th>
+                <th className="text-center py-3 px-3"></th>
               </tr>
             </thead>
 
@@ -416,7 +424,9 @@ export default function StockParts() {
                       {cantidad}
                     </td>
                     <td className="py-3 px-3 text-center">
-                      {eur.format(Number(x.precioCompra ?? x.PrecioCompra ?? 0))}
+                      {eur.format(
+                        Number(x.precioCompra ?? x.PrecioCompra ?? 0),
+                      )}
                     </td>
                     <td className="py-3 px-3 text-center">
                       {eur.format(Number(x.precioVenta ?? x.PrecioVenta ?? 0))}
@@ -437,7 +447,7 @@ export default function StockParts() {
                         <button
                           type="button"
                           onClick={() => startEdit(x)}
-                          className="text-sky-600 hover:underline"
+                          className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
                         >
                           Editar
                         </button>
@@ -445,7 +455,7 @@ export default function StockParts() {
                         <button
                           type="button"
                           onClick={() => removePart(x)}
-                          className="text-rose-600 hover:underline"
+                          className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
                         >
                           Eliminar
                         </button>
@@ -481,7 +491,10 @@ export default function StockParts() {
 
             <div className="mt-4 max-h-72 overflow-y-auto divide-y divide-slate-100">
               {lowStockItems.map((x) => (
-                <div key={x.id ?? x.Id} className="py-3 flex justify-between gap-4">
+                <div
+                  key={x.id ?? x.Id}
+                  className="py-3 flex justify-between gap-4"
+                >
                   <div>
                     <p className="font-semibold text-slate-900">
                       {x.nombre ?? x.Nombre}

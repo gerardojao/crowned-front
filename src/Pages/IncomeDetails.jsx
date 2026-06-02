@@ -4,7 +4,7 @@ import Loader from "../Components/Loader";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { soloFecha } from "../utils/date";
 import {
-  Search, RotateCcw, ArrowLeft, CalendarDays, XCircle, Pencil, Trash2,
+  Search, RotateCcw, ArrowLeft, CalendarDays, XCircle,
 } from "lucide-react";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
@@ -416,20 +416,6 @@ export default function IncomeDetails() {
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="font-semibold text-emerald-700">{eur.format(Number(r.importe ?? 0))}</div>
-                  <div className="mt-2 flex justify-end gap-1">
-                    <button
-                      onClick={() => onEdit(r)}
-                      className="inline-flex items-center rounded-md px-2 py-1 bg-sky-600 text-white text-xs hover:bg-sky-700"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      onClick={() => onDeleteClick(r)}
-                      className="inline-flex items-center rounded-md px-2 py-1 bg-rose-600 text-white text-xs hover:bg-rose-700"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
                 </div>
               </div>
             </article>
@@ -462,13 +448,12 @@ export default function IncomeDetails() {
                       <th className="py-2.5 px-3 font-semibold">Tipo</th>
                       <th className="py-2.5 px-3 font-semibold">Descripción</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Importe</th>
-                      <th className="py-2.5 px-3 font-semibold text-right"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {rows.length === 0 ? (
                       <tr>
-                        <td className="py-6 px-3 text-slate-500" colSpan={6}>
+                        <td className="py-6 px-3 text-slate-500" colSpan={5}>
                           Sin resultados
                         </td>
                       </tr>
@@ -483,22 +468,6 @@ export default function IncomeDetails() {
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
                             {eur.format(Number(r.importe ?? 0))}
-                          </td>
-                          <td className="py-2.5 px-3">
-                            <div className="flex justify-end gap-2">
-                              <button
-                                onClick={() => onEdit(r)}
-                                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
-                              >
-                                <Pencil size={16} /> Editar
-                              </button>
-                              <button
-                                onClick={() => onDeleteClick(r)}
-                                className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
-                              >
-                                <Trash2 size={16} /> Eliminar
-                              </button>
-                            </div>
                           </td>
                         </tr>
                       ))

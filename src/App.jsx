@@ -1,4 +1,4 @@
-// src/App.jsx
+﻿// src/App.jsx
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useState } from "react";
 import Layout from "./Components/Layout";
@@ -34,8 +34,13 @@ import RegisterExpenseType from "./Pages/RegisterExpenseType.jsx";
 import RegisterIncomeType from "./Pages/RegisterIncomeType.jsx";
 import RegisterBudget from "./Pages/RegisterBudget.jsx";
 import PrintBudget from "./Pages/PrintBudget.jsx";
+import AdminWorkshops from "./Pages/AdminWorkshops.jsx";
 
 function App() {
+  const protectedElement = (element) => (
+    <ProtectedRoute>{element}</ProtectedRoute>
+  );
+
   const [income, setIncome] = useState({
     Id: "",
     Foto: "",
@@ -60,7 +65,7 @@ function App() {
       <AuthProvider>
         <Layout>
           <Routes>
-            {/* públicas */}
+            {/* publicas */}
             <Route path="/trial" element={<TrialGate />} />
             <Route path="/register" element={<NewUser />} />
             <Route path="/login" element={<Login />} />
@@ -70,26 +75,34 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
-            <Route path="/print-order/:id" element={<PrintWorkOrder />} />
-            <Route path="/workshop-invoice/:id" element={<WorkshopInvoice />} />
+            <Route path="/print-order/:id" element={protectedElement(<PrintWorkOrder />)} />
+            <Route path="/workshop-invoice/:id" element={protectedElement(<WorkshopInvoice />)} />
 
-            <Route path="/workshop-invoice" element={<WorkshopInvoice />} />
+            <Route path="/workshop-invoice" element={protectedElement(<WorkshopInvoice />)} />
 
-            <Route path="/stock-parts" element={<StockParts />} />
+            <Route path="/stock-parts" element={protectedElement(<StockParts />)} />
             <Route
               path="/reprint-invoice/order/:idOrden"
-              element={<ReprintInvoice />}
+              element={protectedElement(<ReprintInvoice />)}
             />
             <Route
               path="/reprint-invoice/number/:numeroFactura"
-              element={<ReprintInvoice />}
+              element={protectedElement(<ReprintInvoice />)}
             />
-            <Route path="/register-expense-type" element={<RegisterExpenseType />} />
-            <Route path="/register-income-type" element={<RegisterIncomeType />} />
-            <Route path="/presupuestos" element={<RegisterBudget />} />
-            <Route path="/print-budget/:id" element={<PrintBudget />} />
+            <Route path="/register-expense-type" element={protectedElement(<RegisterExpenseType />)} />
+            <Route path="/register-income-type" element={protectedElement(<RegisterIncomeType />)} />
+            <Route path="/presupuestos" element={protectedElement(<RegisterBudget />)} />
+            <Route path="/print-budget/:id" element={protectedElement(<PrintBudget />)} />
+            <Route
+              path="/admin/workshops"
+              element={
+                <ProtectedRoute roles={["superadmin"]}>
+                  <AdminWorkshops />
+                </ProtectedRoute>
+              }
+            />
 
-            {/* protegidas (ajusta según tu necesidad) */}
+            {/* protegidas */}
 
             <Route
               path="/register-work-order"
@@ -194,3 +207,4 @@ function App() {
   );
 }
 export default App;
+

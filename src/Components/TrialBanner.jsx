@@ -1,9 +1,8 @@
-// src/Components/TrialBanner.jsx
 import React from "react";
 import { useAuth } from "./AuthContext";
 
-const SHOW_COUNTDOWN_MIN = 60; // ← solo mostrar contador cuando queden ≤ 60 min
-const URGENT_MIN = 30;         // ← estilo/leyenda urgente cuando queden ≤ 30 min
+const SHOW_COUNTDOWN_MIN = 60;
+const URGENT_MIN = 30;
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -32,7 +31,6 @@ export default function TrialBanner() {
   const showCountdown = minutesLeft > 0 && minutesLeft <= SHOW_COUNTDOWN_MIN;
   const urgent = minutesLeft > 0 && minutesLeft <= URGENT_MIN;
 
-  // estilos suaves por defecto, más marcados si es urgente
   const barClass = urgent
     ? "bg-amber-50 border-amber-300"
     : "bg-emerald-50 border-emerald-300";
@@ -45,37 +43,34 @@ export default function TrialBanner() {
             <span>
               Tu prueba ha caducado.{" "}
               <a className="underline" href="/register">
-                Regístrate
+                Registrate
               </a>{" "}
-              para seguir usando FamilyApp.
+              para seguir usando TallerCrowned.
             </span>
           ) : (
             <>
-              <strong>Estás usando la versión de prueba.</strong>{" "}
+              <strong>Estas usando la version de prueba.</strong>{" "}
               {!showCountdown ? (
-                // antes de los 60 min: sin contador
                 <span>
                   Disfruta la app y cuando quieras,{" "}
                   <a className="underline" href="/register">
-                    regístrate
+                    registrate
                   </a>
                   .
                 </span>
               ) : urgent ? (
-                // ≤ 30 min: urgente + contador
                 <span>
-                  <strong>Queda poco tiempo</strong> — {fmt(leftMs)} restantes.{" "}
+                  <strong>Queda poco tiempo</strong> - {fmt(leftMs)} restantes.{" "}
                   <a className="underline" href="/register">
-                    Regístrate
+                    Registrate
                   </a>{" "}
                   para no perder el acceso.
                 </span>
               ) : (
-                // entre 31 y 60 min: contador normal
                 <span>
                   Tiempo restante: <strong>{fmt(leftMs)}</strong>.{" "}
                   <a className="underline" href="/register">
-                    Regístrate
+                    Registrate
                   </a>{" "}
                   cuando quieras.
                 </span>
@@ -93,7 +88,7 @@ export default function TrialBanner() {
                 : "bg-emerald-600 text-white hover:bg-emerald-700"
             }`}
           >
-            Regístrate
+            Registrate
           </a>
         )}
       </div>

@@ -1,9 +1,9 @@
-// src/Components/api.js
+﻿// src/Components/api.js
 import axios from "axios";
 
 const isDev = import.meta.env.DEV;
 
-// En dev usa tu API local; en prod SIEMPRE usa el proxy /api (Vercel rewrites)
+// En dev usa la API local; en prod usa el proxy /api (Vercel rewrites)
 const baseURL =
   import.meta.env.VITE_API_BASE ??
   (isDev ? "https://localhost:7288/api" : "/api");
@@ -14,7 +14,28 @@ const api = axios.create({
   withCredentials: true,   
 });
 
-// (opcional para verificar en prod)
+export const WORKSHOP_STORAGE_KEY = "tc_workshop_id";
+
+export function getCurrentWorkshopId() {
+  return localStorage.getItem(WORKSHOP_STORAGE_KEY) || "";
+}
+
+export function setCurrentWorkshopId(workshopId) {
+  if (workshopId) {
+    localStorage.setItem(WORKSHOP_STORAGE_KEY, String(workshopId));
+  } else {
+    localStorage.removeItem(WORKSHOP_STORAGE_KEY);
+  }
+  window.dispatchEvent(new Event("tc:workshop-changed"));
+}
+
+export function resolveApiAssetUrl(path) {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  const root = baseURL.replace(/\/api\/?$/i, "");
+  return `${root}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 if (!isDev) console.log("[API baseURL]", baseURL);
 
 // -------- Auth: arranque con token si ya existe --------
@@ -23,7 +44,7 @@ if (bootToken) {
   api.defaults.headers.common["Authorization"] = `Bearer ${bootToken}`;
 }
 
-// Mantén el header sync cuando alguien “inyecta” el token (p.ej. TrialGate)
+// Mantiene el header sincronizado cuando se inyecta el token (p.ej. TrialGate)
 window.addEventListener("fa:token:set", (ev) => {
   try {
     const detail = ev?.detail || {};
@@ -40,9 +61,11 @@ window.addEventListener("fa:token:set", (ev) => {
 
 // -------- Interceptors --------
 api.interceptors.request.use((config) => {
-  // (opcional) doble-check por si otro código actualizó localStorage
+  // Doble check por si otro codigo actualizo localStorage.
   const t = localStorage.getItem("fa_token");
   if (t) config.headers.Authorization = `Bearer ${t}`;
+  const workshopId = getCurrentWorkshopId();
+  if (workshopId) config.headers["X-Workshop-Id"] = workshopId;
   return config;
 });
 
@@ -51,9 +74,10 @@ api.interceptors.response.use(
   (err) => {
     const status = err?.response?.status;
     if (status === 401) {
-      // Limpieza local y aviso global
+      // Limpieza local y aviso global.
       localStorage.removeItem("fa_token");
       localStorage.removeItem("fa_user");
+      localStorage.removeItem(WORKSHOP_STORAGE_KEY);
       delete api.defaults.headers.common["Authorization"];
       window.dispatchEvent(new Event("fa:unauthorized"));
     }
@@ -62,3 +86,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

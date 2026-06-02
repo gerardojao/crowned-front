@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Printer } from "lucide-react";
-import api from "../Components/api";
+import { ArrowLeft, Plus, Trash2, Printer, Wrench } from "lucide-react";
+import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
+import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const EMPTY_ITEM = {
   descripcion: "",
@@ -10,14 +11,25 @@ const EMPTY_ITEM = {
   importe: 0,
 };
 
+const FREQUENT_SERVICES = [
+  "Servicio cambio de aceite y filtro",
+  "Cambio de pastillas de frenos",
+  "Cambio de rodamientos delanteros",
+  "Cambio de amortiguadores",
+  "Mano de obra",
+  "Repuestos",
+];
+
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
-  razonSocial: "JUAN CARLOS FERNÁNDEZ SILVA",
+  razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: " 61407055E",
-  direccion: "CALLE ALCÁCER 63 D, Albal, 46470",
+  direccion: "CALLE ALCACER 63 D, Albal, 46470",
   telefono: "960057935/655042253",
   email: "multiservicioscrower@gmail.com",
   iban: "ES69 2100 4014 9122 0012 3843",
+  serieFactura: "A",
+  logoUrl: "",
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -28,12 +40,20 @@ const eur = new Intl.NumberFormat("es-ES", {
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+const inputCls = "rounded-xl border border-slate-300 px-3 py-2 text-sm";
+const lockedInputCls =
+  "rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-600";
+
 export default function WorkshopInvoice() {
   const { id } = useParams();
+  const labels = useBusinessTerminology();
 
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [frequentServices, setFrequentServices] = useState([]);
+  const [newServiceName, setNewServiceName] = useState("");
+  const [savingService, setSavingService] = useState(false);
 
   const [order, setOrder] = useState(null);
 
@@ -57,6 +77,8 @@ export default function WorkshopInvoice() {
     { descripcion: "Repuestos", cantidad: 1, importe: 0 },
     { descripcion: "Mano de obra", cantidad: 1, importe: 0 },
   ]);
+
+  const clientFieldsLocked = Boolean(id);
 
   const normalizeOrder = (o) => ({
     id: o.id ?? o.Id,
@@ -83,15 +105,64 @@ export default function WorkshopInvoice() {
   // }, [id]);
 
   useEffect(() => {
-    loadInvoice();
+    let alive = true;
+    const init = async () => {
+      const settings = await loadWorkshopSettings();
+      if (alive) await loadFrequentServices();
+      if (alive) await loadInvoice(settings?.serieFactura || "A");
+    };
+    init();
+    return () => {
+      alive = false;
+    };
   }, [id]);
 
-  const loadInvoice = async () => {
+  const loadFrequentServices = async () => {
+    try {
+      const res = await api.get("/ServicioFrecuente");
+      const list = res?.data?.data?.[0] || [];
+      const names = list
+        .map((x) => x.nombre ?? x.Nombre)
+        .filter(Boolean);
+      setFrequentServices(names.length ? names : FREQUENT_SERVICES);
+    } catch (err) {
+      console.error(err);
+      setFrequentServices(FREQUENT_SERVICES);
+    }
+  };
+
+  const loadWorkshopSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      const data = res?.data || {};
+
+      const next = {
+        nombre: data.nombre ?? data.Nombre ?? DEFAULT_TALLER.nombre,
+        razonSocial: data.razonSocial ?? data.RazonSocial ?? DEFAULT_TALLER.razonSocial,
+        nif: data.nif ?? data.Nif ?? DEFAULT_TALLER.nif,
+        direccion: data.direccion ?? data.Direccion ?? DEFAULT_TALLER.direccion,
+        telefono: data.telefono ?? data.Telefono ?? DEFAULT_TALLER.telefono,
+        email: data.email ?? data.Email ?? DEFAULT_TALLER.email,
+        iban: data.iban ?? data.Iban ?? DEFAULT_TALLER.iban,
+        serieFactura: data.serieFactura ?? data.SerieFactura ?? DEFAULT_TALLER.serieFactura,
+        logoUrl: data.logoUrl ?? data.LogoUrl ?? DEFAULT_TALLER.logoUrl,
+      };
+      setTaller(next);
+      return next;
+    } catch {
+      setTaller(DEFAULT_TALLER);
+      return DEFAULT_TALLER;
+    }
+  };
+
+  const loadInvoice = async (serieFactura = taller.serieFactura || "A") => {
     try {
       setLoading(true);
       setError("");
 
-      const previewRes = await api.get("/NumeradorFactura/preview");
+      const previewRes = await api.get("/NumeradorFactura/preview", {
+        params: { serie: serieFactura || "A" },
+      });
 
       const numeroFacturaPrev =
         previewRes?.data?.data?.[0]?.numeroFactura || "";
@@ -111,7 +182,7 @@ export default function WorkshopInvoice() {
       setError(
         err?.response?.data?.message ||
           err?.message ||
-          "No se pudo generar el número de factura.",
+          "No se pudo generar el numero de factura.",
       );
       setLoading(false);
     }
@@ -206,13 +277,6 @@ export default function WorkshopInvoice() {
     }));
   };
 
-  const setTallerField = (name, value) => {
-    setTaller((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
   const setItemField = (index, name, value) => {
     setItems((prev) =>
       prev.map((item, i) =>
@@ -230,13 +294,63 @@ export default function WorkshopInvoice() {
     setItems((prev) => [...prev, { ...EMPTY_ITEM }]);
   };
 
+  const addFrequentService = (descripcion) => {
+    if (!descripcion) return;
+    setItems((prev) => [
+      ...prev,
+      {
+        descripcion,
+        cantidad: 1,
+        importe: 0,
+      },
+    ]);
+  };
+
+  const createFrequentService = async () => {
+    const nombre = newServiceName.trim();
+    if (!nombre) return;
+
+    try {
+      setSavingService(true);
+      setError("");
+      const res = await api.post("/ServicioFrecuente", { nombre });
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(res?.data?.message || res?.data?.Message || "No se pudo registrar el servicio.");
+      }
+
+      await loadFrequentServices();
+      addFrequentService(nombre);
+      setNewServiceName("");
+      setNotice("Servicio frecuente agregado.");
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo registrar el servicio.",
+      );
+    } finally {
+      setSavingService(false);
+    }
+  };
+
   const removeItem = (index) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-const saveIssuedInvoice = async (numeroFactura) => {
+const saveIssuedInvoice = async () => {
+  const billableItems = items.filter(
+    (item) =>
+      String(item.descripcion || "").trim() &&
+      round2(Number(item.cantidad || 0) * Number(item.importe || 0)) > 0,
+  );
+
+  if (billableItems.length === 0) {
+    throw new Error("La factura debe tener al menos una linea con importe mayor que 0.");
+  }
+
   const payload = {
-    numeroFactura,
     idOrdenTrabajo: id ? Number(id) : null,
     fecha: invoice.fecha,
     cliente: invoice.cliente,
@@ -245,35 +359,51 @@ const saveIssuedInvoice = async (numeroFactura) => {
     telefonoCliente: invoice.telefonoCliente || null,
     matricula: invoice.matricula || null,
     km: invoice.km ? String(invoice.km) : null,
-    subtotal,
-    iva,
     otros,
-    total: totalFinal,
+    ivaPct: Number(invoice.ivaPct || 21),
+    serie: taller.serieFactura || "A",
     observaciones: invoice.observaciones || null,
-    itemsJson: JSON.stringify(items),
+    items: billableItems,
   };
 
-  await api.post("/FacturaEmitida", payload);
+  return await api.post("/FacturaEmitida/emitir", payload);
 };
 
 const printInvoice = async () => {
   try {
-    const res = await api.post("/NumeradorFactura/siguiente");
+    const res = await saveIssuedInvoice();
+    if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+      throw new Error(res?.data?.message || res?.data?.Message || "No se pudo guardar la factura.");
+    }
 
     const numeroFactura =
       res?.data?.data?.[0]?.numeroFactura ||
       res?.data?.data?.[0]?.NumeroFactura ||
       "";
 
+    if (!numeroFactura) {
+      throw new Error("No se recibio el numero de factura emitida.");
+    }
+
+    const issuedEvent = {
+      type: "tc:invoice-issued",
+      idOrden: id ? Number(id) : null,
+      numeroFactura,
+      issuedAt: new Date().toISOString(),
+    };
+
     setInvoice((prev) => ({
       ...prev,
       numero: numeroFactura,
     }));
 
-    // if (id) {
-    //   await api.put(`/OrdenTrabajo/${id}/facturada`);
-    // }
-     await saveIssuedInvoice(numeroFactura);
+    localStorage.setItem("tc:invoice-issued", JSON.stringify(issuedEvent));
+    window.dispatchEvent(new CustomEvent("tc:invoice-issued", { detail: issuedEvent }));
+    window.dispatchEvent(new Event("tc:client-alerts:refresh"));
+
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(issuedEvent, window.location.origin);
+    }
 
     setTimeout(() => {
       window.print();
@@ -281,7 +411,12 @@ const printInvoice = async () => {
     }, 150);
   } catch (err) {
     console.error(err);
-    setError("No se pudo generar el número de factura.");
+    setError(
+      err?.response?.data?.message ||
+        err?.response?.data?.Message ||
+        err?.message ||
+        "No se pudo guardar la factura.",
+    );
   }
 };
 
@@ -298,11 +433,11 @@ const printInvoice = async () => {
       <div className="no-print flex items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Factura de taller
+            {labels.invoiceTitle}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             {id
-              ? `Genera una factura a partir de la orden de trabajo #${id}.`
+              ? labels.invoiceFromOrder(id)
               : "Genera una nueva Factura."}
           </p>
         </div>
@@ -342,57 +477,61 @@ const printInvoice = async () => {
       <section className="no-print grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
         <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">
-            Datos del taller
+            Datos de la {labels.businessSingular}
           </h3>
+
+          <p className="mb-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
+            Estos datos pertenecen a la {labels.businessSingular} activa y no se editan desde la factura.
+          </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={lockedInputCls}
               placeholder="Nombre comercial"
               value={taller.nombre}
-              onChange={(e) => setTallerField("nombre", e.target.value)}
+              readOnly
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Razón social"
+              className={lockedInputCls}
+              placeholder="Razon social"
               value={taller.razonSocial}
-              onChange={(e) => setTallerField("razonSocial", e.target.value)}
+              readOnly
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={lockedInputCls}
               placeholder="NIF/CIF"
               value={taller.nif}
-              onChange={(e) => setTallerField("nif", e.target.value)}
+              readOnly
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Teléfono"
+              className={lockedInputCls}
+              placeholder="Telefono"
               value={taller.telefono}
-              onChange={(e) => setTallerField("telefono", e.target.value)}
+              readOnly
             />
 
             <input
-              className="md:col-span-2 rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Dirección"
+              className={`md:col-span-2 ${lockedInputCls}`}
+              placeholder="Direccion"
               value={taller.direccion}
-              onChange={(e) => setTallerField("direccion", e.target.value)}
+              readOnly
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={lockedInputCls}
               placeholder="Email"
               value={taller.email}
-              onChange={(e) => setTallerField("email", e.target.value)}
+              readOnly
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={lockedInputCls}
               placeholder="IBAN"
               value={taller.iban}
-              onChange={(e) => setTallerField("iban", e.target.value)}
+              readOnly
             />
           </div>
         </div>
@@ -404,36 +543,37 @@ const printInvoice = async () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Número factura"
+              className={inputCls}
+              placeholder="Numero factura"
               value={invoice.numero}
-              onChange={(e) => setInvoiceField("numero", e.target.value)}
+              readOnly
             />
 
             <input
               type="date"
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={inputCls}
               value={invoice.fecha}
               onChange={(e) => setInvoiceField("fecha", e.target.value)}
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
               placeholder="Cliente"
               value={invoice.cliente}
+              readOnly={clientFieldsLocked}
               onChange={(e) => setInvoiceField("cliente", e.target.value)}
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={inputCls}
               placeholder="DNI/NIE/NIF"
               value={invoice.dni}
               onChange={(e) => setInvoiceField("dni", e.target.value)}
             />
 
             <input
-              className="md:col-span-2 rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Dirección cliente"
+              className={`md:col-span-2 ${inputCls}`}
+              placeholder="Direccion cliente"
               value={invoice.direccionCliente}
               onChange={(e) =>
                 setInvoiceField("direccionCliente", e.target.value)
@@ -441,40 +581,43 @@ const printInvoice = async () => {
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Teléfono cliente"
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
+              placeholder="Telefono cliente"
               value={invoice.telefonoCliente}
+              readOnly={clientFieldsLocked}
               onChange={(e) =>
                 setInvoiceField("telefonoCliente", e.target.value)
               }
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Matrícula"
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
+              placeholder={labels.referenceLabel}
               value={invoice.matricula}
+              readOnly={clientFieldsLocked}
               onChange={(e) =>
                 setInvoiceField("matricula", e.target.value.toUpperCase())
               }
             />
 
             <input
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="Kilometraje"
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
+              placeholder={labels.metricLabel}
               value={invoice.km}
+              readOnly={clientFieldsLocked}
               onChange={(e) => setInvoiceField("km", e.target.value)}
             />
 
             <input
               type="number"
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={inputCls}
               placeholder="IVA %"
               value={invoice.ivaPct}
               onChange={(e) => setInvoiceField("ivaPct", e.target.value)}
             />
             <input
               type="number"
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+              className={inputCls}
               placeholder="Otros"
               value={invoice.otros}
               onChange={(e) => setInvoiceField("otros", e.target.value)}
@@ -484,16 +627,66 @@ const printInvoice = async () => {
       </section>
 
       <section className="no-print rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200 shadow-sm mb-8">
-        <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col gap-3 mb-4 md:flex-row md:items-center md:justify-between">
           <h3 className="text-lg font-semibold text-slate-800">Conceptos</h3>
 
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative">
+              <Wrench
+                size={16}
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <select
+                defaultValue=""
+                onChange={(e) => {
+                  addFrequentService(e.target.value);
+                  e.target.value = "";
+                }}
+                className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-8 text-sm text-slate-700 sm:w-72"
+                aria-label="Agregar servicio frecuente"
+              >
+                <option value="" disabled>
+                  Agregar servicio frecuente
+                </option>
+                {frequentServices.map((service) => (
+                  <option key={service} value={service}>
+                    {service}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={addItem}
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 bg-slate-700 text-white hover:bg-slate-800 transition text-sm"
+            >
+              <Plus size={16} />
+              Anadir linea
+            </button>
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200 md:grid-cols-[1fr_auto]">
+          <input
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            placeholder="Nuevo servicio frecuente"
+            value={newServiceName}
+            onChange={(e) => setNewServiceName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                createFrequentService();
+              }
+            }}
+          />
           <button
             type="button"
-            onClick={addItem}
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 bg-slate-700 text-white hover:bg-slate-800 transition text-sm"
+            onClick={createFrequentService}
+            disabled={savingService || !newServiceName.trim()}
+            className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
           >
-            <Plus size={16} />
-            Añadir línea
+            {savingService ? "Guardando..." : "Guardar servicio"}
           </button>
         </div>
 
@@ -504,8 +697,9 @@ const printInvoice = async () => {
               className="grid grid-cols-1 md:grid-cols-[1fr_120px_160px_40px] gap-3"
             >
               <input
+                list="frequent-services"
                 className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Descripción"
+                placeholder="Descripcion"
                 value={item.descripcion}
                 onChange={(e) =>
                   setItemField(index, "descripcion", e.target.value)
@@ -541,39 +735,44 @@ const printInvoice = async () => {
             </div>
           ))}
         </div>
+        <datalist id="frequent-services">
+          {frequentServices.map((service) => (
+            <option key={service} value={service} />
+          ))}
+        </datalist>
       </section>
 
       <section className="invoice-print bg-white text-black">
         <div className="invoice-sheet mx-auto max-w-5xl">
-          <div className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
-            <div className="flex items-start gap-5">
+          <div className="grid grid-cols-[150px_1fr_310px] items-start gap-6 border-b-2 border-black pb-4">
+            <div className="flex h-32 items-center justify-center">
               <img
-                src={logoTaller}
+                src={resolveApiAssetUrl(taller.logoUrl) || logoTaller}
                 alt="Logo taller"
-                className="h-50 w-50 object-contain"
+                className="max-h-28 max-w-36 object-contain"
               />
+            </div>
 
-              <div className="text-center min-w-[280px]">
-                <h1 className="text-3xl font-extrabold tracking-wide uppercase mt-8">
-                  {taller.nombre}
-                </h1>
+            <div className="min-w-0 text-center">
+              <h1 className="mt-3 text-3xl font-extrabold tracking-wide uppercase leading-tight">
+                {taller.nombre}
+              </h1>
 
-                <div className="mt-4 text-sm leading-5">
-                  <p>{taller.razonSocial}</p>
-                  <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
-                  <p>{taller.direccion}</p>
-                  <p>{taller.telefono}</p>
-                  <p>{taller.email}</p>
-                </div>
+              <div className="mt-3 text-sm leading-5">
+                <p className="font-semibold">{taller.razonSocial}</p>
+                <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
+                <p>{taller.direccion}</p>
+                <p>{taller.telefono}</p>
+                <p>{taller.email}</p>
               </div>
             </div>
 
-            <div className="text-sm mt-8 min-w-[320px]">
-              <div className="grid grid-cols-[120px_1fr] gap-y-1">
+            <div className="text-sm">
+              <div className="grid grid-cols-[112px_1fr] gap-x-2 gap-y-1">
                 <p className="font-bold">FECHA:</p>
                 <p>{formatDate(invoice.fecha)}</p>
 
-                <p className="font-bold">N.º FACTURA:</p>
+                <p className="font-bold">N. FACTURA:</p>
                 <p className="text-xl font-extrabold">{invoice.numero}</p>
 
                 <p className="font-bold">FACTURAR A:</p>
@@ -582,16 +781,16 @@ const printInvoice = async () => {
                 <p className="font-bold">DNI/NIE/NIF:</p>
                 <p>{invoice.dni}</p>
 
-                <p className="font-bold">DIRECCIÓN:</p>
+                <p className="font-bold">DIRECCION:</p>
                 <p>{invoice.direccionCliente}</p>
 
-                <p className="font-bold">TELÉFONO:</p>
+                <p className="font-bold">TELEFONO:</p>
                 <p>{invoice.telefonoCliente}</p>
 
-                <p className="font-bold">MATRÍCULA:</p>
+                <p className="font-bold">{labels.referenceLabel.toUpperCase()}:</p>
                 <p className="font-bold">{invoice.matricula}</p>
 
-                <p className="font-bold">KM.:</p>
+                <p className="font-bold">{labels.metricLabel.toUpperCase()}:</p>
                 <p>{invoice.km}</p>
               </div>
             </div>
@@ -611,7 +810,7 @@ const printInvoice = async () => {
                   className="border border-black px-2 py-2 text-center"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  DESCRIPCIÓN
+                  DESCRIPCION
                 </th>
                 <th
                   className="border border-black px-2 py-2 w-28 text-center"
@@ -647,17 +846,14 @@ const printInvoice = async () => {
 
           <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
             <div className="text-sm">
-              <p className="font-extrabold">GARANTÍA DE 90 DÍAS O 2000KM</p>
+              <p className="font-extrabold">{labels.warrantyTitle}</p>
 
               <p className="mt-2 italic font-semibold leading-5">
-                Todo repuesto usado o nuevo suministrado e instalado a solicitud
-                del cliente, NO SE LE BRINDARÁ GARANTÍA. Las reparaciones tienen
-                garantía cuando sean repuestos nuevos suministrados por el
-                taller.
+                {labels.warrantyText}
               </p>
 
               <p className="mt-4">
-                Si tiene cualquier tipo de pregunta sobre esta factura, póngase
+                Si tiene cualquier tipo de pregunta sobre esta factura, pongase
                 en contacto con nosotros.
               </p>
 
@@ -685,7 +881,7 @@ const printInvoice = async () => {
 
           <div className="mt-8 border-t border-black pt-2 text-xs">
             <p>
-              RAZÓN SOCIAL: {taller.razonSocial}
+              RAZON SOCIAL: {taller.razonSocial}
               {taller.nif ? ` / NIF: ${taller.nif}` : ""}
               {taller.direccion
                 ? ` / DOMICILIO FISCAL: ${taller.direccion}`
@@ -721,3 +917,4 @@ function formatDate(value) {
     year: "numeric",
   });
 }
+

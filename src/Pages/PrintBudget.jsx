@@ -1,17 +1,19 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
-import api from "../Components/api";
+import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
+import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
-  razonSocial: "JUAN CARLOS FERNÁNDEZ SILVA",
+  razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: "61407055E",
-  direccion: "CALLE ALCÁCER 63 D, Albal, 46470",
+  direccion: "CALLE ALCACER 63 D, Albal, 46470",
   telefono: "960057935/655042253",
   email: "multiservicioscrower@gmail.com",
   iban: "ES69 2100 4014 9122 0012 3843",
+  logoUrl: "",
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -24,18 +26,40 @@ const round2 = (value) =>
 
 export default function PrintBudget() {
   const { id } = useParams();
+  const labels = useBusinessTerminology();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [taller] = useState(DEFAULT_TALLER);
+  const [taller, setTaller] = useState(DEFAULT_TALLER);
   const [budget, setBudget] = useState(null);
 
   const ivaPct = 21;
 
   useEffect(() => {
+    loadWorkshopSettings();
     loadBudget();
   }, [id]);
+
+  const loadWorkshopSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      const data = res?.data || {};
+
+      setTaller({
+        nombre: data.nombre ?? data.Nombre ?? DEFAULT_TALLER.nombre,
+        razonSocial: data.razonSocial ?? data.RazonSocial ?? DEFAULT_TALLER.razonSocial,
+        nif: data.nif ?? data.Nif ?? DEFAULT_TALLER.nif,
+        direccion: data.direccion ?? data.Direccion ?? DEFAULT_TALLER.direccion,
+        telefono: data.telefono ?? data.Telefono ?? DEFAULT_TALLER.telefono,
+        email: data.email ?? data.Email ?? DEFAULT_TALLER.email,
+        iban: data.iban ?? data.Iban ?? DEFAULT_TALLER.iban,
+        logoUrl: data.logoUrl ?? data.LogoUrl ?? DEFAULT_TALLER.logoUrl,
+      });
+    } catch {
+      setTaller(DEFAULT_TALLER);
+    }
+  };
 
   const loadBudget = async () => {
     try {
@@ -46,7 +70,7 @@ export default function PrintBudget() {
       const p = res?.data?.data?.[0];
 
       if (!p) {
-        setError("No se encontró el presupuesto.");
+        setError("No se encontro el presupuesto.");
         return;
       }
 
@@ -128,7 +152,7 @@ export default function PrintBudget() {
   if (error || !budget) {
     return (
       <section className="rounded-2xl bg-rose-50 p-6 text-rose-700 ring-1 ring-rose-200">
-        {error || "No se encontró el presupuesto."}
+        {error || "No se encontro el presupuesto."}
       </section>
     );
   }
@@ -138,7 +162,7 @@ export default function PrintBudget() {
       <div className="no-print flex items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Presupuesto de taller
+            {labels.budgetTitle}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Presupuesto {budget.numeroPresupuesto}
@@ -167,41 +191,41 @@ export default function PrintBudget() {
 
       <section className="invoice-print bg-white text-black">
         <div className="invoice-sheet mx-auto max-w-5xl">
-          <div className="flex items-start justify-between gap-8 border-b-2 border-black pb-4">
-            <div className="flex items-start gap-5">
+          <div className="grid grid-cols-[150px_1fr_310px] items-start gap-6 border-b-2 border-black pb-4">
+            <div className="flex h-32 items-center justify-center">
               <img
-                src={logoTaller}
+                src={resolveApiAssetUrl(taller.logoUrl) || logoTaller}
                 alt="Logo taller"
-                className="h-50 w-50 object-contain"
+                className="max-h-28 max-w-36 object-contain"
               />
+            </div>
 
-              <div className="text-center min-w-[280px]">
-                <h1 className="text-3xl font-extrabold tracking-wide uppercase mt-8">
-                  {taller.nombre}
-                </h1>
+            <div className="min-w-0 text-center">
+              <h1 className="mt-3 text-3xl font-extrabold tracking-wide uppercase leading-tight">
+                {taller.nombre}
+              </h1>
 
-                <div className="mt-4 text-sm leading-5">
-                  <p>{taller.razonSocial}</p>
-                  <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
-                  <p>{taller.direccion}</p>
-                  <p>{taller.telefono}</p>
-                  <p>{taller.email}</p>
-                </div>
+              <div className="mt-3 text-sm leading-5">
+                <p className="font-semibold">{taller.razonSocial}</p>
+                <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
+                <p>{taller.direccion}</p>
+                <p>{taller.telefono}</p>
+                <p>{taller.email}</p>
               </div>
             </div>
 
-            <div className="text-sm mt-8 min-w-[320px]">
+            <div className="text-sm">
               <div className="text-right mb-4">
-                <h2 className="text-3xl font-extrabold uppercase">
+                <h2 className="text-2xl font-extrabold uppercase">
                   PRESUPUESTO
                 </h2>
               </div>
 
-              <div className="grid grid-cols-[150px_1fr] gap-y-1">
+              <div className="grid grid-cols-[118px_1fr] gap-x-2 gap-y-1">
                 <p className="font-bold">FECHA:</p>
                 <p>{formatDate(budget.fecha)}</p>
 
-                <p className="font-bold">N.º PRESUPUESTO:</p>
+                <p className="font-bold">N. PRESUPUESTO:</p>
                 <p className="text-xl font-extrabold">
                   {budget.numeroPresupuesto}
                 </p>
@@ -209,18 +233,18 @@ export default function PrintBudget() {
                 <p className="font-bold">CLIENTE:</p>
                 <p className="font-bold">{budget.cliente}</p>
 
-                <p className="font-bold">TELÉFONO:</p>
+                <p className="font-bold">TELEFONO:</p>
                 <p>{budget.telefono}</p>
 
-                <p className="font-bold">MATRÍCULA:</p>
+                <p className="font-bold">{labels.referenceLabel.toUpperCase()}:</p>
                 <p className="font-bold">{budget.matricula}</p>
 
-                <p className="font-bold">VEHÍCULO:</p>
+                <p className="font-bold">{labels.assetHeader.toUpperCase()}:</p>
                 <p>
                   {budget.marca} {budget.modelo}
                 </p>
 
-                <p className="font-bold">KM.:</p>
+                <p className="font-bold">{labels.metricLabel.toUpperCase()}:</p>
                 <p>{budget.kilometraje}</p>
               </div>
             </div>
@@ -229,13 +253,22 @@ export default function PrintBudget() {
           <table className="w-full border-collapse text-sm mt-4">
             <thead>
               <tr style={{ backgroundColor: "#e2e8f0" }}>
-                <th className="border border-black px-2 py-2 text-center">
-                  DESCRIPCIÓN
+                <th
+                  className="border border-black px-2 py-2 text-center"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
+                  DESCRIPCION
                 </th>
-                <th className="border border-black px-2 py-2 w-28 text-center">
+                <th
+                  className="border border-black px-2 py-2 w-28 text-center"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
                   CANTIDAD
                 </th>
-                <th className="border border-black px-2 py-2 w-36 text-right">
+                <th
+                  className="border border-black px-2 py-2 w-36 text-right"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
                   IMPORTE
                 </th>
               </tr>
@@ -244,13 +277,13 @@ export default function PrintBudget() {
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td className="border border-black px-2 py-2">
+                  <td className="whitespace-pre-line border border-black px-2 py-2 align-top leading-5">
                     {item.descripcion}
                   </td>
-                  <td className="border border-black px-2 py-2 text-center">
+                  <td className="border border-black px-2 py-2 text-center align-top">
                     {item.cantidad}
                   </td>
-                  <td className="border border-black px-2 py-2 text-right">
+                  <td className="border border-black px-2 py-2 text-right align-top">
                     {formatMoney(Number(item.importe || 0))}
                   </td>
                 </tr>
@@ -263,8 +296,8 @@ export default function PrintBudget() {
               <p className="font-extrabold">CONDICIONES DEL PRESUPUESTO</p>
 
               <p className="mt-2 italic font-semibold leading-5">
-                Este presupuesto tiene validez de 15 días desde su fecha de
-                emisión. La aceptación del presupuesto autoriza el inicio de los
+                Este presupuesto tiene validez de 15 dias desde su fecha de
+                emision. La aceptacion del presupuesto autoriza el inicio de los
                 trabajos indicados.
               </p>
 
@@ -273,7 +306,7 @@ export default function PrintBudget() {
                   OBSERVACIONES:
                 </p>
 
-                <p className="mt-2">{budget.observaciones}</p>
+                <p className="mt-2 whitespace-pre-line">{budget.observaciones}</p>
               </div>
             </div>
 
@@ -287,17 +320,17 @@ export default function PrintBudget() {
 
           <div className="mt-10 grid grid-cols-2 gap-12 text-sm">
             <div className="border-t border-black pt-2 text-center">
-              Firma taller
+              Firma {labels.businessSingular}
             </div>
 
             <div className="border-t border-black pt-2 text-center">
-              Firma cliente / aceptación
+              Firma cliente / aceptacion
             </div>
           </div>
 
           <div className="mt-8 border-t border-black pt-2 text-xs">
             <p>
-              RAZÓN SOCIAL: {taller.razonSocial}
+              RAZON SOCIAL: {taller.razonSocial}
               {taller.nif ? ` / NIF: ${taller.nif}` : ""}
               {taller.direccion
                 ? ` / DOMICILIO FISCAL: ${taller.direccion}`
