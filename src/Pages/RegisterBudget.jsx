@@ -736,7 +736,7 @@ export default function RegisterBudget() {
             value={budget.Repuestos}
             onChange={handleChange}
             className={cls}
-            placeholder={labels.partsPlaceholder}
+            placeholder={`${labels.partsPlaceholder} IVA incl.`}
           />
 
           <input
@@ -746,11 +746,11 @@ export default function RegisterBudget() {
             value={budget.ManoObra}
             onChange={handleChange}
             className={cls}
-            placeholder="Mano de obra €"
+            placeholder="Mano de obra IVA incl. €"
           />
 
           <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-xs text-slate-500">Total presupuesto</div>
+            <div className="text-xs text-slate-500">Total presupuesto IVA incl.</div>
             <div className="text-xl font-semibold text-slate-900">
               {total.toLocaleString("es-ES", {
                 style: "currency",

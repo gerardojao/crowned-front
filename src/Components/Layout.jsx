@@ -108,6 +108,13 @@ export default function Layout({ children }) {
   const activeWorkshop = workshops.find(
     (x) => String(x.id ?? x.Id) === String(activeWorkshopId),
   );
+  const activeWorkshopLogo = activeWorkshop?.logoUrl ?? activeWorkshop?.LogoUrl ?? "";
+  const navbarLogo = isAuthed && activeWorkshopLogo
+    ? resolveApiAssetUrl(activeWorkshopLogo)
+    : zagaProLogo;
+  const navbarLogoAlt = isAuthed
+    ? `${activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "Negocio"}`
+    : "ZagaPro - Gestion inteligente de negocios";
   const labels = getBusinessTerminology(activeWorkshop);
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
   const openClientAlerts = () => {
@@ -124,8 +131,8 @@ export default function Layout({ children }) {
               className="font-extrabold tracking-tight text-slate-900 text-lg sm:text-xl"
             >
               <img
-                src={zagaProLogo}
-                alt="ZagaPro - Gestion inteligente de negocios"
+                src={navbarLogo}
+                alt={navbarLogoAlt}
                 className="h-20 w-auto max-w-[220px] rounded-2xl bg-white object-contain p-2 shadow-sm ring-1 ring-slate-200 sm:h-24 sm:max-w-[280px]"
               />
             </Link>
@@ -479,7 +486,7 @@ export default function Layout({ children }) {
       >
         {children}
       </main>
-          <ClientAlertModal />
+          <ClientAlertModal workshop={activeWorkshop} />
 
       {!isPrintRoute && (
         <footer className="mt-auto border-t border-slate-200 bg-white/80 backdrop-blur">

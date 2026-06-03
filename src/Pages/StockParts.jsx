@@ -13,6 +13,7 @@ const EMPTY_PART = {
   StockMinimo: 3,
   PrecioCompra: "",
   PrecioVenta: "",
+  UtilidadPct: "",
   Ubicacion: "",
   Observaciones: "",
   IdProveedor: "",
@@ -41,6 +42,37 @@ export default function StockParts() {
 
   const setField = (name, value) => {
     setPart((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const calculateSalePrice = (purchase, utilityPct) => {
+    const precioCompra = Number(purchase || 0);
+    const pct = Number(utilityPct || 0);
+    if (precioCompra <= 0) return "";
+    return ((precioCompra * (1 + pct / 100))).toFixed(2);
+  };
+
+  const calculateUtilityPct = (purchase, sale) => {
+    const precioCompra = Number(purchase || 0);
+    const precioVenta = Number(sale || 0);
+    if (precioCompra <= 0 || precioVenta <= 0) return "";
+    return (((precioVenta - precioCompra) / precioCompra) * 100).toFixed(2);
+  };
+
+  const handlePurchaseChange = (value) => {
+    setPart((prev) => {
+      const nextSale = prev.UtilidadPct !== ""
+        ? calculateSalePrice(value, prev.UtilidadPct)
+        : prev.PrecioVenta;
+      return { ...prev, PrecioCompra: value, PrecioVenta: nextSale };
+    });
+  };
+
+  const handleUtilityChange = (value) => {
+    setPart((prev) => ({
+      ...prev,
+      UtilidadPct: value,
+      PrecioVenta: calculateSalePrice(prev.PrecioCompra, value),
+    }));
   };
 
   const loadSuppliers = async () => {
@@ -173,6 +205,10 @@ export default function StockParts() {
       StockMinimo: x.stockMinimo ?? x.StockMinimo ?? 3,
       PrecioCompra: x.precioCompra ?? x.PrecioCompra ?? "",
       PrecioVenta: x.precioVenta ?? x.PrecioVenta ?? "",
+      UtilidadPct: calculateUtilityPct(
+        x.precioCompra ?? x.PrecioCompra ?? "",
+        x.precioVenta ?? x.PrecioVenta ?? "",
+      ),
       Ubicacion: x.ubicacion ?? x.Ubicacion ?? "",
       Observaciones: x.observaciones ?? x.Observaciones ?? "",
       IdProveedor: x.idProveedor ?? x.IdProveedor ?? "",
@@ -201,10 +237,10 @@ export default function StockParts() {
       <div className="flex items-center justify-between gap-3 mt-2 mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Stock de repuestos
+            Rentabilidad de repuestos
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Controla piezas, proveedores, cantidades y alertas de stock bajo.
+            Controla piezas, proveedores, costos, utilidad y alertas de stock bajo.
           </p>
         </div>
 
@@ -301,16 +337,31 @@ export default function StockParts() {
             className={cls}
             placeholder="Precio compra"
             value={part.PrecioCompra}
-            onChange={(e) => setField("PrecioCompra", e.target.value)}
+            onChange={(e) => handlePurchaseChange(e.target.value)}
           />
 
           <input
             type="number"
             step="0.01"
             className={cls}
-            placeholder="Precio venta"
+            placeholder="% utilidad"
+            value={part.UtilidadPct}
+            onChange={(e) => handleUtilityChange(e.target.value)}
+          />
+
+          <input
+            type="number"
+            step="0.01"
+            className={cls}
+            placeholder="Precio venta calculado"
             value={part.PrecioVenta}
-            onChange={(e) => setField("PrecioVenta", e.target.value)}
+            onChange={(e) =>
+              setPart((prev) => ({
+                ...prev,
+                PrecioVenta: e.target.value,
+                UtilidadPct: calculateUtilityPct(prev.PrecioCompra, e.target.value),
+              }))
+            }
           />
 
           <select
@@ -372,7 +423,7 @@ export default function StockParts() {
       <section className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
           <h3 className="text-lg font-semibold text-slate-800">
-            Repuestos registrados
+            Rentabilidad registrada
           </h3>
 
           <input
@@ -396,7 +447,9 @@ export default function StockParts() {
                 <th className="text-center py-3 px-3">Categoría</th>
                 <th className="text-center py-3 px-3">Cantidad</th>
                 <th className="text-center py-3 px-3">Compra</th>
+                <th className="text-center py-3 px-3">% utilidad</th>
                 <th className="text-center py-3 px-3">Venta</th>
+                <th className="text-center py-3 px-3">Ganancia</th>
                 <th className="text-center py-3 px-3">Estado</th>
                 <th className="text-center py-3 px-3"></th>
               </tr>
@@ -407,6 +460,12 @@ export default function StockParts() {
                 const id = x.id ?? x.Id;
                 const cantidad = Number(x.cantidad ?? x.Cantidad ?? 0);
                 const stockMinimo = Number(x.stockMinimo ?? x.StockMinimo ?? 3);
+                const precioCompra = Number(x.precioCompra ?? x.PrecioCompra ?? 0);
+                const precioVenta = Number(x.precioVenta ?? x.PrecioVenta ?? 0);
+                const ganancia = precioVenta - precioCompra;
+                const utilidadPct = precioCompra > 0
+                  ? (ganancia / precioCompra) * 100
+                  : 0;
                 const bajo = cantidad <= stockMinimo;
 
                 return (
@@ -425,11 +484,20 @@ export default function StockParts() {
                     </td>
                     <td className="py-3 px-3 text-center">
                       {eur.format(
-                        Number(x.precioCompra ?? x.PrecioCompra ?? 0),
+                        precioCompra,
                       )}
                     </td>
+                    <td className="py-3 px-3 text-center font-semibold">
+                      {utilidadPct.toLocaleString("es-ES", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}%
+                    </td>
                     <td className="py-3 px-3 text-center">
-                      {eur.format(Number(x.precioVenta ?? x.PrecioVenta ?? 0))}
+                      {eur.format(precioVenta)}
+                    </td>
+                    <td className={`py-3 px-3 text-center font-semibold ${ganancia >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
+                      {eur.format(ganancia)}
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span
@@ -467,7 +535,7 @@ export default function StockParts() {
 
               {parts.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="py-6 text-center text-slate-500">
+                  <td colSpan={10} className="py-6 text-center text-slate-500">
                     No hay repuestos para mostrar.
                   </td>
                 </tr>

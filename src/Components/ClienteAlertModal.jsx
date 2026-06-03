@@ -2,7 +2,43 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Bell, CheckCircle2, Phone, X } from "lucide-react";
 import api from "./api";
 
-export default function ClientAlertModal() {
+const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
+
+function getAlertField(alerta, field) {
+  if (!alerta) return "";
+  const pascalField = field.charAt(0).toUpperCase() + field.slice(1);
+  return alerta[field] ?? alerta[pascalField] ?? "";
+}
+
+function normalizeWhatsAppPhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) return digits.slice(2);
+  if (digits.startsWith(DEFAULT_WHATSAPP_COUNTRY_PREFIX)) return digits;
+  if (digits.length === 9) return `${DEFAULT_WHATSAPP_COUNTRY_PREFIX}${digits}`;
+  return digits;
+}
+
+function buildWhatsAppAlertUrl(alerta, workshopName) {
+  const phone = normalizeWhatsAppPhone(getAlertField(alerta, "telefono"));
+  if (!phone) return "";
+
+  const cliente = getAlertField(alerta, "cliente");
+  const saludo = cliente ? `Hola ${cliente},` : "Hola,";
+  const sender = workshopName ? ` desde ${workshopName}` : "";
+  const message = `${saludo} le contactamos${sender} para recordarle que corresponde realizar el servicio de cambio de aceite y filtro. Puede responder a este mensaje o llamarnos para coordinar una cita. Le llamaremos en el transcurso del día para recordarle esta notificación. ¡Gracias por confiar en nosotros!`;
+
+  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+}
+
+function openWhatsAppAlert(alerta, workshopName) {
+  const url = buildWhatsAppAlertUrl(alerta, workshopName);
+  if (!url) return false;
+  window.open(url, "_blank", "noopener,noreferrer");
+  return true;
+}
+
+export default function ClientAlertModal({ workshop }) {
   const [alertas, setAlertas] = useState([]);
   const [current, setCurrent] = useState(null);
   const [dismissedAlertId, setDismissedAlertId] = useState(null);
@@ -94,6 +130,8 @@ export default function ClientAlertModal() {
     try {
       const id = alerta.id ?? alerta.Id;
       await api.put(`/AlertaCliente/${id}/atendida`);
+      const workshopName = workshop?.nombre ?? workshop?.Nombre ?? "";
+      openWhatsAppAlert(alerta, workshopName);
 
       const next = alertas.filter(
         (x) => (x.id ?? x.Id) !== id,
@@ -127,7 +165,7 @@ export default function ClientAlertModal() {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">Alerta atendida</p>
               <p className="mt-0.5 text-sm">
-                Se registro la llamada pendiente de {doneClient || "cliente"}.
+                Se registro la llamada pendiente de {doneClient || "cliente"} y se preparo el mensaje de WhatsApp.
               </p>
             </div>
             <button
@@ -209,7 +247,7 @@ export default function ClientAlertModal() {
                           onClick={() => marcarAtendida(alerta)}
                           className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
                         >
-                          Aceptar llamada realizada
+                          Aceptar y abrir WhatsApp
                         </button>
                       </div>
                     </div>

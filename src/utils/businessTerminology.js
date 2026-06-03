@@ -22,7 +22,7 @@ const automotive = {
   metricPlaceholder: "Kilometraje",
   partsLabel: "Repuestos",
   partsPlaceholder: "Repuestos €",
-  stockTitle: "Stock de repuestos",
+  stockTitle: "Rentabilidad de repuestos",
   stockEmpty: "No hay repuestos para mostrar.",
   supplierHint: "Repuestos, pintura, neumaticos...",
   orderTitle: "Nueva orden de trabajo",

@@ -85,6 +85,18 @@ export default function Statement() {
     0
   );
 
+  const variableExpenses = expenses.reduce((s, x) => {
+    const tipo = String(x.tipoGasto ?? x.TipoGasto ?? "variable").toLowerCase();
+    return tipo === "fijo" ? s : s + Number(x.total ?? x.Total ?? 0);
+  }, 0);
+
+  const fixedExpenses = expenses.reduce((s, x) => {
+    const tipo = String(x.tipoGasto ?? x.TipoGasto ?? "variable").toLowerCase();
+    return tipo === "fijo" ? s + Number(x.total ?? x.Total ?? 0) : s;
+  }, 0);
+
+  const grossProfit = totalIncomes - variableExpenses;
+  const operatingProfit = grossProfit - fixedExpenses;
   const balance = totalIncomes - totalExpenses;
 
   useEffect(() => {
@@ -122,6 +134,94 @@ export default function Statement() {
     setAppliedFrom("");
     setAppliedTo("");
     setErr("");
+  };
+
+  const generateProfitAndLoss = async () => {
+    if (!from || !to) {
+      setErr("Selecciona fecha desde y fecha hasta para generar el estado de resultados.");
+      return;
+    }
+
+    if (from > to) {
+      setErr("La fecha desde no puede ser mayor que la fecha hasta.");
+      return;
+    }
+
+    try {
+      setErr("");
+
+      const [incomeRes, expenseRes] = await Promise.all([
+        api.get("/Ingreso/totalesPorMes", {
+          params: { fechaInicio: from, fechaFin: to },
+        }),
+        api.get("/Egreso/totalesPorMes", {
+          params: { fechaInicio: from, fechaFin: to },
+        }),
+      ]);
+
+      const reportIncomes = incomeRes?.data?.data?.[0] || [];
+      const reportExpenses = expenseRes?.data?.data?.[0] || [];
+
+      const reportTotalIncomes = sumRows(reportIncomes);
+      const reportVariableExpenses = reportExpenses.reduce((sum, item) => {
+        const kind = String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase();
+        return kind === "fijo" ? sum : sum + Number(item.total ?? item.Total ?? 0);
+      }, 0);
+      const reportFixedExpenses = reportExpenses.reduce((sum, item) => {
+        const kind = String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase();
+        return kind === "fijo" ? sum + Number(item.total ?? item.Total ?? 0) : sum;
+      }, 0);
+      const reportTotalExpenses = reportVariableExpenses + reportFixedExpenses;
+      const reportGrossProfit = reportTotalIncomes - reportVariableExpenses;
+      const reportNetResult = reportGrossProfit - reportFixedExpenses;
+
+      downloadProfitAndLossExcel(
+        {
+          from,
+          to,
+          incomes: reportIncomes,
+          expenses: reportExpenses,
+          totalIncomes: reportTotalIncomes,
+          variableExpenses: reportVariableExpenses,
+          fixedExpenses: reportFixedExpenses,
+          totalExpenses: reportTotalExpenses,
+          grossProfit: reportGrossProfit,
+          netResult: reportNetResult,
+        },
+        `estado-resultados-${from}-a-${to}.xls`,
+      );
+      setAppliedFrom(from);
+      setAppliedTo(to);
+    } catch (e) {
+      setErr(e?.response?.data?.message || e.message || "No se pudo generar el estado de resultados.");
+    }
+  };
+
+  const downloadInvoices = async () => {
+    if (!from || !to) {
+      setErr("Selecciona fecha desde y fecha hasta para descargar las facturas.");
+      return;
+    }
+
+    if (from > to) {
+      setErr("La fecha desde no puede ser mayor que la fecha hasta.");
+      return;
+    }
+
+    try {
+      setErr("");
+      const res = await api.get("/FacturaEmitida/exportar", {
+        params: { fechaInicio: from, fechaFin: to },
+        responseType: "blob",
+      });
+
+      downloadBlob(res.data, `facturas-${from}-a-${to}.zip`);
+      setAppliedFrom(from);
+      setAppliedTo(to);
+    } catch (e) {
+      const message = await readBlobError(e);
+      setErr(message || "No se pudieron descargar las facturas del periodo.");
+    }
   };
 
   if (loading) {
@@ -166,7 +266,7 @@ export default function Statement() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-[160px_160px_auto_auto]">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[160px_160px_auto_auto_auto_auto]">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">
                 Desde
@@ -205,6 +305,22 @@ export default function Statement() {
               className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
             >
               Limpiar
+            </button>
+
+            <button
+              type="button"
+              onClick={generateProfitAndLoss}
+              className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition"
+            >
+              Generar estado
+            </button>
+
+            <button
+              type="button"
+              onClick={downloadInvoices}
+              className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition"
+            >
+              Descargar facturas
             </button>
           </div>
         </div>
@@ -257,6 +373,7 @@ export default function Statement() {
               <thead className="bg-slate-50">
                 <tr className="text-left text-slate-500">
                   <th className="th">Tipo</th>
+                  <th className="th text-right">Participación</th>
                   <th className="th text-right">Total</th>
                 </tr>
               </thead>
@@ -267,6 +384,9 @@ export default function Statement() {
                     <td className="td">
                       {i.cuenta_Ingreso ?? i.Cuenta_Ingreso ?? i.nombre ?? "Sin tipo"}
                     </td>
+                    <td className="td text-right text-slate-600">
+                      {formatPct(i.total ?? i.Total ?? 0, totalIncomes)}
+                    </td>
                     <td className="td text-right font-semibold text-emerald-700">
                       {currency(i.total ?? i.Total ?? 0)}
                     </td>
@@ -275,7 +395,7 @@ export default function Statement() {
 
                 {incomes.length === 0 && (
                   <tr>
-                    <td className="td text-slate-500" colSpan={2}>
+                    <td className="td text-slate-500" colSpan={3}>
                       Sin resultados
                     </td>
                   </tr>
@@ -295,6 +415,8 @@ export default function Statement() {
               <thead className="bg-slate-50">
                 <tr className="text-left text-slate-500">
                   <th className="th">Tipo</th>
+                  <th className="th">Clasificación</th>
+                  <th className="th text-right">Participación</th>
                   <th className="th text-right">Total</th>
                 </tr>
               </thead>
@@ -305,6 +427,18 @@ export default function Statement() {
                     <td className="td">
                       {e.cuenta_Egreso ?? e.Cuenta_Egreso ?? e.nombre ?? "Sin tipo"}
                     </td>
+                    <td className="td">
+                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                        String(e.tipoGasto ?? e.TipoGasto ?? "variable").toLowerCase() === "fijo"
+                          ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
+                          : "bg-amber-50 text-amber-700 ring-amber-200"
+                      }`}>
+                        {String(e.tipoGasto ?? e.TipoGasto ?? "variable").toLowerCase() === "fijo" ? "Fijo" : "Variable"}
+                      </span>
+                    </td>
+                    <td className="td text-right text-slate-600">
+                      {formatPct(e.total ?? e.Total ?? 0, totalExpenses)}
+                    </td>
                     <td className="td text-right font-semibold text-rose-700">
                       {currency(e.total ?? e.Total ?? 0)}
                     </td>
@@ -313,7 +447,7 @@ export default function Statement() {
 
                 {expenses.length === 0 && (
                   <tr>
-                    <td className="td text-slate-500" colSpan={2}>
+                    <td className="td text-slate-500" colSpan={4}>
                       Sin resultados
                     </td>
                   </tr>
@@ -325,4 +459,356 @@ export default function Statement() {
       </section>
     </>
   );
+}
+
+function formatPct(value, total) {
+  const amount = Number(value || 0);
+  const base = Number(total || 0);
+  if (base <= 0) return "0,00%";
+  return `${((amount / base) * 100).toLocaleString("es-ES", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}%`;
+}
+
+function sumRows(rows) {
+  return rows.reduce((sum, item) => sum + Number(item.total ?? item.Total ?? 0), 0);
+}
+
+function downloadProfitAndLossExcel(report, filename) {
+  const incomeRows = report.incomes
+    .map((item) => {
+      const amount = Number(item.total ?? item.Total ?? 0);
+      const name = item.cuenta_Ingreso ?? item.Cuenta_Ingreso ?? item.nombre ?? "Sin tipo";
+
+      return `
+        <tr>
+          <td class="cell name" colspan="2">${escapeHtmlCell(name)}</td>
+          <td class="cell percent">${escapeHtmlCell(formatPct(amount, report.totalIncomes))}</td>
+          <td class="cell money positive">${formatMoneyCell(amount)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const expenseRows = report.expenses
+    .map((item) => {
+      const amount = Number(item.total ?? item.Total ?? 0);
+      const name = item.cuenta_Egreso ?? item.Cuenta_Egreso ?? item.nombre ?? "Sin tipo";
+      const kind = String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase() === "fijo"
+        ? "Fijo"
+        : "Variable";
+
+      return `
+        <tr>
+          <td class="cell name">${escapeHtmlCell(name)}</td>
+          <td class="cell center ${kind === "Fijo" ? "fixed" : "variable"}">${kind}</td>
+          <td class="cell percent">${escapeHtmlCell(formatPct(amount, report.totalExpenses))}</td>
+          <td class="cell money negative">${formatMoneyCell(amount)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const resultClass = report.netResult >= 0 ? "positive" : "negative";
+  const generatedAt = new Date().toLocaleString("es-ES");
+
+  const html = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head>
+        <meta charset="UTF-8" />
+        <!--[if gte mso 9]>
+        <xml>
+          <x:ExcelWorkbook>
+            <x:ExcelWorksheets>
+              <x:ExcelWorksheet>
+                <x:Name>Estado de Resultado</x:Name>
+                <x:WorksheetOptions>
+                  <x:FitToPage/>
+                  <x:Print>
+                    <x:FitWidth>1</x:FitWidth>
+                    <x:FitHeight>0</x:FitHeight>
+                  </x:Print>
+                </x:WorksheetOptions>
+              </x:ExcelWorksheet>
+            </x:ExcelWorksheets>
+          </x:ExcelWorkbook>
+        </xml>
+        <![endif]-->
+        <style>
+          @page {
+            margin: 0.35in 0.35in 0.35in 0.35in;
+            mso-page-orientation: portrait;
+          }
+          body {
+            font-family: Arial, sans-serif;
+            color: #1f2937;
+            background: #ffffff;
+            margin: 0;
+          }
+          table {
+            border-collapse: collapse;
+          }
+          .sheet {
+            table-layout: fixed;
+            width: 680px;
+          }
+          .title {
+            background: #0f172a;
+            color: #ffffff;
+            font-size: 18px;
+            font-weight: 700;
+            padding: 12px;
+            text-align: center;
+          }
+          .subtitle {
+            background: #e0f2fe;
+            color: #075985;
+            font-size: 10px;
+            padding: 7px;
+            text-align: center;
+          }
+          .spacer td {
+            height: 10px;
+            border: none;
+          }
+          .section {
+            background: #334155;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 7px;
+            text-transform: uppercase;
+          }
+          .head {
+            background: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+            padding: 6px;
+            border: 1px solid #cbd5e1;
+            font-size: 10px;
+          }
+          .cell {
+            border: 1px solid #dbe3ee;
+            padding: 6px;
+            font-size: 10px;
+          }
+          .name {
+            color: #111827;
+            font-weight: 600;
+            white-space: normal;
+            word-wrap: break-word;
+          }
+          .center {
+            text-align: center;
+          }
+          .percent,
+          .money {
+            text-align: right;
+          }
+          .money {
+            mso-number-format: "0.00";
+            white-space: nowrap;
+          }
+          .positive {
+            color: #047857;
+            font-weight: 700;
+          }
+          .negative {
+            color: #be123c;
+            font-weight: 700;
+          }
+          .fixed {
+            background: #eef2ff;
+            color: #3730a3;
+            font-weight: 700;
+          }
+          .variable {
+            background: #fff7ed;
+            color: #9a3412;
+            font-weight: 700;
+          }
+          .summary-label {
+            background: #f8fafc;
+            border: 1px solid #dbe3ee;
+            color: #475569;
+            font-weight: 700;
+            padding: 6px;
+            font-size: 10px;
+          }
+          .summary-value {
+            border: 1px solid #dbe3ee;
+            padding: 6px;
+            text-align: right;
+            font-weight: 700;
+            font-size: 10px;
+          }
+          .net-label {
+            background: #0f172a;
+            color: #ffffff;
+            border: 1px solid #0f172a;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 8px;
+          }
+          .net-value {
+            background: #0f172a;
+            border: 1px solid #0f172a;
+            font-size: 11px;
+            padding: 8px;
+            text-align: right;
+          }
+          .note {
+            color: #64748b;
+            font-size: 9px;
+            padding: 6px;
+          }
+        </style>
+      </head>
+      <body>
+        <table class="sheet">
+          <colgroup>
+            <col style="width: 290px;" />
+            <col style="width: 105px;" />
+            <col style="width: 115px;" />
+            <col style="width: 170px;" />
+          </colgroup>
+          <tr>
+            <td class="title" colspan="4">Estado de Ganancias y Perdidas</td>
+          </tr>
+          <tr>
+            <td class="subtitle" colspan="4">
+              Periodo: ${escapeHtmlCell(report.from)} al ${escapeHtmlCell(report.to)} | Generado: ${escapeHtmlCell(generatedAt)}
+            </td>
+          </tr>
+          <tr class="spacer"><td colspan="4"></td></tr>
+
+          <tr>
+            <td class="section" colspan="4">Resumen ejecutivo</td>
+          </tr>
+          <tr>
+            <td class="summary-label" colspan="3">Ingresos totales</td>
+            <td class="summary-value positive">${formatMoneyCell(report.totalIncomes)}</td>
+          </tr>
+          <tr>
+            <td class="summary-label" colspan="3">Gastos variables</td>
+            <td class="summary-value negative">${formatMoneyCell(report.variableExpenses)}</td>
+          </tr>
+          <tr>
+            <td class="summary-label" colspan="3">Ganancia bruta</td>
+            <td class="summary-value ${report.grossProfit >= 0 ? "positive" : "negative"}">${formatMoneyCell(report.grossProfit)}</td>
+          </tr>
+          <tr>
+            <td class="summary-label" colspan="3">Gastos fijos</td>
+            <td class="summary-value negative">${formatMoneyCell(report.fixedExpenses)}</td>
+          </tr>
+          <tr>
+            <td class="summary-label" colspan="3">Total gastos</td>
+            <td class="summary-value negative">${formatMoneyCell(report.totalExpenses)}</td>
+          </tr>
+          <tr>
+            <td class="net-label" colspan="3">Resultado neto</td>
+            <td class="net-value ${resultClass}">${formatMoneyCell(report.netResult)}</td>
+          </tr>
+
+          <tr class="spacer"><td colspan="4"></td></tr>
+
+          <tr>
+            <td class="section" colspan="4">Ingresos por categoria</td>
+          </tr>
+          <tr>
+            <td class="head" colspan="2">Categoria</td>
+            <td class="head">Participacion</td>
+            <td class="head">Importe</td>
+          </tr>
+          ${incomeRows || `<tr><td class="cell" colspan="4">Sin ingresos registrados en el periodo.</td></tr>`}
+          <tr>
+            <td class="summary-label" colspan="3">Total ingresos</td>
+            <td class="summary-value positive">${formatMoneyCell(report.totalIncomes)}</td>
+          </tr>
+
+          <tr class="spacer"><td colspan="4"></td></tr>
+
+          <tr>
+            <td class="section" colspan="4">Gastos por categoria</td>
+          </tr>
+          <tr>
+            <td class="head">Categoria</td>
+            <td class="head">Clasificacion</td>
+            <td class="head">Participacion</td>
+            <td class="head">Importe</td>
+          </tr>
+          ${expenseRows || `<tr><td class="cell" colspan="4">Sin gastos registrados en el periodo.</td></tr>`}
+          <tr>
+            <td class="summary-label" colspan="3">Total gastos</td>
+            <td class="summary-value negative">${formatMoneyCell(report.totalExpenses)}</td>
+          </tr>
+
+          <tr class="spacer"><td colspan="4"></td></tr>
+          <tr>
+            <td class="note" colspan="4">
+              Los importes se muestran en euros. Este archivo se genera desde ZagaPro con la informacion registrada para el rango seleccionado.
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function formatMoneyCell(value) {
+  const amount = Number(value || 0);
+  const safeAmount = Number.isFinite(amount) ? amount : 0;
+
+  return escapeHtmlCell(safeAmount.toLocaleString("es-ES", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }));
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+async function readBlobError(error) {
+  const blob = error?.response?.data;
+  if (!blob || typeof blob.text !== "function") {
+    return error?.response?.data?.message || error?.message || "";
+  }
+
+  try {
+    const text = await blob.text();
+    const parsed = JSON.parse(text);
+    return parsed?.message || parsed?.Message || text;
+  } catch {
+    return error?.message || "";
+  }
+}
+
+function escapeHtmlCell(value) {
+  if (value === null || value === undefined) return "";
+  return (typeof value === "number"
+    ? value.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : String(value)
+  )
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }

@@ -119,7 +119,7 @@ export default function PrintBudget() {
     ];
   }, [budget]);
 
-  const subtotal = useMemo(() => {
+  const total = useMemo(() => {
     return round2(
       items.reduce(
         (sum, item) =>
@@ -129,13 +129,13 @@ export default function PrintBudget() {
     );
   }, [items]);
 
-  const iva = useMemo(() => {
-    return round2(subtotal * (ivaPct / 100));
-  }, [subtotal]);
+  const subtotal = useMemo(() => {
+    return round2(total / (1 + ivaPct / 100));
+  }, [total]);
 
-  const total = useMemo(() => {
-    return round2(subtotal + iva);
-  }, [subtotal, iva]);
+  const iva = useMemo(() => {
+    return round2(total - subtotal);
+  }, [total, subtotal]);
 
   const printBudget = () => {
     window.print();
@@ -269,7 +269,7 @@ export default function PrintBudget() {
                   className="border border-black px-2 py-2 w-36 text-right"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  IMPORTE
+                  IMPORTE IVA INCL.
                 </th>
               </tr>
             </thead>
@@ -311,7 +311,7 @@ export default function PrintBudget() {
             </div>
 
             <div className="border border-black text-sm">
-              <Row label="SUBTOTAL" value={formatMoney(subtotal)} />
+              <Row label="BASE IMPONIBLE" value={formatMoney(subtotal)} />
               <Row label="TASA IVA" value={`${ivaPct}%`} />
               <Row label="IVA" value={formatMoney(iva)} />
               <Row label="TOTAL" value={formatMoney(total)} strong />

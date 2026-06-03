@@ -210,26 +210,16 @@ export default function WorkshopInvoice() {
         otros: o.otros || "",
       }));
 
-      const ivaPct = Number(invoice.ivaPct || 0) / 100;
-      const totalOrden = round2(
-        Number(o.manoObra || 0) + Number(o.repuestos || 0),
-      );
-
-      const baseTotal = round2(totalOrden / (1 + ivaPct));
-
-      const baseRepuestos = round2(Number(o.repuestos || 0) / (1 + ivaPct));
-      const baseManoObra = round2(baseTotal - baseRepuestos);
-
       setItems([
         {
           descripcion: o.trabajo || "Trabajo realizado",
           cantidad: 1,
-          importe: baseRepuestos,
+          importe: Number(o.repuestos || 0),
         },
         {
           descripcion: "Mano de obra",
           cantidad: 1,
-          importe: baseManoObra,
+          importe: Number(o.manoObra || 0),
         },
       ]);
     } catch (err) {
@@ -244,7 +234,7 @@ export default function WorkshopInvoice() {
     }
   };
 
-  const subtotal = useMemo(() => {
+  const totalConIva = useMemo(() => {
     return round2(
       items.reduce(
         (sum, item) =>
@@ -254,21 +244,22 @@ export default function WorkshopInvoice() {
     );
   }, [items]);
 
-  const iva = useMemo(() => {
-    return round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
-  }, [subtotal, invoice.ivaPct]);
-
   const otros = useMemo(() => {
     return round2(Number(invoice.otros || 0));
   }, [invoice.otros]);
 
   const totalFinal = useMemo(() => {
-    return round2(subtotal + iva - otros);
-  }, [subtotal, iva, otros]);
+    return round2(Math.max(0, totalConIva - otros));
+  }, [totalConIva, otros]);
 
-  // const totalFinal = useMemo(() => {
-  //   return round2(subtotal + iva);
-  // }, [subtotal, iva]);
+  const subtotal = useMemo(() => {
+    const rate = Number(invoice.ivaPct || 0) / 100;
+    return rate > 0 ? round2(totalFinal / (1 + rate)) : totalFinal;
+  }, [totalFinal, invoice.ivaPct]);
+
+  const iva = useMemo(() => {
+    return round2(totalFinal - subtotal);
+  }, [totalFinal, subtotal]);
 
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
@@ -720,7 +711,7 @@ const printInvoice = async () => {
                 type="number"
                 step="0.01"
                 className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Importe"
+                placeholder="Importe IVA incl."
                 value={item.importe}
                 onChange={(e) => setItemField(index, "importe", e.target.value)}
               />
@@ -822,7 +813,7 @@ const printInvoice = async () => {
                   className="border border-black px-2 py-2 w-36 text-right"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  IMPORTE
+                  IMPORTE IVA INCL.
                 </th>
               </tr>
             </thead>
@@ -871,7 +862,7 @@ const printInvoice = async () => {
             </div>
 
             <div className="border border-black text-sm">
-              <Row label="SUBTOTAL" value={formatMoney(subtotal)} />
+              <Row label="BASE IMPONIBLE" value={formatMoney(subtotal)} />
               <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
               <Row label="IVA" value={formatMoney(iva)} />
               <Row label="OTROS" value={`- ${formatMoney(otros)}`} />

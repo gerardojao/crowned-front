@@ -6,6 +6,7 @@ import api from "../Components/api";
 const EMPTY_EGRESO = {
   Id: "",
   Nombre: "",
+  TipoGasto: "variable",
 };
 
 export default function RegisterExpenseType() {
@@ -66,6 +67,7 @@ export default function RegisterExpenseType() {
         data.map((x) => ({
           Id: x.id ?? x.Id,
           Nombre: x.nombre ?? x.Nombre,
+          TipoGasto: x.tipoGasto ?? x.TipoGasto ?? "variable",
         })),
       );
     } catch (err) {
@@ -95,6 +97,7 @@ export default function RegisterExpenseType() {
 
       const payload = {
         nombre: egreso.Nombre.trim(),
+        tipoGasto: egreso.TipoGasto || "variable",
       };
 
       if (editingId) {
@@ -136,6 +139,7 @@ export default function RegisterExpenseType() {
     setEgreso({
       Id: item.Id,
       Nombre: item.Nombre || "",
+      TipoGasto: item.TipoGasto || "variable",
     });
 
     window.scrollTo({
@@ -217,7 +221,7 @@ export default function RegisterExpenseType() {
             {editingId ? "Actualizar egreso" : "Nuevo egreso"}
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_auto_auto] gap-3">
             <input
               type="text"
               value={egreso.Nombre}
@@ -230,6 +234,20 @@ export default function RegisterExpenseType() {
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               placeholder="Ejemplo: Repuestos, alquiler, herramientas..."
             />
+
+            <select
+              value={egreso.TipoGasto}
+              onChange={(e) =>
+                setEgreso((prev) => ({
+                  ...prev,
+                  TipoGasto: e.target.value,
+                }))
+              }
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="variable">Gasto variable</option>
+              <option value="fijo">Gasto fijo</option>
+            </select>
 
             <button
               type="submit"
@@ -264,6 +282,7 @@ export default function RegisterExpenseType() {
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="text-center text-lg py-3 px-4">Cuenta / Categoría</th>
+                <th className="text-center py-3 px-4 w-40">Tipo</th>
                 <th className="text-center py-3 px-4 w-40"></th>
               </tr>
             </thead>
@@ -273,6 +292,16 @@ export default function RegisterExpenseType() {
                 <tr key={item.Id} className="hover:bg-slate-50">
                   <td className="py-3 px-4 font-medium text-slate-800">
                     {item.Nombre}
+                  </td>
+
+                  <td className="py-3 px-4 text-center">
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                      item.TipoGasto === "fijo"
+                        ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
+                        : "bg-amber-50 text-amber-700 ring-amber-200"
+                    }`}>
+                      {item.TipoGasto === "fijo" ? "Fijo" : "Variable"}
+                    </span>
                   </td>
 
                   <td className="py-3 px-4 text-center">
@@ -304,7 +333,7 @@ export default function RegisterExpenseType() {
 
               {egresos.length === 0 && (
                 <tr>
-                  <td colSpan={2} className="py-6 text-center text-slate-500">
+                  <td colSpan={3} className="py-6 text-center text-slate-500">
                     No hay egresos registrados.
                   </td>
                 </tr>

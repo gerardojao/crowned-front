@@ -259,7 +259,7 @@ export default function ReprintInvoice() {
                     CANTIDAD
                   </th>
                   <th className="border border-black px-2 py-2 w-36 text-right">
-                    IMPORTE
+                    IMPORTE IVA INCL.
                   </th>
                 </tr>
               </thead>
@@ -311,7 +311,7 @@ export default function ReprintInvoice() {
               </div>
 
               <div className="border border-black text-sm">
-                <Row label="SUBTOTAL" value={formatMoney(totals.subtotal)} />
+                <Row label="BASE IMPONIBLE" value={formatMoney(totals.subtotal)} />
                 <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
                 <Row label="IVA" value={formatMoney(totals.iva)} />
                 <Row label="OTROS" value={`- ${formatMoney(totals.otros)}`} />

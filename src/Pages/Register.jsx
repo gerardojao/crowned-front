@@ -132,7 +132,6 @@ useEffect(() => {
     let msg = "";
     switch (name) {
       case "NombreEgreso":
-      case "Mes":
       case "Fecha":
         if (!value) msg = REQUIRED;
         break;
@@ -150,7 +149,7 @@ useEffect(() => {
   };
 
   const validateAll = () => {
-    const fields = ["NombreEgreso", "Mes", "Fecha", "Importe"];
+    const fields = ["NombreEgreso", "Fecha", "Importe"];
     const next = {};
     for (const f of fields) {
       const ok = validateField(f, expense[f]);
@@ -166,7 +165,7 @@ useEffect(() => {
     }
     setErrors(prev => ({ ...prev, ...next }));
     // enfocar el primero con error
-    const firstError = ["NombreEgreso", "Mes", "Fecha", "Importe"].find(f => next[f]);
+    const firstError = ["NombreEgreso", "Fecha", "Importe"].find(f => next[f]);
     if (firstError) {
       const el = document.getElementById(firstError);
       el?.focus();
@@ -190,8 +189,8 @@ useEffect(() => {
       if (isEdit) {
         const id = state.id || record?.id;
         await api.put(`/FichaEgreso/detalle/${id}`, {
-          fecha: expense.Fecha, // ahora requerido
-          mes: expense.Mes,
+          fecha: expense.Fecha || null,
+          mes: expense.Mes || null,
           nombreEgreso: expense.NombreEgreso ? Number(expense.NombreEgreso) : null,
           descripcion: expense.Descripcion ?? null,
           importe: Number(expense.Importe ?? 0),
@@ -214,8 +213,8 @@ useEffect(() => {
       // CREATE
       await api.post("/FichaEgreso", {
         Foto: expense.Foto || null,
-        Fecha: expense.Fecha,             // requerido
-        Mes: expense.Mes,                 // requerido
+        Fecha: expense.Fecha || null,
+        Mes: expense.Mes || null,
         Importe: Number(expense.Importe), // requerido > 0
         NombreEgreso: Number(expense.NombreEgreso), // requerido
         Descripcion: expense.Descripcion || null,
