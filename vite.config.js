@@ -8,19 +8,24 @@ export default defineConfig(({ command }) => {
   const mkcertFactory = typeof mkcert === 'function' ? mkcert : mkcert?.default;
   const plugins = [react(),
     VitePWA({
+    registerType: 'autoUpdate',
+    workbox: {
+      cleanupOutdatedCaches: true,
+    },
     manifest: {
-      name: 'TallerCrowned',
-      short_name: 'TallerCrowned',
-      description: 'Gestion de taller, ordenes, presupuestos y facturas',
+      name: 'ZagaPro',
+      short_name: 'ZagaPro',
+      description: 'Sistema de gestion y control integral para negocios de servicios',
+      lang: 'es',
       theme_color: '#ffffff',
       icons: [
         {
-          src: 'pwa-192x192.png',
-          sizes: '192x192',
+          src: 'logozagapro.png',
+          sizes: '512x512',
           type: 'image/png',
         },
         {
-          src: 'pwa-512x512.png',
+          src: 'logozagapro.png',
           sizes: '512x512',
           type: 'image/png',
         },

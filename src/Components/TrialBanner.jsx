@@ -45,7 +45,7 @@ export default function TrialBanner() {
               <a className="underline" href="/register">
                 Registrate
               </a>{" "}
-              para seguir usando TallerCrowned.
+              para seguir usando ZagaPro.
             </span>
           ) : (
             <>

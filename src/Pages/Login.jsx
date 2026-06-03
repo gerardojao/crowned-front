@@ -22,8 +22,10 @@ export default function Login() {
   const allowed = [
     "https://invoice.tallercrowned.store",
     "https://www.invoice.tallercrowned.store",
-    "https://invoice.familyapp.store",
-    "https://www.invoice.familyapp.store",
+    "https://zagapro.app",
+    "https://www.zagapro.app",
+    "https://invoice.zagapro.app",
+    "https://www.invoice.zagapro.app",
     "https://localhost:5173",
     "https://localhost:5174",
     "http://localhost:5173",
@@ -209,7 +211,7 @@ export default function Login() {
           </Link>
         </div>
         <div className="mt-3 text-center text-sm">
-          <a href={supportMailto("Soporte acceso TallerCrowned")} className="text-slate-600 hover:text-slate-900">
+          <a href={supportMailto("Soporte acceso ZagaPro")} className="text-slate-600 hover:text-slate-900">
             Necesitas soporte?
           </a>
         </div>

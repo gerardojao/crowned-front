@@ -1,6 +1,8 @@
 {
+  "framework": "vite",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "http://familyapp-api.somee.com/api/$1" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }

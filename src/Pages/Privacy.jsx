@@ -16,7 +16,7 @@ export default function Privacy() {
 
   const workshopName = settings?.nombre ?? settings?.Nombre ?? "App Multitaller";
   const text = settings?.privacyPolicyText ?? settings?.PrivacyPolicyText ?? DEFAULT_TEXT;
-  const email = settings?.email ?? settings?.Email ?? "soporte@tallercrowned.store";
+  const email = settings?.email ?? settings?.Email ?? "soporte@zagapro.app";
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4 text-slate-700 space-y-4">

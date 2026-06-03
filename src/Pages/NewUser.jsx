@@ -38,7 +38,7 @@ export default function NewUser() {
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
           <a
-            href={supportMailto("Alta usuario TallerCrowned")}
+            href={supportMailto("Alta usuario ZagaPro")}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
           >
             <Mail size={17} />

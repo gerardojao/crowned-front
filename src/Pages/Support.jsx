@@ -24,7 +24,7 @@ export default function Support() {
         </div>
 
         <a
-          href={supportMailto("Soporte TallerCrowned")}
+          href={supportMailto("Soporte ZagaPro")}
           className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700"
         >
           <Mail size={17} />
