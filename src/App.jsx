@@ -27,7 +27,7 @@ import Support from "./Pages/Support";
 import RegisterSupplier from "./Pages/RegisterSupplier.jsx";
 import RegisterWorkOrder from "./Pages/RegisterWorkOrder.jsx";
 import PrintWorkOrder from "./Pages/PrintWorkOrder.jsx";
-import WorkshopInvoice from "./Pages/WorkshopInvoice.jsx";
+import WorkshopInvoice from "./Pages/WorkShopInvoice.jsx";
 import StockParts from "./Pages/StockParts.jsx";
 import ReprintInvoice from "./Pages/ReprintInvoice.jsx";
 import RegisterExpenseType from "./Pages/RegisterExpenseType.jsx";
