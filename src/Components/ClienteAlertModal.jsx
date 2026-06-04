@@ -44,6 +44,8 @@ export default function ClientAlertModal({ workshop }) {
   const [dismissedAlertId, setDismissedAlertId] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [done, setDone] = useState(null);
+  const whatsappEnabled =
+    workshop?.enableWhatsappAlerts ?? workshop?.EnableWhatsappAlerts ?? true;
 
   const publishCount = useCallback((list) => {
     window.dispatchEvent(
@@ -131,7 +133,9 @@ export default function ClientAlertModal({ workshop }) {
       const id = alerta.id ?? alerta.Id;
       await api.put(`/AlertaCliente/${id}/atendida`);
       const workshopName = workshop?.nombre ?? workshop?.Nombre ?? "";
-      openWhatsAppAlert(alerta, workshopName);
+      if (whatsappEnabled) {
+        openWhatsAppAlert(alerta, workshopName);
+      }
 
       const next = alertas.filter(
         (x) => (x.id ?? x.Id) !== id,
@@ -165,7 +169,8 @@ export default function ClientAlertModal({ workshop }) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">Alerta atendida</p>
               <p className="mt-0.5 text-sm">
-                Se registro la llamada pendiente de {doneClient || "cliente"} y se preparo el mensaje de WhatsApp.
+                Se registro la llamada pendiente de {doneClient || "cliente"}
+                {whatsappEnabled ? " y se preparo el mensaje de WhatsApp." : "."}
               </p>
             </div>
             <button
@@ -247,7 +252,7 @@ export default function ClientAlertModal({ workshop }) {
                           onClick={() => marcarAtendida(alerta)}
                           className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
                         >
-                          Aceptar y abrir WhatsApp
+                          {whatsappEnabled ? "Aceptar y abrir WhatsApp" : "Aceptar llamada realizada"}
                         </button>
                       </div>
                     </div>

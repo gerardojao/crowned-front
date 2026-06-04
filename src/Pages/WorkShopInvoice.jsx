@@ -4,6 +4,8 @@ import { ArrowLeft, Plus, Trash2, Printer, Wrench } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
+import { amountInput } from "../utils/currency";
 
 const EMPTY_ITEM = {
   descripcion: "",
@@ -293,6 +295,20 @@ export default function WorkshopInvoice() {
         descripcion,
         cantidad: 1,
         importe: 0,
+      },
+    ]);
+  };
+
+  const addPartItem = (part) => {
+    const descripcion = getPartDisplayName(part);
+    if (!descripcion) return;
+
+    setItems((prev) => [
+      ...prev,
+      {
+        descripcion,
+        cantidad: 1,
+        importe: getPartSalePrice(part).toFixed(2),
       },
     ]);
   };
@@ -612,6 +628,7 @@ const printInvoice = async () => {
               placeholder="Otros"
               value={invoice.otros}
               onChange={(e) => setInvoiceField("otros", e.target.value)}
+              onBlur={(e) => setInvoiceField("otros", amountInput(e.target.value))}
             />
           </div>
         </div>
@@ -622,6 +639,13 @@ const printInvoice = async () => {
           <h3 className="text-lg font-semibold text-slate-800">Conceptos</h3>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <PartPicker
+              onSelect={addPartItem}
+              placeholder="Buscar repuesto"
+              buttonLabel="Agregar linea"
+              className="w-full sm:w-80"
+            />
+
             <div className="relative">
               <Wrench
                 size={16}
@@ -714,6 +738,7 @@ const printInvoice = async () => {
                 placeholder="Importe IVA incl."
                 value={item.importe}
                 onChange={(e) => setItemField(index, "importe", e.target.value)}
+                onBlur={(e) => setItemField(index, "importe", amountInput(e.target.value))}
               />
 
               <button

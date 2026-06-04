@@ -13,6 +13,10 @@ export default function Statement() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [features, setFeatures] = useState({
+    enableInvoiceExport: true,
+    enableProfitAndLoss: true,
+  });
 
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -61,7 +65,13 @@ export default function Statement() {
     try {
       setLoading(true);
       setErr("");
-      await Promise.all([getIncomes(), getExpenses()]);
+      const settingsPromise = api.get("/WorkshopSettings");
+      const [, , settingsRes] = await Promise.all([getIncomes(), getExpenses(), settingsPromise]);
+      const settings = settingsRes?.data || {};
+      setFeatures({
+        enableInvoiceExport: settings.enableInvoiceExport ?? settings.EnableInvoiceExport ?? true,
+        enableProfitAndLoss: settings.enableProfitAndLoss ?? settings.EnableProfitAndLoss ?? true,
+      });
     } catch (e) {
       setErr(e?.response?.data?.message || e.message || "Error cargando relación");
       setIncomes([]);
@@ -307,21 +317,25 @@ export default function Statement() {
               Limpiar
             </button>
 
-            <button
-              type="button"
-              onClick={generateProfitAndLoss}
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition"
-            >
-              Generar estado
-            </button>
+            {features.enableProfitAndLoss && (
+              <button
+                type="button"
+                onClick={generateProfitAndLoss}
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-emerald-600 text-white hover:bg-emerald-700 transition"
+              >
+                Generar estado
+              </button>
+            )}
 
-            <button
-              type="button"
-              onClick={downloadInvoices}
-              className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition"
-            >
-              Descargar facturas
-            </button>
+            {features.enableInvoiceExport && (
+              <button
+                type="button"
+                onClick={downloadInvoices}
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition"
+              >
+                Descargar facturas
+              </button>
+            )}
           </div>
         </div>
 

@@ -30,6 +30,9 @@ const emptyWorkshop = {
   footerText: "",
   privacyPolicyText: "",
   termsText: "",
+  enableWhatsappAlerts: true,
+  enableInvoiceExport: true,
+  enableProfitAndLoss: true,
   ownerEmail: "",
   ownerPassword: "",
   ownerFullName: "",
@@ -58,6 +61,9 @@ export default function AdminWorkshops() {
     maxUsers: 3,
     businessType: "automotive",
     terminologyProfile: "automotive",
+    enableWhatsappAlerts: true,
+    enableInvoiceExport: true,
+    enableProfitAndLoss: true,
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -91,6 +97,9 @@ export default function AdminWorkshops() {
         maxUsers: 3,
         businessType: "automotive",
         terminologyProfile: "automotive",
+        enableWhatsappAlerts: true,
+        enableInvoiceExport: true,
+        enableProfitAndLoss: true,
       });
       setUsers([]);
       return;
@@ -103,6 +112,9 @@ export default function AdminWorkshops() {
       maxUsers: selectedWorkshop.maxUsers ?? selectedWorkshop.MaxUsers ?? 3,
       businessType: selectedWorkshop.businessType ?? selectedWorkshop.BusinessType ?? "automotive",
       terminologyProfile: selectedWorkshop.terminologyProfile ?? selectedWorkshop.TerminologyProfile ?? "automotive",
+      enableWhatsappAlerts: selectedWorkshop.enableWhatsappAlerts ?? selectedWorkshop.EnableWhatsappAlerts ?? true,
+      enableInvoiceExport: selectedWorkshop.enableInvoiceExport ?? selectedWorkshop.EnableInvoiceExport ?? true,
+      enableProfitAndLoss: selectedWorkshop.enableProfitAndLoss ?? selectedWorkshop.EnableProfitAndLoss ?? true,
     });
     setEditingUserId("");
     loadUsers(selectedId).catch((err) => setError(err?.response?.data?.message || "No se pudieron cargar los usuarios."));
@@ -268,6 +280,12 @@ export default function AdminWorkshops() {
             <Input label="Password owner nuevo" type="password" value={form.ownerPassword} onChange={(v) => setField("ownerPassword", v)} />
             <div className="md:col-span-2">
               <Input label="Nombre owner" value={form.ownerFullName} onChange={(v) => setField("ownerFullName", v)} />
+            </div>
+            <div className="md:col-span-2">
+              <FeatureSwitches
+                values={form}
+                onChange={(name, value) => setField(name, value)}
+              />
             </div>
           </div>
 
@@ -489,6 +507,12 @@ export default function AdminWorkshops() {
           <Select label="Tipo de negocio" value={legalForm.businessType} onChange={(v) => setLegalForm((p) => ({ ...p, businessType: v }))} options={BUSINESS_TYPES} />
           <Select label="Perfil de textos" value={legalForm.terminologyProfile} onChange={(v) => setLegalForm((p) => ({ ...p, terminologyProfile: v }))} options={TERMINOLOGY_PROFILES} />
           <Input label="Footer" value={legalForm.footerText} onChange={(v) => setLegalForm((p) => ({ ...p, footerText: v }))} />
+          <div className="md:col-span-2">
+            <FeatureSwitches
+              values={legalForm}
+              onChange={(name, value) => setLegalForm((p) => ({ ...p, [name]: value }))}
+            />
+          </div>
           <Textarea label="Politicas" value={legalForm.privacyPolicyText} onChange={(v) => setLegalForm((p) => ({ ...p, privacyPolicyText: v }))} />
           <Textarea label="Terminos" value={legalForm.termsText} onChange={(v) => setLegalForm((p) => ({ ...p, termsText: v }))} />
         </div>
@@ -593,6 +617,51 @@ function Textarea({ label, value, onChange }) {
         rows={5}
         className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
       />
+    </label>
+  );
+}
+
+function FeatureSwitches({ values, onChange }) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-bold text-slate-800">Modulos comerciales</p>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        <Switch
+          label="Alertas WhatsApp"
+          description="Abre WhatsApp al atender alertas de cliente."
+          checked={values.enableWhatsappAlerts}
+          onChange={(checked) => onChange("enableWhatsappAlerts", checked)}
+        />
+        <Switch
+          label="Exportacion de facturas"
+          description="Permite descargar facturas por periodo."
+          checked={values.enableInvoiceExport}
+          onChange={(checked) => onChange("enableInvoiceExport", checked)}
+        />
+        <Switch
+          label="Estado de resultados"
+          description="Permite generar el reporte financiero."
+          checked={values.enableProfitAndLoss}
+          onChange={(checked) => onChange("enableProfitAndLoss", checked)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Switch({ label, description, checked, onChange }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm transition hover:bg-slate-50">
+      <input
+        type="checkbox"
+        className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-600"
+        checked={Boolean(checked)}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+      <span>
+        <span className="block font-bold text-slate-800">{label}</span>
+        <span className="mt-0.5 block text-xs leading-4 text-slate-500">{description}</span>
+      </span>
     </label>
   );
 }

@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Search, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
+import { amountInput } from "../utils/currency";
 
 const EMPTY_ORDER = {
   Cliente: "",
@@ -132,6 +134,24 @@ export default function RegisterWorkOrder() {
         ? `${prev.Trabajo.trim()}\n${value}`
         : value,
     }));
+  };
+
+  const addPartToOrder = (part) => {
+    const name = getPartDisplayName(part);
+    const price = getPartSalePrice(part);
+    if (!name) return;
+
+    setOrder((prev) => {
+      const currentParts = Number(prev.Repuestos || 0);
+      const nextParts = (currentParts + price).toFixed(2);
+
+      return {
+        ...prev,
+        Repuestos: nextParts,
+      };
+    });
+
+    setNotice(`Repuesto agregado al importe: ${name}.`);
   };
 
   const createFrequentService = async () => {
@@ -834,15 +854,23 @@ export default function RegisterWorkOrder() {
               required
             />
 
-            <input
-              name="Repuestos"
-              type="number"
-              step="0.01"
-              value={order.Repuestos}
-              onChange={handleChange}
-              className={cls}
-              placeholder={`${labels.partsPlaceholder} IVA incl.`}
-            />
+            <div className="space-y-2">
+              <PartPicker
+                onSelect={addPartToOrder}
+                placeholder="Buscar repuesto en rentabilidad"
+                buttonLabel="Agregar"
+              />
+              <input
+                name="Repuestos"
+                type="number"
+                step="0.01"
+                value={order.Repuestos}
+                onChange={handleChange}
+                onBlur={(e) => setField("Repuestos", amountInput(e.target.value))}
+                className={cls}
+                placeholder={`${labels.partsPlaceholder} IVA incl.`}
+              />
+            </div>
 
             <input
               name="ManoObra"
@@ -850,6 +878,7 @@ export default function RegisterWorkOrder() {
               step="0.01"
               value={order.ManoObra}
               onChange={handleChange}
+              onBlur={(e) => setField("ManoObra", amountInput(e.target.value))}
               className={cls}
               placeholder="Mano de obra IVA incl. €"
             />

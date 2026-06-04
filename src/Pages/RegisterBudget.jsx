@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Search, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
+import { amountInput } from "../utils/currency";
 
 const EMPTY_BUDGET = {
   NumeroPresupuesto: "",
@@ -98,6 +100,24 @@ export default function RegisterBudget() {
         ? `${prev.Trabajo.trim()}\n${value}`
         : value,
     }));
+  };
+
+  const addPartToBudget = (part) => {
+    const name = getPartDisplayName(part);
+    const price = getPartSalePrice(part);
+    if (!name) return;
+
+    setBudget((prev) => {
+      const currentParts = Number(prev.Repuestos || 0);
+      const nextParts = (currentParts + price).toFixed(2);
+
+      return {
+        ...prev,
+        Repuestos: nextParts,
+      };
+    });
+
+    setNotice(`Repuesto agregado al importe: ${name}.`);
   };
 
   const createFrequentService = async () => {
@@ -729,15 +749,23 @@ export default function RegisterBudget() {
             required
           />
 
-          <input
-            name="Repuestos"
-            type="number"
-            step="0.01"
-            value={budget.Repuestos}
-            onChange={handleChange}
-            className={cls}
-            placeholder={`${labels.partsPlaceholder} IVA incl.`}
-          />
+          <div className="space-y-2">
+            <PartPicker
+              onSelect={addPartToBudget}
+              placeholder="Buscar repuesto en rentabilidad"
+              buttonLabel="Agregar"
+            />
+            <input
+              name="Repuestos"
+              type="number"
+              step="0.01"
+              value={budget.Repuestos}
+              onChange={handleChange}
+              onBlur={(e) => setField("Repuestos", amountInput(e.target.value))}
+              className={cls}
+              placeholder={`${labels.partsPlaceholder} IVA incl.`}
+            />
+          </div>
 
           <input
             name="ManoObra"
@@ -745,6 +773,7 @@ export default function RegisterBudget() {
             step="0.01"
             value={budget.ManoObra}
             onChange={handleChange}
+            onBlur={(e) => setField("ManoObra", amountInput(e.target.value))}
             className={cls}
             placeholder="Mano de obra IVA incl. €"
           />
