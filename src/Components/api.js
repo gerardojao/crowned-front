@@ -3,13 +3,13 @@ import axios from "axios";
 
 const isDev = import.meta.env.DEV;
 
-// En dev usa la API local; en prod usa el proxy /api (Vercel rewrites)
-const baseURL =
+// En dev usa la API local; en prod usa VITE_API_BASE.
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE ??
   (isDev ? "https://localhost:7288/api" : "/api");
 
 const api = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   timeout: 45000,
   withCredentials: true,   
 });
@@ -32,11 +32,11 @@ export function setCurrentWorkshopId(workshopId) {
 export function resolveApiAssetUrl(path) {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  const root = baseURL.replace(/\/api\/?$/i, "");
+  const root = API_BASE_URL.replace(/\/api\/?$/i, "");
   return `${root}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
-if (!isDev) console.log("[API baseURL]", baseURL);
+if (!isDev) console.log("[API baseURL]", API_BASE_URL);
 
 // -------- Auth: arranque con token si ya existe --------
 const bootToken = localStorage.getItem("fa_token");

@@ -84,12 +84,10 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../Components/AuthContext";
+import { API_BASE_URL } from "../Components/api";
  // ajusta la ruta si difiere
 
-const API_BASE =
-  ["localhost", "127.0.0.1"].includes(window.location.hostname)
-    ? "https://localhost:7288"
-    : "";
+const API_BASE = API_BASE_URL.replace(/\/$/, "");
 
 export default function TrialGate() {
 
@@ -115,7 +113,7 @@ export default function TrialGate() {
           return;
         }
 
-        const res = await fetch(`${API_BASE}/api/Trials/redeem`, {
+        const res = await fetch(`${API_BASE}/Trials/redeem`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, token }),
