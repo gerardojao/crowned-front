@@ -25,6 +25,8 @@ const emptyWorkshop = {
   iban: "",
   serieFactura: "A",
   logoPath: "",
+  maxUsers: 3,
+  activo: true,
   businessType: "automotive",
   terminologyProfile: "automotive",
   footerText: "",
@@ -55,6 +57,16 @@ export default function AdminWorkshops() {
   });
   const [removeModal, setRemoveModal] = useState({ open: false, user: null, loading: false });
   const [legalForm, setLegalForm] = useState({
+    nombre: "",
+    razonSocial: "",
+    nif: "",
+    direccion: "",
+    telefono: "",
+    email: "",
+    iban: "",
+    serieFactura: "A",
+    logoPath: "",
+    activo: true,
     footerText: "",
     privacyPolicyText: "",
     termsText: "",
@@ -91,6 +103,16 @@ export default function AdminWorkshops() {
   useEffect(() => {
     if (!selectedWorkshop) {
       setLegalForm({
+        nombre: "",
+        razonSocial: "",
+        nif: "",
+        direccion: "",
+        telefono: "",
+        email: "",
+        iban: "",
+        serieFactura: "A",
+        logoPath: "",
+        activo: true,
         footerText: "",
         privacyPolicyText: "",
         termsText: "",
@@ -106,6 +128,16 @@ export default function AdminWorkshops() {
     }
 
     setLegalForm({
+      nombre: selectedWorkshop.nombre ?? selectedWorkshop.Nombre ?? "",
+      razonSocial: selectedWorkshop.razonSocial ?? selectedWorkshop.RazonSocial ?? "",
+      nif: selectedWorkshop.nif ?? selectedWorkshop.Nif ?? "",
+      direccion: selectedWorkshop.direccion ?? selectedWorkshop.Direccion ?? "",
+      telefono: selectedWorkshop.telefono ?? selectedWorkshop.Telefono ?? "",
+      email: selectedWorkshop.email ?? selectedWorkshop.Email ?? "",
+      iban: selectedWorkshop.iban ?? selectedWorkshop.Iban ?? "",
+      serieFactura: selectedWorkshop.serieFactura ?? selectedWorkshop.SerieFactura ?? "A",
+      logoPath: selectedWorkshop.logoPath ?? selectedWorkshop.LogoPath ?? "",
+      activo: selectedWorkshop.activo ?? selectedWorkshop.Activo ?? true,
       footerText: selectedWorkshop.footerText ?? selectedWorkshop.FooterText ?? "",
       privacyPolicyText: selectedWorkshop.privacyPolicyText ?? selectedWorkshop.PrivacyPolicyText ?? "",
       termsText: selectedWorkshop.termsText ?? selectedWorkshop.TermsText ?? "",
@@ -116,6 +148,30 @@ export default function AdminWorkshops() {
       enableInvoiceExport: selectedWorkshop.enableInvoiceExport ?? selectedWorkshop.EnableInvoiceExport ?? true,
       enableProfitAndLoss: selectedWorkshop.enableProfitAndLoss ?? selectedWorkshop.EnableProfitAndLoss ?? true,
     });
+    setForm({
+      nombre: selectedWorkshop.nombre ?? selectedWorkshop.Nombre ?? "",
+      razonSocial: selectedWorkshop.razonSocial ?? selectedWorkshop.RazonSocial ?? "",
+      nif: selectedWorkshop.nif ?? selectedWorkshop.Nif ?? "",
+      direccion: selectedWorkshop.direccion ?? selectedWorkshop.Direccion ?? "",
+      telefono: selectedWorkshop.telefono ?? selectedWorkshop.Telefono ?? "",
+      email: selectedWorkshop.email ?? selectedWorkshop.Email ?? "",
+      iban: selectedWorkshop.iban ?? selectedWorkshop.Iban ?? "",
+      serieFactura: selectedWorkshop.serieFactura ?? selectedWorkshop.SerieFactura ?? "A",
+      logoPath: selectedWorkshop.logoPath ?? selectedWorkshop.LogoPath ?? "",
+      maxUsers: selectedWorkshop.maxUsers ?? selectedWorkshop.MaxUsers ?? 3,
+      activo: selectedWorkshop.activo ?? selectedWorkshop.Activo ?? true,
+      businessType: selectedWorkshop.businessType ?? selectedWorkshop.BusinessType ?? "automotive",
+      terminologyProfile: selectedWorkshop.terminologyProfile ?? selectedWorkshop.TerminologyProfile ?? "automotive",
+      footerText: selectedWorkshop.footerText ?? selectedWorkshop.FooterText ?? "",
+      privacyPolicyText: selectedWorkshop.privacyPolicyText ?? selectedWorkshop.PrivacyPolicyText ?? "",
+      termsText: selectedWorkshop.termsText ?? selectedWorkshop.TermsText ?? "",
+      enableWhatsappAlerts: selectedWorkshop.enableWhatsappAlerts ?? selectedWorkshop.EnableWhatsappAlerts ?? true,
+      enableInvoiceExport: selectedWorkshop.enableInvoiceExport ?? selectedWorkshop.EnableInvoiceExport ?? true,
+      enableProfitAndLoss: selectedWorkshop.enableProfitAndLoss ?? selectedWorkshop.EnableProfitAndLoss ?? true,
+      ownerEmail: "",
+      ownerPassword: "",
+      ownerFullName: "",
+    });
     setEditingUserId("");
     loadUsers(selectedId).catch((err) => setError(err?.response?.data?.message || "No se pudieron cargar los usuarios."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,19 +179,39 @@ export default function AdminWorkshops() {
 
   const setField = (name, value) => setForm((prev) => ({ ...prev, [name]: value }));
 
-  const createWorkshop = async (ev) => {
+  const saveWorkshop = async (ev) => {
     ev.preventDefault();
     setMessage("");
     setError("");
 
     try {
-      await api.post("/AdminWorkshops", { ...form, maxUsers: 3 });
-      setForm(emptyWorkshop);
-      setMessage("Negocio creado correctamente.");
+      if (selectedId) {
+        await api.put(`/AdminWorkshops/${selectedId}/legal`, {
+          ...form,
+          maxUsers: Number(form.maxUsers || 3),
+        });
+        setMessage("Negocio actualizado correctamente.");
+      } else {
+        await api.post("/AdminWorkshops", {
+          ...form,
+          maxUsers: Number(form.maxUsers || 3),
+        });
+        setForm(emptyWorkshop);
+        setMessage("Negocio creado correctamente.");
+      }
       await load();
     } catch (err) {
-      setError(err?.response?.data?.message || err?.message || "No se pudo crear el negocio.");
+      setError(err?.response?.data?.message || err?.message || "No se pudo guardar el negocio.");
     }
+  };
+
+  const startNewWorkshop = () => {
+    setSelectedId("");
+    setForm(emptyWorkshop);
+    setUsers([]);
+    setEditingUserId("");
+    setMessage("");
+    setError("");
   };
 
   const addUser = async (ev) => {
@@ -256,11 +332,22 @@ export default function AdminWorkshops() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
-        <form onSubmit={createWorkshop} className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
-          <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900">
-            <Plus size={19} />
-            Nuevo negocio
-          </h3>
+        <form onSubmit={saveWorkshop} className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
+              {selectedId ? <Save size={19} /> : <Plus size={19} />}
+              {selectedId ? "Editar negocio" : "Nuevo negocio"}
+            </h3>
+            {selectedId && (
+              <button
+                type="button"
+                onClick={startNewWorkshop}
+                className="rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Crear nuevo
+              </button>
+            )}
+          </div>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input label="Nombre" value={form.nombre} onChange={(v) => setField("nombre", v)} required />
@@ -273,31 +360,49 @@ export default function AdminWorkshops() {
             <Input label="Email" value={form.email} onChange={(v) => setField("email", v)} />
             <Input label="IBAN" value={form.iban} onChange={(v) => setField("iban", v)} />
             <Input label="Logo path" value={form.logoPath} onChange={(v) => setField("logoPath", v)} placeholder="/uploads/workshops/logo.png" />
+            <Input label="Max usuarios" type="number" value={form.maxUsers} onChange={(v) => setField("maxUsers", v)} />
             <div className="md:col-span-2">
               <Input label="Direccion" value={form.direccion} onChange={(v) => setField("direccion", v)} required />
             </div>
-            <Input label="Email owner" value={form.ownerEmail} onChange={(v) => setField("ownerEmail", v)} />
-            <Input label="Password owner nuevo" type="password" value={form.ownerPassword} onChange={(v) => setField("ownerPassword", v)} />
-            <div className="md:col-span-2">
-              <Input label="Nombre owner" value={form.ownerFullName} onChange={(v) => setField("ownerFullName", v)} />
-            </div>
+            {selectedId && (
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.activo)}
+                  onChange={(e) => setField("activo", e.target.checked)}
+                />
+                Negocio activo
+              </label>
+            )}
+            {!selectedId && (
+              <>
+                <Input label="Email owner" value={form.ownerEmail} onChange={(v) => setField("ownerEmail", v)} />
+                <Input label="Password owner nuevo" type="password" value={form.ownerPassword} onChange={(v) => setField("ownerPassword", v)} />
+                <div className="md:col-span-2">
+                  <Input label="Nombre owner" value={form.ownerFullName} onChange={(v) => setField("ownerFullName", v)} />
+                </div>
+              </>
+            )}
             <div className="md:col-span-2">
               <FeatureSwitches
                 values={form}
                 onChange={(name, value) => setField(name, value)}
               />
             </div>
+            <Input label="Footer" value={form.footerText} onChange={(v) => setField("footerText", v)} />
+            <Textarea label="Politicas" value={form.privacyPolicyText} onChange={(v) => setField("privacyPolicyText", v)} />
+            <Textarea label="Terminos" value={form.termsText} onChange={(v) => setField("termsText", v)} />
           </div>
 
           <button className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800">
-            <Plus size={17} />
-            Crear negocio
+            {selectedId ? <Save size={17} /> : <Plus size={17} />}
+            {selectedId ? "Guardar cambios" : "Crear negocio"}
           </button>
         </form>
 
         <div className="space-y-6">
           <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
-            <h3 className="mb-4 text-lg font-bold text-slate-900">Negocios activos</h3>
+            <h3 className="mb-4 text-lg font-bold text-slate-900">Negocios registrados</h3>
             <div className="space-y-2">
               {workshops.map((w) => (
                 <button
@@ -312,6 +417,9 @@ export default function AdminWorkshops() {
                   <div className="text-slate-500">
                     {w.nif ?? w.Nif} · {w.activeUsers ?? w.ActiveUsers}/{w.maxUsers ?? w.MaxUsers ?? 3} usuarios
                   </div>
+                  {!(w.activo ?? w.Activo ?? true) && (
+                    <div className="mt-1 text-xs font-bold text-rose-600">Negocio desactivado</div>
+                  )}
                   <div className="text-xs text-slate-400">
                     {businessTypeLabel(w.businessType ?? w.BusinessType)} - {terminologyProfileLabel(w.terminologyProfile ?? w.TerminologyProfile)}
                   </div>
@@ -496,31 +604,6 @@ export default function AdminWorkshops() {
           </div>
         </form>
       )}
-
-      <form onSubmit={saveLegal} className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-900">
-          <Save size={19} />
-          Tipo, footer, politicas y terminos
-        </h3>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Input label="Max usuarios" type="number" value={legalForm.maxUsers} onChange={(v) => setLegalForm((p) => ({ ...p, maxUsers: v }))} />
-          <Select label="Tipo de negocio" value={legalForm.businessType} onChange={(v) => setLegalForm((p) => ({ ...p, businessType: v }))} options={BUSINESS_TYPES} />
-          <Select label="Perfil de textos" value={legalForm.terminologyProfile} onChange={(v) => setLegalForm((p) => ({ ...p, terminologyProfile: v }))} options={TERMINOLOGY_PROFILES} />
-          <Input label="Footer" value={legalForm.footerText} onChange={(v) => setLegalForm((p) => ({ ...p, footerText: v }))} />
-          <div className="md:col-span-2">
-            <FeatureSwitches
-              values={legalForm}
-              onChange={(name, value) => setLegalForm((p) => ({ ...p, [name]: value }))}
-            />
-          </div>
-          <Textarea label="Politicas" value={legalForm.privacyPolicyText} onChange={(v) => setLegalForm((p) => ({ ...p, privacyPolicyText: v }))} />
-          <Textarea label="Terminos" value={legalForm.termsText} onChange={(v) => setLegalForm((p) => ({ ...p, termsText: v }))} />
-        </div>
-        <button disabled={!selectedId} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50">
-          <Save size={17} />
-          Guardar configuracion
-        </button>
-      </form>
 
       {removeModal.open && (
         <div
