@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
   ClipboardList,
@@ -45,7 +45,7 @@ const getEstadoBadge = (estado) => {
   switch (estado) {
     case "Recibido":
       return "bg-sky-50 text-sky-700 ring-sky-200";
-    case "Diagnóstico":
+    case "DiagnÃ³stico":
       return "bg-violet-50 text-violet-700 ring-violet-200";
     case "Reparando":
       return "bg-amber-50 text-amber-700 ring-amber-200";
@@ -113,7 +113,7 @@ export default function Home() {
           Una plataforma lista para impulsar tu negocio
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-          Gestiona clientes, documentos, facturación y operaciones desde un solo lugar. Una solución diseñada para el éxito de tu negocio.
+          Gestiona clientes, documentos, facturaciÃ³n y operaciones desde un solo lugar. Una soluciÃ³n diseÃ±ada para el Ã©xito de tu negocio.
         </p>
 
         <div className="mt-7 flex justify-center">
@@ -164,10 +164,10 @@ export default function Home() {
 
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-slate-900">
-                    Órdenes de trabajo
+                    Ã“rdenes de trabajo
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Crea órdenes, registra trabajos y controla el estado del
+                    Crea Ã³rdenes, registra trabajos y controla el estado del
                     {labels.assetSingular}.
                   </p>
 
@@ -179,7 +179,7 @@ export default function Home() {
                       to="/register-work-order#ordenes-recientes"
                       className={actionLink}
                     >
-                      Ver órdenes <ArrowRight size={15} />
+                      Ver Ã³rdenes <ArrowRight size={15} />
                     </Link>
                     <Link to="/presupuestos" className={actionLink}>
                       Presupuestos <ArrowRight size={15} />
@@ -200,7 +200,7 @@ export default function Home() {
                     Clientes
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Registra clientes con matrícula, modelo y datos del
+                    Registra clientes con matrÃ­cula, modelo y datos del
                     {labels.assetSingular}.
                   </p>
 
@@ -286,7 +286,7 @@ export default function Home() {
               Ordenes recientes
             </h3>
             <p className="text-sm text-slate-500">
-              Últimas ordenes registrados.
+              Ãšltimas ordenes registrados.
             </p>
           </div>
 
@@ -298,19 +298,11 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="md:hidden divide-y rounded-xl border border-slate-200 bg-white/60">
+        <div className="md:hidden space-y-3">
           {ordenes.length === 0 && (
-            <div className="px-3 py-4 text-slate-500">
+            <div className="rounded-xl border border-slate-200 bg-white/60 px-3 py-4 text-sm text-slate-500">
               No hay ordenes registradas.
             </div>
-          )}
-
-          {ordenes.length === 0 && (
-            <tr>
-              <td className="py-4 px-3 text-slate-500" colSpan={5}>
-                No hay órdenes recientes.
-              </td>
-            </tr>
           )}
 
           {ordenesSorted.map((o) => {
@@ -321,40 +313,42 @@ export default function Home() {
             const matricula = o.matricula ?? o.Matricula;
 
             return (
-              <tr key={id} className="hover:bg-slate-50">
-                <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-                  {soloFecha(fecha)}
-                </td>
+              <article
+                key={id}
+                className="rounded-xl border border-slate-200 bg-white/75 p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {matricula ?? "Sin referencia"}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm text-slate-700">
+                      {cliente ?? "Sin cliente"}
+                    </p>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      {soloFecha(fecha)}
+                    </p>
+                  </div>
 
-                <td className="py-2.5 px-3">
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
                   >
                     {estado}
                   </span>
-                </td>
+                </div>
 
-                <td className="py-2.5 px-3 text-slate-700 truncate">
-                  {cliente ?? "—"}
-                </td>
-
-                <td className="py-2.5 px-3 font-semibold text-slate-900">
-                  {matricula ?? "—"}
-                </td>
-
-                <td className="py-2.5 px-3 text-right">
+                <div className="mt-3">
                   <Link
                     to="/register-work-order#ordenes-recientes"
-                    className="inline-flex items-center rounded-lg px-3 py-1.5 text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
+                    className="inline-flex w-full items-center justify-center rounded-lg px-3 py-2 text-xs font-medium bg-orange-600 text-white hover:bg-orange-700"
                   >
                     Ir a orden
                   </Link>
-                </td>
-              </tr>
+                </div>
+              </article>
             );
           })}
         </div>
-
         <div className="hidden md:block rounded-xl border border-slate-200 overflow-hidden">
           <div className="max-h-[420px] overflow-y-auto">
             <table className="min-w-full text-sm">
@@ -378,7 +372,7 @@ export default function Home() {
                 {ordenes.length === 0 && (
                   <tr>
                     <td className="py-4 px-3 text-slate-500" colSpan={4}>
-                      No hay ordenes aún.
+                      No hay ordenes aÃºn.
                     </td>
                   </tr>
                 )}
@@ -405,11 +399,11 @@ export default function Home() {
                       </td>
 
                       <td className="py-2.5 px-3 text-slate-700 truncate">
-                        {cliente ?? "—"}
+                        {cliente ?? "â€”"}
                       </td>
 
                       <td className="py-2.5 px-3 font-semibold text-slate-900">
-                        {matricula ?? "—"}
+                        {matricula ?? "â€”"}
                       </td>
 
                       <td className="py-2.5 px-3 text-right">
@@ -440,3 +434,4 @@ export default function Home() {
     </>
   );
 }
+
