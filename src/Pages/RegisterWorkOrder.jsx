@@ -955,7 +955,7 @@ export default function RegisterWorkOrder() {
           id="ordenes-recientes"
           className="mt-4 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6"
         >
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+        <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,320px)_auto_auto_auto] md:items-end">
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-slate-800">
               Órdenes recientes
@@ -971,20 +971,20 @@ export default function RegisterWorkOrder() {
             value={plateSearch}
             onChange={(e) => setPlateSearch(e.target.value)}
             placeholder={labels.referenceSearchPlaceholder}
-            className="w-full md:w-80 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
 
           <input
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
           />
           {(plateSearch || dateFrom || dateTo) && (
             <button
@@ -995,7 +995,7 @@ export default function RegisterWorkOrder() {
                 setDateTo("");
                 setOrderPage(1);
               }}
-              className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+              className="w-full rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition md:w-auto"
             >
               Limpiar
             </button>
@@ -1012,10 +1012,10 @@ export default function RegisterWorkOrder() {
           {filteredOrders.map((o) => (
             <article
               key={o.Id}
-              className={`rounded-2xl border p-5 shadow-sm hover:shadow-md transition ${getStateStyles(o.Estado)}`}
+              className={`rounded-2xl border p-4 shadow-sm hover:shadow-md transition sm:p-5 ${getStateStyles(o.Estado)}`}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
                   <h4 className="text-lg font-bold text-slate-900">
                     {o.Matricula}
                   </h4>
@@ -1051,7 +1051,7 @@ export default function RegisterWorkOrder() {
                       );
                     }
                   }}
-                  className={`rounded-full px-3 py-1 text-xs font-medium ring-1 bg-white ${
+                  className={`w-full rounded-full px-3 py-2 text-xs font-medium ring-1 bg-white sm:w-auto sm:py-1 ${
                     o.Estado === "Entregado"
                       ? "text-emerald-700 ring-emerald-200"
                       : o.Estado === "Reparando"
@@ -1067,29 +1067,29 @@ export default function RegisterWorkOrder() {
                 </select>
               </div>
 
-              <div className="mt-4 flex items-start justify-center gap-16">
-                <div className="w-48 text-center">
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                <div className="min-w-0 rounded-xl bg-white/50 p-3 text-left sm:text-center">
                   <p className="text-xs uppercase tracking-wide text-slate-400">
                     Cliente
                   </p>
 
-                  <p className="text-md font-semibold text-slate-800 truncate">
+                  <p className="text-md break-words font-semibold text-slate-800 sm:truncate">
                     {o.Cliente}
                   </p>
                 </div>
 
-                <div className="w-[420px] text-center">
+                <div className="min-w-0 rounded-xl bg-white/50 p-3 text-left sm:text-center">
                   <p className="text-xs uppercase tracking-wide text-slate-400">
                     Trabajo
                   </p>
 
-                  <p className="text-md text-slate-700 line-clamp-2">
+                  <p className="text-md break-words text-slate-700 sm:line-clamp-2">
                     {o.Trabajo}
                   </p>
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center justify-between">
+              <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-400">
                     Total
@@ -1103,12 +1103,12 @@ export default function RegisterWorkOrder() {
                   </p>
                 </div>
 
-                <div className="mt-3 flex md:justify-end items-center gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
                   <a
                     href={`/print-order/${o.Id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
+                    className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
                   >
                     Imprimir
                   </a>
@@ -1117,7 +1117,7 @@ export default function RegisterWorkOrder() {
                     <button
                       type="button"
                       onClick={() => startEdit(o)}
-                      className="rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+                      className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
                     >
                       Editar
                     </button>
@@ -1128,7 +1128,7 @@ export default function RegisterWorkOrder() {
                       to={`/workshop-invoice/${o.Id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
+                      className="inline-flex justify-center rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
                     >
                       Facturar
                     </Link>
@@ -1142,7 +1142,7 @@ export default function RegisterWorkOrder() {
                       to={`/reprint-invoice/order/${o.Id}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition"
+                      className="col-span-2 inline-flex justify-center rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition sm:col-span-1"
                     >
                       Reimprimir factura
                     </Link>
@@ -1173,7 +1173,7 @@ export default function RegisterWorkOrder() {
           )}
         </div>
 
-        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+        <div className="mt-5 flex flex-col items-stretch justify-center gap-3 text-sm sm:flex-row sm:items-center">
           <button
             type="button"
             disabled={orderPage <= 1 || loadingOrders}
@@ -1182,7 +1182,7 @@ export default function RegisterWorkOrder() {
           >
             Anterior
           </button>
-          <span className="text-slate-600">
+          <span className="text-center text-slate-600">
             Pagina {orderPage} de {orderTotalPages} · {orderTotal} ordenes
           </span>
           <button

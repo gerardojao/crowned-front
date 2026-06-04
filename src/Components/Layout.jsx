@@ -125,7 +125,7 @@ export default function Layout({ children }) {
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-cyan-50 via-white to-amber-50">
       {!isPrintRoute && (
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
-          <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-3 flex items-center">
+          <div className="mx-auto w-full max-w-screen-2xl px-4 pr-5 sm:px-6 lg:px-8 py-3 flex items-center">
             <Link
               to="/"
               className="font-extrabold tracking-tight text-slate-900 text-lg sm:text-xl"
@@ -207,7 +207,7 @@ export default function Layout({ children }) {
                 </nav>
 
                 <button
-                  className="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  className="mr-1 inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:mr-0"
                   aria-label="Abrir menú"
                   onClick={() => setOpen((v) => !v)}
                 >
@@ -223,6 +223,36 @@ export default function Layout({ children }) {
                 <div className="flex flex-col">
                   {isAuthed ? (
                     <>
+                      <div className="border-b border-slate-100 px-3 py-3">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Sesion
+                        </div>
+                        <div className="mt-1 break-all text-sm font-medium text-slate-700">
+                          {user?.email}
+                        </div>
+                        {workshops.length > 1 && (
+                          <label className="mt-3 block">
+                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                              Negocio activo
+                            </span>
+                            <select
+                              value={activeWorkshopId}
+                              onChange={onWorkshopChange}
+                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800"
+                              aria-label="Negocio activo"
+                            >
+                              {workshops.map((workshop) => (
+                                <option
+                                  key={workshop.id ?? workshop.Id}
+                                  value={workshop.id ?? workshop.Id}
+                                >
+                                  {workshop.nombre ?? workshop.Nombre}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                      </div>
                       <NavLink
                         to="/register-work-order"
                         className={mobileLink}
