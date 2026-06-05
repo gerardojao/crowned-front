@@ -225,7 +225,7 @@ export default function Layout({ children }) {
                     <>
                       <div className="border-b border-slate-100 px-3 py-3">
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Sesion
+                          Sesión
                         </div>
                         <div className="mt-1 break-all text-sm font-medium text-slate-700">
                           {user?.email}

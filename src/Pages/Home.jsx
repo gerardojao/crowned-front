@@ -45,7 +45,7 @@ const getEstadoBadge = (estado) => {
   switch (estado) {
     case "Recibido":
       return "bg-sky-50 text-sky-700 ring-sky-200";
-    case "DiagnÃ³stico":
+    case "Diagnóstico":
       return "bg-violet-50 text-violet-700 ring-violet-200";
     case "Reparando":
       return "bg-amber-50 text-amber-700 ring-amber-200";
@@ -113,7 +113,7 @@ export default function Home() {
           Una plataforma lista para impulsar tu negocio
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-          Gestiona clientes, documentos, facturaciÃ³n y operaciones desde un solo lugar. Una soluciÃ³n diseÃ±ada para el Ã©xito de tu negocio.
+          Gestiona clientes, documentos, facturación y operaciones desde un solo lugar. Una solución diseñada para el éxito de tu negocio.
         </p>
 
         <div className="mt-7 flex justify-center">
@@ -122,7 +122,7 @@ export default function Home() {
             className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white hover:bg-orange-700"
           >
             <LogIn size={18} />
-            Iniciar sesion
+            Iniciar sesión
           </Link>
         </div>
       </section>
@@ -164,10 +164,10 @@ export default function Home() {
 
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-slate-900">
-                    Ã“rdenes de trabajo
+                    Órdenes de trabajo
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Crea Ã³rdenes, registra trabajos y controla el estado del
+                    Crea órdenes, registra trabajos y controla el estado del
                     {labels.assetSingular}.
                   </p>
 
@@ -179,7 +179,7 @@ export default function Home() {
                       to="/register-work-order#ordenes-recientes"
                       className={actionLink}
                     >
-                      Ver Ã³rdenes <ArrowRight size={15} />
+                      Ver órdenes <ArrowRight size={15} />
                     </Link>
                     <Link to="/presupuestos" className={actionLink}>
                       Presupuestos <ArrowRight size={15} />
@@ -200,7 +200,7 @@ export default function Home() {
                     Clientes
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Registra clientes con matrÃ­cula, modelo y datos del
+                    Registra clientes con matrícula, modelo y datos del
                     {labels.assetSingular}.
                   </p>
 
@@ -283,10 +283,10 @@ export default function Home() {
         <div className="flex items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="text-lg md:text-xl font-semibold text-slate-900">
-              Ordenes recientes
+              Órdenes recientes
             </h3>
             <p className="text-sm text-slate-500">
-              Ãšltimas ordenes registrados.
+              Últimas órdenes registradas.
             </p>
           </div>
 
@@ -301,7 +301,7 @@ export default function Home() {
         <div className="md:hidden space-y-3">
           {ordenes.length === 0 && (
             <div className="rounded-xl border border-slate-200 bg-white/60 px-3 py-4 text-sm text-slate-500">
-              No hay ordenes registradas.
+              No hay órdenes registradas.
             </div>
           )}
 
@@ -372,7 +372,7 @@ export default function Home() {
                 {ordenes.length === 0 && (
                   <tr>
                     <td className="py-4 px-3 text-slate-500" colSpan={4}>
-                      No hay ordenes aÃºn.
+                      No hay órdenes aún.
                     </td>
                   </tr>
                 )}
@@ -399,11 +399,11 @@ export default function Home() {
                       </td>
 
                       <td className="py-2.5 px-3 text-slate-700 truncate">
-                        {cliente ?? "â€”"}
+                        {cliente ?? "-"}
                       </td>
 
                       <td className="py-2.5 px-3 font-semibold text-slate-900">
-                        {matricula ?? "â€”"}
+                        {matricula ?? "-"}
                       </td>
 
                       <td className="py-2.5 px-3 text-right">
