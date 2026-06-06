@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../Components/api";
 import { useAuth } from "../Components/AuthContext";
-import { SUPPORT_EMAIL } from "../Components/support";
+import { SUPPORT_DELIVERY_EMAIL, SUPPORT_EMAIL } from "../Components/support";
 
 const DEFAULT_TEXT = `ZagaPro trata los datos necesarios para prestar el servicio de gestión operativa y administrativa: usuarios, clientes, teléfonos, direcciones, vehículos o equipos, matrículas o referencias, órdenes, presupuestos, facturas, ingresos, gastos, proveedores, repuestos y alertas de seguimiento.
 
@@ -21,6 +21,7 @@ export default function Privacy() {
   const workshopName = settings?.nombre ?? settings?.Nombre ?? "ZagaPro";
   const text = settings?.privacyPolicyText ?? settings?.PrivacyPolicyText ?? DEFAULT_TEXT;
   const contactEmail = settings?.email ?? settings?.Email ?? SUPPORT_EMAIL;
+  const contactMailto = settings?.email || settings?.Email ? contactEmail : SUPPORT_DELIVERY_EMAIL;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 text-slate-700">
@@ -65,7 +66,7 @@ export default function Privacy() {
           <Block title="Derechos y contacto">
             <p>
               Puedes solicitar acceso, rectificación, actualización o eliminación de datos cuando proceda escribiendo a{" "}
-              <a href={`mailto:${contactEmail}`} className="font-semibold text-emerald-700 hover:underline">
+              <a href={`mailto:${contactMailto}`} className="font-semibold text-emerald-700 hover:underline">
                 {contactEmail}
               </a>
               . Algunas solicitudes pueden estar limitadas por obligaciones legales, fiscales, contractuales o de

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BarChart3, Eye, EyeOff, FileText, LogIn, ShieldCheck } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../Components/AuthContext";
+import { API_BASE_URL } from "../Components/api";
 import { supportMailto } from "../Components/support";
 import zagaProLogo from "../assets/logozagapro.png";
 
@@ -42,8 +43,7 @@ export default function Login() {
     if (!isAuthed) return;
 
     (async () => {
-      const base = import.meta.env.VITE_API_BASE ?? "https://localhost:7288/api";
-      const r = await fetch(`${base}/auth/me`, { credentials: "include", cache: "no-store" });
+      const r = await fetch(`${API_BASE_URL}/auth/me`, { credentials: "include", cache: "no-store" });
       if (!r.ok) return;
 
       if (targetAfterLogin === "/") {

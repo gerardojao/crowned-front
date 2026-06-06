@@ -23,6 +23,7 @@ import TrialBanner from "./TrialBanner";
 import zagaProLogo from "../assets/logozagapro.png";
 import ClientAlertModal from "./ClienteAlertModal";
 import { getBusinessTerminology } from "../utils/businessTerminology";
+import { sendSupportRequest } from "./supportRequest";
 
 const heroBtnBase =
   "group flex min-w-[240px] items-center justify-between gap-4 rounded-2xl px-5 py-5 text-white shadow-md transition hover:scale-[1.01]";
@@ -40,6 +41,16 @@ export default function Layout({ children }) {
   const [workshops, setWorkshops] = useState([]);
   const [activeWorkshopId, setActiveWorkshopId] = useState(getCurrentWorkshopId());
   const [alertCount, setAlertCount] = useState(0);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [helpForm, setHelpForm] = useState({
+    name: "",
+    business: "",
+    email: "",
+    type: "",
+    message: "",
+  });
+  const [helpSubmitting, setHelpSubmitting] = useState(false);
+  const [helpStatus, setHelpStatus] = useState(null);
 
   const isAuthRoute = /^\/(login|register)(\/|$)?/.test(location.pathname);
   const isPrintRoute = /^\/print-order\/.+/.test(location.pathname);
@@ -119,6 +130,46 @@ export default function Layout({ children }) {
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
+  };
+
+  const setHelpField = (field) => (event) => {
+    setHelpForm((current) => ({ ...current, [field]: event.target.value }));
+  };
+
+  const closeHelp = () => {
+    setHelpOpen(false);
+    setHelpStatus(null);
+  };
+
+  const submitHelp = async (event) => {
+    event.preventDefault();
+    setHelpSubmitting(true);
+    setHelpStatus(null);
+
+    try {
+      await sendSupportRequest({
+        ...helpForm,
+        source: "Modal publico del front",
+      });
+      setHelpStatus({
+        type: "success",
+        message: `${helpForm.name}, tu correo ha sido enviado a ZagaPro. A la brevedad sera atendida tu consulta.`,
+      });
+      setHelpForm({
+        name: "",
+        business: "",
+        email: "",
+        type: "",
+        message: "",
+      });
+    } catch (error) {
+      setHelpStatus({
+        type: "error",
+        message: error?.message || "No se pudo enviar la solicitud.",
+      });
+    } finally {
+      setHelpSubmitting(false);
+    }
   };
 
   return (
@@ -387,21 +438,52 @@ export default function Layout({ children }) {
                         <img
                           src={zagaProLogo}
                           alt="ZagaPro"
-                          className="mx-auto h-36 w-auto max-w-full rounded-2xl bg-white object-contain p-3 shadow-sm ring-1 ring-slate-200 md:h-44"
+                          className="mx-auto h-32 w-auto max-w-full rounded-2xl bg-white object-contain p-3 shadow-sm ring-1 ring-slate-200 md:h-40"
                         />
                       </>
                     )}
                   </h1>
 
-                  <p className="mt-2 text-slate-600 text-sm md:text-base font-medium">
+                  <p className="mx-auto mt-4 max-w-2xl text-slate-600 text-sm md:text-lg font-medium leading-7">
                     {isAuthed
                       ? `Gestion inteligente para ${labels.businessPlural}.`
-                      : "Una entrada profesional para gestionar clientes, documentos y operaciones."}
+                      : "Gestiona clientes, documentos, facturacion y operaciones desde una plataforma clara, segura y preparada para tu negocio."}
                   </p>
+
+                  {!isAuthed && (
+                    <>
+                      <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs font-bold text-slate-700">
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Clientes</span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Documentos</span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Facturacion</span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Seguimiento</span>
+                      </div>
+
+                      <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                        <Link
+                          to="/login"
+                          className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700"
+                        >
+                          <LogIn size={18} />
+                          Iniciar sesion
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setHelpOpen(true);
+                            setHelpStatus(null);
+                          }}
+                          className="inline-flex items-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                        >
+                          Necesito ayuda
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
-              <div className="mt-7 hidden md:grid grid-cols-1 lg:grid-cols-4 gap-5">
+              <div className={isAuthed ? "mt-7 hidden md:grid grid-cols-1 lg:grid-cols-4 gap-5" : "hidden"}>
                 {isAuthed ? (
                   <>
                     <Link
@@ -518,16 +600,132 @@ export default function Layout({ children }) {
       </main>
           <ClientAlertModal workshop={activeWorkshop} />
 
+      {helpOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+          <section className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-700">
+                  Soporte ZagaPro
+                </p>
+                <h2 className="mt-1 text-2xl font-extrabold text-slate-950">
+                  Cuéntanos qué necesitas
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Enviaremos tu solicitud al equipo de ZagaPro con los datos necesarios para atender tu consulta.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeHelp}
+                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                aria-label="Cerrar ayuda"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {helpStatus && (
+              <div
+                className={`mt-5 rounded-2xl px-4 py-3 text-sm font-semibold ${
+                  helpStatus.type === "success"
+                    ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                    : "bg-red-50 text-red-800 ring-1 ring-red-200"
+                }`}
+              >
+                {helpStatus.message}
+              </div>
+            )}
+
+            <form className="mt-5 space-y-4" onSubmit={submitHelp}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-bold text-slate-800">
+                  Nombre
+                  <input
+                    value={helpForm.name}
+                    onChange={setHelpField("name")}
+                    required
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold text-slate-800">
+                  Negocio
+                  <input
+                    value={helpForm.business}
+                    onChange={setHelpField("business")}
+                    required
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                  />
+                </label>
+              </div>
+
+              <label className="grid gap-1.5 text-sm font-bold text-slate-800">
+                Correo de usuario
+                <input
+                  type="email"
+                  value={helpForm.email}
+                  onChange={setHelpField("email")}
+                  required
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                />
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-bold text-slate-800">
+                Tipo de ayuda
+                <select
+                  value={helpForm.type}
+                  onChange={setHelpField("type")}
+                  required
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                >
+                  <option value="">Selecciona una opción</option>
+                  <option value="Acceso o contraseña">Acceso o contraseña</option>
+                  <option value="Alta o cambio de usuario">Alta o cambio de usuario</option>
+                  <option value="Problema con facturas o documentos">Facturas o documentos</option>
+                  <option value="Configuración del negocio">Configuración del negocio</option>
+                  <option value="Otra consulta">Otra consulta</option>
+                </select>
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-bold text-slate-800">
+                Mensaje
+                <textarea
+                  rows={4}
+                  value={helpForm.message}
+                  onChange={setHelpField("message")}
+                  required
+                  className="resize-y rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
+                />
+              </label>
+
+              <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={closeHelp}
+                  className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={helpSubmitting}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-orange-700"
+                >
+                  {helpSubmitting ? "Enviando..." : "Enviar solicitud"}
+                  <ArrowRight size={17} />
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
       {!isPrintRoute && (
         <footer className="mt-auto border-t border-slate-200 bg-white/80 backdrop-blur">
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center justify-center gap-3 py-4 md:py-6 text-sm text-slate-500 md:flex-row md:justify-between">
               <div className="order-2 md:order-1 text-center md:text-left">
-                {isAuthed
-                  ? activeWorkshop?.footerText ??
-                    activeWorkshop?.FooterText ??
-                    `© ${new Date().getFullYear()} ${activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "ZagaPro"}. Todos los derechos reservados.`
-                  : `© ${new Date().getFullYear()} ZagaPro. Todos los derechos reservados.`}
+               `© ${new Date().getFullYear()} ZagaPro. Todos los derechos reservados.`
               </div>
 
               <nav className="order-1 md:order-2 w-full md:w-auto">

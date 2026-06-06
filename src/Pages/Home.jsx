@@ -101,33 +101,7 @@ export default function Home() {
   }, [isAuthed]);
 
   if (!isAuthed) {
-    return (
-      <div className="flex min-h-[calc(100dvh-24rem)] items-center justify-center py-3 md:min-h-[calc(100dvh-25rem)]">
-      <section className="mx-auto w-full max-w-3xl rounded-3xl bg-white/90 p-6 text-center shadow-sm ring-1 ring-cyan-100 md:p-10">
-
-
-        <p className="mt-5 text-lg font-semibold uppercase tracking-[0.18em] text-orange-700">
-          PLATAFORMA CENTRALIZADA
-        </p>
-        <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 md:text-4xl">
-          Una plataforma lista para impulsar tu negocio
-        </h2>
-        <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
-          Gestiona clientes, documentos, facturación y operaciones desde un solo lugar. Una solución diseñada para el éxito de tu negocio.
-        </p>
-
-        <div className="mt-7 flex justify-center">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-5 py-3 text-sm font-bold text-white hover:bg-orange-700"
-          >
-            <LogIn size={18} />
-            Iniciar sesión
-          </Link>
-        </div>
-      </section>
-      </div>
-    );
+    return null;
   }
 
   return (

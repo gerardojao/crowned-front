@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../Components/api";
 import { useAuth } from "../Components/AuthContext";
-import { SUPPORT_EMAIL } from "../Components/support";
+import { SUPPORT_DELIVERY_EMAIL, SUPPORT_EMAIL } from "../Components/support";
 
 const DEFAULT_TEXT = `El usuario se compromete a introducir información veraz, revisar los documentos antes de entregarlos a sus clientes y utilizar la aplicación de forma responsable.
 
@@ -19,6 +19,7 @@ export default function Terms() {
   const workshopName = settings?.nombre ?? settings?.Nombre ?? "ZagaPro";
   const text = settings?.termsText ?? settings?.TermsText ?? DEFAULT_TEXT;
   const contactEmail = settings?.email ?? settings?.Email ?? SUPPORT_EMAIL;
+  const contactMailto = settings?.email || settings?.Email ? contactEmail : SUPPORT_DELIVERY_EMAIL;
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10 text-slate-700">
@@ -78,7 +79,7 @@ export default function Terms() {
           <Block title="Contacto">
             <p>
               Para dudas sobre estas condiciones o soporte operativo, contacta con{" "}
-              <a href={`mailto:${contactEmail}`} className="font-semibold text-emerald-700 hover:underline">
+              <a href={`mailto:${contactMailto}`} className="font-semibold text-emerald-700 hover:underline">
                 {contactEmail}
               </a>
               .
