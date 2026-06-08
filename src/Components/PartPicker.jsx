@@ -369,7 +369,7 @@ export default function PartPicker({
                       type="number"
                       step="0.01"
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Precio venta IVA incl."
+                      placeholder="Precio venta."
                       value={newPart.precioVenta}
                       onChange={(e) => setNewPartField("precioVenta", e.target.value)}
                     />

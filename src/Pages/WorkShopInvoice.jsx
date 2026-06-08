@@ -85,13 +85,16 @@ export default function WorkshopInvoice() {
   const normalizeOrder = (o) => ({
     id: o.id ?? o.Id,
     cliente: o.cliente ?? o.Cliente ?? "",
+    dni: o.dni ?? o.Dni ?? "",
     telefono: o.telefono ?? o.Telefono ?? "",
     matricula: o.matricula ?? o.Matricula ?? "",
     marca: o.marca ?? o.Marca ?? "",
     modelo: o.modelo ?? o.Modelo ?? "",
     kilometraje: o.kilometraje ?? o.Kilometraje ?? "",
     trabajo: o.trabajo ?? o.Trabajo ?? "",
+    itemsJson: o.itemsJson ?? o.ItemsJson ?? null,
     repuestos: Number(o.repuestos ?? o.Repuestos ?? 0),
+    cantidad: Number(o.cantidad ?? o.Cantidad ?? 1),
     manoObra: Number(o.manoObra ?? o.ManoObra ?? 0),
     estado: o.estado ?? o.Estado ?? "",
     observaciones: o.observaciones ?? o.Observaciones ?? "",
@@ -205,6 +208,7 @@ export default function WorkshopInvoice() {
         ...prev,
         numero: numeroFacturaPrev,
         cliente: o.cliente,
+        dni: o.dni,
         telefonoCliente: o.telefono,
         matricula: o.matricula,
         km: o.kilometraje || "",
@@ -212,18 +216,23 @@ export default function WorkshopInvoice() {
         otros: o.otros || "",
       }));
 
-      setItems([
-        {
-          descripcion: o.trabajo || "Trabajo realizado",
-          cantidad: 1,
-          importe: Number(o.repuestos || 0),
-        },
-        {
-          descripcion: "Mano de obra",
-          cantidad: 1,
-          importe: Number(o.manoObra || 0),
-        },
-      ]);
+      const orderItems = parseOrderItems(o.itemsJson);
+      setItems(
+        orderItems.length > 0
+          ? orderItems
+          : [
+              {
+                descripcion: o.trabajo || "Trabajo realizado",
+                cantidad: Number(o.cantidad || 1),
+                importe: Number(o.repuestos || 0),
+              },
+              {
+                descripcion: "Mano de obra",
+                cantidad: 1,
+                importe: Number(o.manoObra || 0),
+              },
+            ],
+      );
     } catch (err) {
       console.error(err);
       setError(
@@ -236,7 +245,7 @@ export default function WorkshopInvoice() {
     }
   };
 
-  const totalConIva = useMemo(() => {
+  const baseAntesOtros = useMemo(() => {
     return round2(
       items.reduce(
         (sum, item) =>
@@ -250,18 +259,17 @@ export default function WorkshopInvoice() {
     return round2(Number(invoice.otros || 0));
   }, [invoice.otros]);
 
-  const totalFinal = useMemo(() => {
-    return round2(Math.max(0, totalConIva - otros));
-  }, [totalConIva, otros]);
-
   const subtotal = useMemo(() => {
-    const rate = Number(invoice.ivaPct || 0) / 100;
-    return rate > 0 ? round2(totalFinal / (1 + rate)) : totalFinal;
-  }, [totalFinal, invoice.ivaPct]);
+    return round2(Math.max(0, baseAntesOtros - otros));
+  }, [baseAntesOtros, otros]);
 
   const iva = useMemo(() => {
-    return round2(totalFinal - subtotal);
-  }, [totalFinal, subtotal]);
+    return round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
+  }, [subtotal, invoice.ivaPct]);
+
+  const totalFinal = useMemo(() => {
+    return round2(subtotal + iva);
+  }, [subtotal, iva]);
 
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
@@ -735,7 +743,7 @@ const printInvoice = async () => {
                 type="number"
                 step="0.01"
                 className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Importe IVA incl."
+                placeholder="Precio unitario"
                 value={item.importe}
                 onChange={(e) => setItemField(index, "importe", e.target.value)}
                 onBlur={(e) => setItemField(index, "importe", amountInput(e.target.value))}
@@ -823,22 +831,28 @@ const printInvoice = async () => {
             <thead>
               <tr style={{ backgroundColor: "#e2e8f0" }}>
                 <th
+                  className="border border-black px-2 py-2 w-24 text-center"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
+                  CANTIDAD
+                </th>
+                <th
                   className="border border-black px-2 py-2 text-center"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
                   DESCRIPCION
                 </th>
                 <th
-                  className="border border-black px-2 py-2 w-28 text-center"
+                  className="border border-black px-2 py-2 w-36 text-right"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  CANTIDAD
+                  PRECIO UNITARIO
                 </th>
                 <th
                   className="border border-black px-2 py-2 w-36 text-right"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  IMPORTE IVA INCL.
+                  IMPORTE
                 </th>
               </tr>
             </thead>
@@ -846,14 +860,19 @@ const printInvoice = async () => {
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td className="border border-black px-2 py-2">
-                    {item.descripcion}
-                  </td>
                   <td className="border border-black px-2 py-2 text-center">
                     {item.cantidad}
                   </td>
+                  <td className="border border-black px-2 py-2">
+                    {item.descripcion}
+                  </td>
                   <td className="border border-black px-2 py-2 text-right">
                     {formatMoney(Number(item.importe || 0))}
+                  </td>
+                  <td className="border border-black px-2 py-2 text-right">
+                    {formatMoney(
+                      Number(item.cantidad || 0) * Number(item.importe || 0),
+                    )}
                   </td>
                 </tr>
               ))}
@@ -923,6 +942,36 @@ function Row({ label, value, strong = false }) {
 
 function formatMoney(value) {
   return eur.format(Number(value || 0));
+}
+
+function parseOrderItems(itemsJson) {
+  if (!itemsJson) return [];
+
+  try {
+    const parsed = JSON.parse(itemsJson);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) => ({
+        descripcion: item.descripcion || item.Descripcion || "",
+        cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
+        importe: Number(
+          item.precioUnitario ??
+            item.PrecioUnitario ??
+            item.importe ??
+            item.Importe ??
+            0,
+        ),
+      }))
+      .filter(
+        (item) =>
+          item.descripcion.trim() &&
+          item.cantidad > 0 &&
+          item.importe >= 0,
+      );
+  } catch {
+    return [];
+  }
 }
 
 function formatDate(value) {

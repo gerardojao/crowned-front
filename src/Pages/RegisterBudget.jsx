@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, UserPlus, Wrench, X } from "lucide-react";
+import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
@@ -9,6 +9,7 @@ import { amountInput } from "../utils/currency";
 const EMPTY_BUDGET = {
   NumeroPresupuesto: "",
   Cliente: "",
+  Dni: "",
   Telefono: "",
   Matricula: "",
   Marca: "",
@@ -16,7 +17,9 @@ const EMPTY_BUDGET = {
   Kilometraje: "",
   Fecha: new Date().toISOString().slice(0, 10),
   Trabajo: "",
+  Items: [],
   Repuestos: "",
+  Cantidad: "1",
   ManoObra: "",
   Estado: "Pendiente",
   Observaciones: "",
@@ -64,7 +67,17 @@ export default function RegisterBudget() {
   const [savingService, setSavingService] = useState(false);
   const budgetPageSize = 10;
 
-  const total = Number(budget.Repuestos || 0) + Number(budget.ManoObra || 0);
+  const detailItems = Array.isArray(budget.Items) ? budget.Items : [];
+  const detailTotal = detailItems.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.cantidad || 0) * Number(item.precioUnitario || item.importe || 0),
+    0,
+  );
+  const total = detailItems.length
+    ? detailTotal
+    : Number(budget.ManoObra || 0) +
+      Number(budget.Repuestos || 0) * Number(budget.Cantidad || 1);
 
   const setField = (name, value) => {
     setBudget((prev) => ({
@@ -96,9 +109,61 @@ export default function RegisterBudget() {
     if (!value) return;
     setBudget((prev) => ({
       ...prev,
+      Items: [
+        ...(Array.isArray(prev.Items) ? prev.Items : []),
+        createDetailItem(value, 1, 0),
+      ],
       Trabajo: prev.Trabajo?.trim()
         ? `${prev.Trabajo.trim()}\n${value}`
         : value,
+    }));
+  };
+
+  const createDetailItem = (descripcion, cantidad = 1, precioUnitario = 0) => ({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    descripcion,
+    cantidad,
+    precioUnitario: Number(precioUnitario || 0).toFixed(2),
+  });
+
+  const setDetailItemField = (id, field, value) => {
+    setBudget((prev) => ({
+      ...prev,
+      Items: (Array.isArray(prev.Items) ? prev.Items : []).map((item) =>
+        item.id === id ? { ...item, [field]: value } : item,
+      ),
+    }));
+  };
+
+  const upsertLaborItem = (value) => {
+    const amount = amountInput(value);
+    setBudget((prev) => {
+      const items = Array.isArray(prev.Items) ? prev.Items : [];
+      const existing = items.find((item) => item.kind === "labor");
+      const nextLabor = {
+        ...(existing || createDetailItem("Mano de obra", 1, amount)),
+        kind: "labor",
+        descripcion: "Mano de obra",
+        cantidad: 1,
+        precioUnitario: amount,
+      };
+
+      return {
+        ...prev,
+        ManoObra: amount,
+        Items: existing
+          ? items.map((item) => (item.id === existing.id ? nextLabor : item))
+          : [...items, nextLabor],
+      };
+    });
+  };
+
+  const removeDetailItem = (id) => {
+    setBudget((prev) => ({
+      ...prev,
+      Items: (Array.isArray(prev.Items) ? prev.Items : []).filter(
+        (item) => item.id !== id,
+      ),
     }));
   };
 
@@ -110,9 +175,15 @@ export default function RegisterBudget() {
     setBudget((prev) => {
       const currentParts = Number(prev.Repuestos || 0);
       const nextParts = (currentParts + price).toFixed(2);
-
       return {
         ...prev,
+        Trabajo: prev.Trabajo?.trim()
+          ? `${prev.Trabajo.trim()}\n${name}`
+          : name,
+        Items: [
+          ...(Array.isArray(prev.Items) ? prev.Items : []),
+          createDetailItem(name, 1, price),
+        ],
         Repuestos: nextParts,
       };
     });
@@ -149,6 +220,7 @@ export default function RegisterBudget() {
     Id: x.id ?? x.Id,
     NumeroPresupuesto: x.numeroPresupuesto ?? x.NumeroPresupuesto ?? "",
     Cliente: x.cliente ?? x.Cliente ?? "",
+    Dni: x.dni ?? x.Dni ?? "",
     Telefono: x.telefono ?? x.Telefono ?? "",
     Matricula: x.matricula ?? x.Matricula ?? "",
     Marca: x.marca ?? x.Marca ?? "",
@@ -157,16 +229,41 @@ export default function RegisterBudget() {
     Fecha: x.fecha ?? x.Fecha,
     Trabajo: x.trabajo ?? x.Trabajo ?? "",
     Repuestos: x.repuestos ?? x.Repuestos ?? 0,
+    Cantidad: x.cantidad ?? x.Cantidad ?? 1,
     ManoObra: x.manoObra ?? x.ManoObra ?? 0,
+    Items: parseDetailItems(x.itemsJson ?? x.ItemsJson),
     Estado: x.estado ?? x.Estado ?? "Pendiente",
     Observaciones: x.observaciones ?? x.Observaciones ?? "",
     ConvertidoEnOrden: x.convertidoEnOrden ?? x.ConvertidoEnOrden ?? false,
     IdOrdenTrabajo: x.idOrdenTrabajo ?? x.IdOrdenTrabajo ?? null,
   });
 
+  const parseDetailItems = (itemsJson) => {
+    if (!itemsJson) return [];
+    try {
+      const parsed = JSON.parse(itemsJson);
+      return Array.isArray(parsed)
+        ? parsed.map((item, index) => ({
+            id: item.id || `stored-${index}`,
+            descripcion: item.descripcion || item.Descripcion || "",
+            cantidad: item.cantidad ?? item.Cantidad ?? 1,
+            precioUnitario:
+              item.precioUnitario ??
+              item.PrecioUnitario ??
+              item.importe ??
+              item.Importe ??
+              0,
+          }))
+        : [];
+    } catch {
+      return [];
+    }
+  };
+
   const normalizeCustomer = (c) => ({
     Id: c.id ?? c.Id,
     Nombre: c.nombre ?? c.Nombre ?? "",
+    Dni: c.dni ?? c.Dni ?? "",
     Telefono: c.telefono ?? c.Telefono ?? "",
     Matricula: c.matricula ?? c.Matricula ?? "",
     Marca: c.marca ?? c.Marca ?? "",
@@ -181,6 +278,7 @@ export default function RegisterBudget() {
     setBudget((prev) => ({
       ...prev,
       Cliente: customer.Nombre || prev.Cliente,
+      Dni: customer.Dni || prev.Dni,
       Telefono: customer.Telefono || prev.Telefono,
       Matricula: customer.Matricula || prev.Matricula,
       Marca: customer.Marca || prev.Marca,
@@ -242,6 +340,7 @@ export default function RegisterBudget() {
 
     const payload = {
       nombre: budget.Cliente,
+      dni: budget.Dni || null,
       telefono: budget.Telefono,
       email: null,
       direccion: null,
@@ -352,9 +451,24 @@ export default function RegisterBudget() {
       setNotice("");
       setError("");
 
+      const normalizedItems = detailItems
+        .filter((item) => String(item.descripcion || "").trim())
+        .map((item) => ({
+          descripcion: String(item.descripcion || "").trim(),
+          cantidad: Number(item.cantidad || 1),
+          precioUnitario: Number(item.precioUnitario || 0),
+        }));
+      const laborTotal = normalizedItems
+        .filter((item) => item.descripcion.trim().toLowerCase() === "mano de obra")
+        .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+      const partsTotal = normalizedItems
+        .filter((item) => item.descripcion.trim().toLowerCase() !== "mano de obra")
+        .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+
       const payload = {
         numeroPresupuesto: budget.NumeroPresupuesto || null,
         cliente: budget.Cliente,
+        dni: budget.Dni || null,
         telefono: budget.Telefono || null,
         matricula: budget.Matricula,
         marca: budget.Marca || null,
@@ -362,8 +476,12 @@ export default function RegisterBudget() {
         kilometraje: budget.Kilometraje ? Number(budget.Kilometraje) : null,
         fecha: budget.Fecha,
         trabajo: budget.Trabajo,
-        repuestos: Number(budget.Repuestos || 0),
-        manoObra: Number(budget.ManoObra || 0),
+        itemsJson: normalizedItems.length
+          ? JSON.stringify(normalizedItems)
+          : null,
+        repuestos: normalizedItems.length ? partsTotal : Number(budget.Repuestos || 0),
+        cantidad: Number(budget.Cantidad || 1),
+        manoObra: normalizedItems.length ? laborTotal : Number(budget.ManoObra || 0),
         estado: budget.Estado || "Pendiente",
         observaciones: budget.Observaciones || null,
       };
@@ -400,6 +518,7 @@ export default function RegisterBudget() {
     setBudget({
       NumeroPresupuesto: p.NumeroPresupuesto || "",
       Cliente: p.Cliente || "",
+      Dni: p.Dni || "",
       Telefono: p.Telefono || "",
       Matricula: p.Matricula || "",
       Marca: p.Marca || "",
@@ -409,7 +528,9 @@ export default function RegisterBudget() {
         ? String(p.Fecha).slice(0, 10)
         : new Date().toISOString().slice(0, 10),
       Trabajo: p.Trabajo || "",
+      Items: p.Items || [],
       Repuestos: p.Repuestos || "",
+      Cantidad: p.Cantidad || "1",
       ManoObra: p.ManoObra || "",
       Estado: p.Estado || "Pendiente",
       Observaciones: p.Observaciones || "",
@@ -460,7 +581,7 @@ export default function RegisterBudget() {
   };
 
   const cls =
-    "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm";
+    "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-center";
 
   const budgetTotalPages = Math.max(1, Math.ceil(budgetTotal / budgetPageSize));
 
@@ -621,6 +742,14 @@ export default function RegisterBudget() {
           />
 
           <input
+            name="Dni"
+            value={budget.Dni}
+            onChange={handleChange}
+            className={cls}
+            placeholder="DNI/NIE/NIF"
+          />
+
+          <input
             name="Telefono"
             value={budget.Telefono}
             onChange={handleChange}
@@ -687,7 +816,7 @@ export default function RegisterBudget() {
           </select>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-3">
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
               <div className="relative">
@@ -749,43 +878,36 @@ export default function RegisterBudget() {
             required
           />
 
-          <div className="space-y-2">
+          <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
+            Lineas de detalle / costes
+          </div>
+
+          <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Repuesto
+            </label>
             <PartPicker
               onSelect={addPartToBudget}
-              placeholder="Buscar repuesto en rentabilidad"
+              placeholder="Buscar pieza o repuesto"
               buttonLabel="Agregar"
-            />
-            <input
-              name="Repuestos"
-              type="number"
-              step="0.01"
-              value={budget.Repuestos}
-              onChange={handleChange}
-              onBlur={(e) => setField("Repuestos", amountInput(e.target.value))}
-              className={cls}
-              placeholder={`${labels.partsPlaceholder} IVA incl.`}
             />
           </div>
 
+          <div className="space-y-2 rounded-r-xl border border-l-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Mano de obra (EUR)
+            </label>
           <input
             name="ManoObra"
             type="number"
             step="0.01"
             value={budget.ManoObra}
             onChange={handleChange}
-            onBlur={(e) => setField("ManoObra", amountInput(e.target.value))}
+            onBlur={(e) => upsertLaborItem(e.target.value)}
             className={cls}
-            placeholder="Mano de obra IVA incl. €"
+            placeholder="Mano de obra €"
           />
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-xs text-slate-500">Total presupuesto IVA incl.</div>
-            <div className="text-xl font-semibold text-slate-900">
-              {total.toLocaleString("es-ES", {
-                style: "currency",
-                currency: "EUR",
-              })}
-            </div>
           </div>
 
           <textarea
@@ -796,6 +918,105 @@ export default function RegisterBudget() {
             rows={2}
             placeholder="Observaciones"
           />
+
+          <div className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-right">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Total presupuestado
+            </div>
+            {/* <div className="mt-2 text-xs font-semibold text-slate-500">
+              Calculo: ({Number(budget.Cantidad || 1)} x {Number(budget.Repuestos || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) + {Number(budget.ManoObra || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div> */}
+            <div className="mt-2 text-xl font-semibold text-slate-900">
+              {total.toLocaleString("es-ES", {
+                style: "currency",
+                currency: "EUR",
+              })}
+            </div>
+          </div>
+
+          {detailItems.length > 0 && (
+            <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                
+              </div>
+              <div className="hidden lg:grid grid-cols-[100px_minmax(0,1fr)_150px_150px_40px] gap-2 px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div>Cantidad</div>
+                <div>Detalle del presupuesto</div>
+                <div>P. Unit.</div>
+                <div className="text-center">Importe</div>
+                <div />
+              </div>
+              <div className="space-y-2">
+                {detailItems.map((item) => {
+                  const lineTotal =
+                    Number(item.cantidad || 0) *
+                    Number(item.precioUnitario || item.importe || 0);
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="grid grid-cols-1 gap-2 lg:grid-cols-[100px_minmax(0,1fr)_150px_150px_40px]"
+                    >
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={item.cantidad}
+                        onChange={(e) =>
+                          setDetailItemField(item.id, "cantidad", e.target.value)
+                        }
+                        className={cls}
+                        placeholder="Cantidad"
+                      />
+                      <input
+                        value={item.descripcion}
+                        onChange={(e) =>
+                          setDetailItemField(item.id, "descripcion", e.target.value)
+                        }
+                        className={cls}
+                        placeholder="Descripcion"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={item.precioUnitario}
+                        onChange={(e) =>
+                          setDetailItemField(
+                            item.id,
+                            "precioUnitario",
+                            e.target.value,
+                          )
+                        }
+                        onBlur={(e) =>
+                          setDetailItemField(
+                            item.id,
+                            "precioUnitario",
+                            Number(e.target.value || 0).toFixed(2),
+                          )
+                        }
+                        className={cls}
+                        placeholder="Precio unit."
+                      />
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-semibold text-slate-800">
+                        {lineTotal.toLocaleString("es-ES", {
+                          style: "currency",
+                          currency: "EUR",
+                        })}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeDetailItem(item.id)}
+                        className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
+                        aria-label="Eliminar linea"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-3">
@@ -912,7 +1133,10 @@ export default function RegisterBudget() {
               Total
             </p>
             <p className="text-xl font-bold text-slate-900">
-              {(Number(p.Repuestos || 0) + Number(p.ManoObra || 0)).toLocaleString(
+              {(
+                Number(p.ManoObra || 0) +
+                Number(p.Repuestos || 0) * Number(p.Cantidad || 1)
+              ).toLocaleString(
                 "es-ES",
                 {
                   style: "currency",

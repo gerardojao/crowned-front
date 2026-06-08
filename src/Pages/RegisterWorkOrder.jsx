@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, UserPlus, Wrench, X } from "lucide-react";
+import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
@@ -8,6 +8,7 @@ import { amountInput } from "../utils/currency";
 
 const EMPTY_ORDER = {
   Cliente: "",
+  Dni: "",
   Telefono: "",
   Matricula: "",
   Marca: "",
@@ -15,7 +16,9 @@ const EMPTY_ORDER = {
   Kilometraje: "",
   Fecha: new Date().toISOString().slice(0, 10),
   Trabajo: "",
+  Items: [],
   Repuestos: "",
+  Cantidad: "1",
   ManoObra: "",
   Estado: "Recibido",
   Observaciones: "",
@@ -99,6 +102,17 @@ export default function RegisterWorkOrder() {
   const [newServiceName, setNewServiceName] = useState("");
   const [savingService, setSavingService] = useState(false);
   const orderPageSize = 10;
+  const detailItems = Array.isArray(order.Items) ? order.Items : [];
+  const detailTotal = detailItems.reduce(
+    (sum, item) =>
+      sum +
+      Number(item.cantidad || 0) * Number(item.precioUnitario || item.importe || 0),
+    0,
+  );
+  const total = detailItems.length
+    ? detailTotal
+    : Number(order.ManoObra || 0) +
+      Number(order.Repuestos || 0) * Number(order.Cantidad || 1);
 
   const setField = (name, value) => {
     setOrder((prev) => ({
@@ -130,9 +144,61 @@ export default function RegisterWorkOrder() {
     if (!value) return;
     setOrder((prev) => ({
       ...prev,
+      Items: [
+        ...(Array.isArray(prev.Items) ? prev.Items : []),
+        createDetailItem(value, 1, 0),
+      ],
       Trabajo: prev.Trabajo?.trim()
         ? `${prev.Trabajo.trim()}\n${value}`
         : value,
+    }));
+  };
+
+  const createDetailItem = (descripcion, cantidad = 1, precioUnitario = 0) => ({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    descripcion,
+    cantidad,
+    precioUnitario: Number(precioUnitario || 0).toFixed(2),
+  });
+
+  const setDetailItemField = (id, field, value) => {
+    setOrder((prev) => ({
+      ...prev,
+      Items: (Array.isArray(prev.Items) ? prev.Items : []).map((item) =>
+        item.id === id ? { ...item, [field]: value } : item,
+      ),
+    }));
+  };
+
+  const upsertLaborItem = (value) => {
+    const amount = amountInput(value);
+    setOrder((prev) => {
+      const items = Array.isArray(prev.Items) ? prev.Items : [];
+      const existing = items.find((item) => item.kind === "labor");
+      const nextLabor = {
+        ...(existing || createDetailItem("Mano de obra", 1, amount)),
+        kind: "labor",
+        descripcion: "Mano de obra",
+        cantidad: 1,
+        precioUnitario: amount,
+      };
+
+      return {
+        ...prev,
+        ManoObra: amount,
+        Items: existing
+          ? items.map((item) => (item.id === existing.id ? nextLabor : item))
+          : [...items, nextLabor],
+      };
+    });
+  };
+
+  const removeDetailItem = (id) => {
+    setOrder((prev) => ({
+      ...prev,
+      Items: (Array.isArray(prev.Items) ? prev.Items : []).filter(
+        (item) => item.id !== id,
+      ),
     }));
   };
 
@@ -147,6 +213,13 @@ export default function RegisterWorkOrder() {
 
       return {
         ...prev,
+        Trabajo: prev.Trabajo?.trim()
+          ? `${prev.Trabajo.trim()}\n${name}`
+          : name,
+        Items: [
+          ...(Array.isArray(prev.Items) ? prev.Items : []),
+          createDetailItem(name, 1, price),
+        ],
         Repuestos: nextParts,
       };
     });
@@ -179,11 +252,10 @@ export default function RegisterWorkOrder() {
     }
   };
 
-  const total = Number(order.Repuestos || 0) + Number(order.ManoObra || 0);
-
   const normalizeOrder = (o) => ({
     Id: o.id ?? o.Id,
     Cliente: o.cliente ?? o.Cliente,
+    Dni: o.dni ?? o.Dni ?? "",
     Telefono: o.telefono ?? o.Telefono,
     Matricula: o.matricula ?? o.Matricula,
     Marca: o.marca ?? o.Marca,
@@ -192,20 +264,46 @@ export default function RegisterWorkOrder() {
     Fecha: o.fecha ?? o.Fecha,
     Trabajo: o.trabajo ?? o.Trabajo,
     Repuestos: o.repuestos ?? o.Repuestos ?? 0,
+    Cantidad: o.cantidad ?? o.Cantidad ?? 1,
     ManoObra: o.manoObra ?? o.ManoObra ?? 0,
+    Items: parseDetailItems(o.itemsJson ?? o.ItemsJson),
     Estado: o.estado ?? o.Estado,
     Observaciones: o.observaciones ?? o.Observaciones,
     Total:
       o.total ??
       o.Total ??
-      Number(o.repuestos ?? o.Repuestos ?? 0) +
-        Number(o.manoObra ?? o.ManoObra ?? 0),
+      Number(o.manoObra ?? o.ManoObra ?? 0) +
+        Number(o.repuestos ?? o.Repuestos ?? 0) *
+          Number(o.cantidad ?? o.Cantidad ?? 1),
     Facturada: o.facturada ?? o.Facturada ?? false,
   });
+
+  const parseDetailItems = (itemsJson) => {
+    if (!itemsJson) return [];
+    try {
+      const parsed = JSON.parse(itemsJson);
+      return Array.isArray(parsed)
+        ? parsed.map((item, index) => ({
+            id: item.id || `stored-${index}`,
+            descripcion: item.descripcion || item.Descripcion || "",
+            cantidad: item.cantidad ?? item.Cantidad ?? 1,
+            precioUnitario:
+              item.precioUnitario ??
+              item.PrecioUnitario ??
+              item.importe ??
+              item.Importe ??
+              0,
+          }))
+        : [];
+    } catch {
+      return [];
+    }
+  };
 
   const normalizeCustomer = (c) => ({
     Id: c.id ?? c.Id,
     Nombre: c.nombre ?? c.Nombre ?? "",
+    Dni: c.dni ?? c.Dni ?? "",
     Telefono: c.telefono ?? c.Telefono ?? "",
     Matricula: c.matricula ?? c.Matricula ?? "",
     Marca: c.marca ?? c.Marca ?? "",
@@ -220,6 +318,7 @@ export default function RegisterWorkOrder() {
     setOrder((prev) => ({
       ...prev,
       Cliente: customer.Nombre || prev.Cliente,
+      Dni: customer.Dni || prev.Dni,
       Telefono: customer.Telefono || prev.Telefono,
       Matricula: customer.Matricula || prev.Matricula,
       Marca: customer.Marca || prev.Marca,
@@ -281,6 +380,7 @@ export default function RegisterWorkOrder() {
 
     const payload = {
       nombre: order.Cliente,
+      dni: order.Dni || null,
       telefono: order.Telefono,
       email: null,
       direccion: null,
@@ -481,6 +581,7 @@ export default function RegisterWorkOrder() {
 
     setOrder({
       Cliente: o.Cliente || "",
+      Dni: o.Dni || "",
       Telefono: o.Telefono || "",
       Matricula: o.Matricula || "",
       Marca: o.Marca || "",
@@ -490,7 +591,9 @@ export default function RegisterWorkOrder() {
         ? String(o.Fecha).slice(0, 10)
         : new Date().toISOString().slice(0, 10),
       Trabajo: o.Trabajo || "",
+      Items: o.Items || [],
       Repuestos: o.Repuestos || "",
+      Cantidad: o.Cantidad || "1",
       ManoObra: o.ManoObra || "",
       Estado: o.Estado || "Recibido",
       Observaciones: o.Observaciones || "",
@@ -512,8 +615,23 @@ export default function RegisterWorkOrder() {
       setNotice("");
       setError("");
 
+      const normalizedItems = detailItems
+        .filter((item) => String(item.descripcion || "").trim())
+        .map((item) => ({
+          descripcion: String(item.descripcion || "").trim(),
+          cantidad: Number(item.cantidad || 1),
+          precioUnitario: Number(item.precioUnitario || 0),
+        }));
+      const laborTotal = normalizedItems
+        .filter((item) => item.descripcion.trim().toLowerCase() === "mano de obra")
+        .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+      const partsTotal = normalizedItems
+        .filter((item) => item.descripcion.trim().toLowerCase() !== "mano de obra")
+        .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+
       const payload = {
         cliente: order.Cliente,
+        dni: order.Dni || null,
         telefono: order.Telefono || null,
         matricula: order.Matricula,
         marca: order.Marca || null,
@@ -521,8 +639,12 @@ export default function RegisterWorkOrder() {
         kilometraje: order.Kilometraje ? Number(order.Kilometraje) : null,
         fecha: order.Fecha,
         trabajo: order.Trabajo,
-        repuestos: Number(order.Repuestos || 0),
-        manoObra: Number(order.ManoObra || 0),
+        itemsJson: normalizedItems.length
+          ? JSON.stringify(normalizedItems)
+          : null,
+        repuestos: normalizedItems.length ? partsTotal : Number(order.Repuestos || 0),
+        cantidad: Number(order.Cantidad || 1),
+        manoObra: normalizedItems.length ? laborTotal : Number(order.ManoObra || 0),
         estado: order.Estado || "Recibido",
         observaciones: order.Observaciones || null,
       };
@@ -724,6 +846,14 @@ export default function RegisterWorkOrder() {
             />
 
             <input
+              name="Dni"
+              value={order.Dni}
+              onChange={handleChange}
+              className={cls}
+              placeholder="DNI/NIE"
+            />
+
+            <input
               name="Telefono"
               value={order.Telefono}
               onChange={handleChange}
@@ -843,7 +973,7 @@ export default function RegisterWorkOrder() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <textarea
               name="Trabajo"
               value={order.Trabajo}
@@ -854,43 +984,36 @@ export default function RegisterWorkOrder() {
               required
             />
 
-            <div className="space-y-2">
+            <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Lineas de detalle / costes
+            </div>
+
+            <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Repuesto
+              </label>
               <PartPicker
                 onSelect={addPartToOrder}
-                placeholder="Buscar repuesto en rentabilidad"
+                placeholder="Buscar pieza o repuesto"
                 buttonLabel="Agregar"
-              />
-              <input
-                name="Repuestos"
-                type="number"
-                step="0.01"
-                value={order.Repuestos}
-                onChange={handleChange}
-                onBlur={(e) => setField("Repuestos", amountInput(e.target.value))}
-                className={cls}
-                placeholder={`${labels.partsPlaceholder} IVA incl.`}
               />
             </div>
 
-            <input
+            <div className="space-y-2 rounded-r-xl border border-l-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Mano de obra (EUR)
+              </label>
+              <input
               name="ManoObra"
               type="number"
               step="0.01"
               value={order.ManoObra}
               onChange={handleChange}
-              onBlur={(e) => setField("ManoObra", amountInput(e.target.value))}
+              onBlur={(e) => upsertLaborItem(e.target.value)}
               className={cls}
-              placeholder="Mano de obra IVA incl. €"
+              placeholder="Mano de obra €"
             />
 
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <div className="text-xs text-slate-500">Total estimado IVA incl.</div>
-              <div className="text-xl font-semibold text-slate-900">
-                {total.toLocaleString("es-ES", {
-                  style: "currency",
-                  currency: "EUR",
-                })}
-              </div>
             </div>
 
             <textarea
@@ -901,6 +1024,99 @@ export default function RegisterWorkOrder() {
               rows={2}
               placeholder="Observaciones internas"
             />
+
+            <div className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-right">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Total estimado
+              </div>
+              <div className="mt-2 text-xl font-semibold text-slate-900">
+                {total.toLocaleString("es-ES", {
+                  style: "currency",
+                  currency: "EUR",
+                })}
+              </div>
+            </div>
+
+            {detailItems.length > 0 && (
+              <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
+                <div className="hidden lg:grid grid-cols-[100px_minmax(0,1fr)_150px_150px_40px] gap-2 px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div>Cantidad</div>
+                  <div>Detalle de la orden</div>
+                  <div>P. Unit.</div>
+                  <div className="text-center">Importe</div>
+                  <div />
+                </div>
+                <div className="space-y-2">
+                  {detailItems.map((item) => {
+                    const lineTotal =
+                      Number(item.cantidad || 0) *
+                      Number(item.precioUnitario || item.importe || 0);
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="grid grid-cols-1 gap-2 lg:grid-cols-[100px_minmax(0,1fr)_150px_150px_40px]"
+                      >
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={item.cantidad}
+                          onChange={(e) =>
+                            setDetailItemField(item.id, "cantidad", e.target.value)
+                          }
+                          className={cls}
+                          placeholder="Cantidad"
+                        />
+                        <input
+                          value={item.descripcion}
+                          onChange={(e) =>
+                            setDetailItemField(item.id, "descripcion", e.target.value)
+                          }
+                          className={cls}
+                          placeholder="Descripcion"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={item.precioUnitario}
+                          onChange={(e) =>
+                            setDetailItemField(
+                              item.id,
+                              "precioUnitario",
+                              e.target.value,
+                            )
+                          }
+                          onBlur={(e) =>
+                            setDetailItemField(
+                              item.id,
+                              "precioUnitario",
+                              Number(e.target.value || 0).toFixed(2),
+                            )
+                          }
+                          className={cls}
+                          placeholder="Precio unit."
+                        />
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-semibold text-slate-800">
+                          {lineTotal.toLocaleString("es-ES", {
+                            style: "currency",
+                            currency: "EUR",
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeDetailItem(item.id)}
+                          className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
+                          aria-label="Eliminar linea"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

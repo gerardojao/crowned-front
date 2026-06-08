@@ -54,10 +54,6 @@ export default function PrintWorkOrder() {
         </div>
 
         <div className="space-y-5">
-          {/* <div>
-            <p className="font-bold">Cliente</p>
-            <p>{order.cliente || order.Cliente}</p>
-          </div> */}
 
           <div>
             <p className="font-bold">Vehiculo</p>
@@ -71,7 +67,7 @@ export default function PrintWorkOrder() {
               Matricula
             </p>
 
-            <p className="text-4xl font-extrabold tracking-wider mt-2">
+            <p className="text-2xl font-extrabold tracking-wider mt-2">
               {order.matricula || order.Matricula}
             </p>
           </div>
@@ -81,7 +77,7 @@ export default function PrintWorkOrder() {
               Trabajo a realizar
             </p>
 
-            <p className="text-4xl font-bold leading-relaxed text-center">
+            <p className="text-2xl font-bold leading-relaxed text-center">
               {order.trabajo || order.Trabajo}
             </p>
           </div>

@@ -8,6 +8,7 @@ const EMPTY_CUSTOMER = {
   Id: "",
   // Cliente
   Nombre: "",
+  Dni: "",
   Telefono: "",
   Email: "",
   Direccion: "",
@@ -146,6 +147,7 @@ export default function RegisterCustomer() {
 
       const payload = {
         nombre: customer.Nombre,
+        dni: customer.Dni || null,
         telefono: customer.Telefono,
         email: customer.Email || null,
         direccion: customer.Direccion || null,
@@ -232,6 +234,7 @@ export default function RegisterCustomer() {
     setCustomer({
       Id: id,
       Nombre: c.nombre ?? c.Nombre ?? "",
+      Dni: c.dni ?? c.Dni ?? "",
       Telefono: c.telefono ?? c.Telefono ?? "",
       Email: c.email ?? c.Email ?? "",
       Direccion: c.direccion ?? c.Direccion ?? "",
@@ -290,7 +293,7 @@ export default function RegisterCustomer() {
             Datos del cliente
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Nombre *
@@ -303,6 +306,21 @@ export default function RegisterCustomer() {
                 onChange={handleChange}
                 className={cls("Nombre")}
                 placeholder="Nombre del cliente"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                DNI/NIE
+              </label>
+
+              <input
+                type="text"
+                name="Dni"
+                value={customer.Dni}
+                onChange={handleChange}
+                className={cls("Dni")}
+                placeholder="DNI/NIE"
               />
             </div>
 
@@ -451,6 +469,7 @@ export default function RegisterCustomer() {
             <thead>
               <tr className="border-b border-slate-200 text-slate-600">
                 <th className="text-left py-3">Cliente</th>
+                <th className="text-left py-3">DNI/NIE</th>
                 <th className="text-left py-3">Teléfono</th>
                 <th className="text-left py-3">{labels.referenceLabel}</th>
                 <th className="text-left py-3">{labels.modelLabel}</th>
@@ -463,6 +482,7 @@ export default function RegisterCustomer() {
               {customers.map((c) => {
                 const id = c.id ?? c.Id;
                 const nombre = c.nombre ?? c.Nombre;
+                const dni = c.dni ?? c.Dni;
                 const telefono = c.telefono ?? c.Telefono;
                 const matricula = c.matricula ?? c.Matricula;
                 const modelo = c.modelo ?? c.Modelo;
@@ -474,6 +494,7 @@ export default function RegisterCustomer() {
                     className="border-b border-slate-100 hover:bg-slate-50"
                   >
                     <td className="py-3">{nombre}</td>
+                    <td className="py-3">{dni}</td>
                     <td className="py-3">{telefono}</td>
                     <td className="py-3">{matricula}</td>
                     <td className="py-3">{modelo}</td>

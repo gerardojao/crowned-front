@@ -78,6 +78,7 @@ export default function PrintBudget() {
         id: p.id ?? p.Id,
         numeroPresupuesto: p.numeroPresupuesto ?? p.NumeroPresupuesto ?? "",
         cliente: p.cliente ?? p.Cliente ?? "",
+        dni: p.dni ?? p.Dni ?? "",
         telefono: p.telefono ?? p.Telefono ?? "",
         matricula: p.matricula ?? p.Matricula ?? "",
         marca: p.marca ?? p.Marca ?? "",
@@ -85,7 +86,9 @@ export default function PrintBudget() {
         kilometraje: p.kilometraje ?? p.Kilometraje ?? "",
         fecha: p.fecha ?? p.Fecha,
         trabajo: p.trabajo ?? p.Trabajo ?? "",
+        itemsJson: p.itemsJson ?? p.ItemsJson ?? null,
         repuestos: Number(p.repuestos ?? p.Repuestos ?? 0),
+        cantidad: Number(p.cantidad ?? p.Cantidad ?? 1),
         manoObra: Number(p.manoObra ?? p.ManoObra ?? 0),
         estado: p.estado ?? p.Estado ?? "",
         observaciones: p.observaciones ?? p.Observaciones ?? "",
@@ -105,37 +108,40 @@ export default function PrintBudget() {
   const items = useMemo(() => {
     if (!budget) return [];
 
+    const storedItems = parseBudgetItems(budget.itemsJson);
+    if (storedItems.length > 0) return storedItems;
+
     return [
       {
         descripcion: budget.trabajo || "Trabajo presupuestado",
-        cantidad: 1,
-        importe: budget.repuestos,
+        cantidad: budget.cantidad || 1,
+        precioUnitario: budget.repuestos,
       },
       {
         descripcion: "Mano de obra",
         cantidad: 1,
-        importe: budget.manoObra,
+        precioUnitario: budget.manoObra,
       },
-    ];
+    ].filter((item) => Number(item.precioUnitario || 0) > 0);
   }, [budget]);
 
-  const total = useMemo(() => {
+  const subtotal = useMemo(() => {
     return round2(
       items.reduce(
         (sum, item) =>
-          sum + Number(item.cantidad || 0) * Number(item.importe || 0),
+          sum + Number(item.cantidad || 0) * Number(item.precioUnitario || 0),
         0,
       ),
     );
   }, [items]);
 
-  const subtotal = useMemo(() => {
-    return round2(total / (1 + ivaPct / 100));
-  }, [total]);
-
   const iva = useMemo(() => {
-    return round2(total - subtotal);
-  }, [total, subtotal]);
+    return round2(subtotal * (ivaPct / 100));
+  }, [subtotal]);
+
+  const total = useMemo(() => {
+    return round2(subtotal + iva);
+  }, [subtotal, iva]);
 
   const printBudget = () => {
     window.print();
@@ -233,6 +239,9 @@ export default function PrintBudget() {
                 <p className="font-bold">CLIENTE:</p>
                 <p className="font-bold">{budget.cliente}</p>
 
+                <p className="font-bold">DNI/NIE/NIF:</p>
+                <p>{budget.dni}</p>
+
                 <p className="font-bold">TELEFONO:</p>
                 <p>{budget.telefono}</p>
 
@@ -254,22 +263,28 @@ export default function PrintBudget() {
             <thead>
               <tr style={{ backgroundColor: "#e2e8f0" }}>
                 <th
+                  className="border border-black px-2 py-2 w-24 text-center"
+                  style={{ backgroundColor: "#e2e8f0" }}
+                >
+                  CANTIDAD
+                </th>
+                <th
                   className="border border-black px-2 py-2 text-center"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
                   DESCRIPCION
                 </th>
                 <th
-                  className="border border-black px-2 py-2 w-28 text-center"
+                  className="border border-black px-2 py-2 w-36 text-right"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  CANTIDAD
+                  PRECIO UNITARIO
                 </th>
                 <th
                   className="border border-black px-2 py-2 w-36 text-right"
                   style={{ backgroundColor: "#e2e8f0" }}
                 >
-                  IMPORTE IVA INCL.
+                  IMPORTE
                 </th>
               </tr>
             </thead>
@@ -277,14 +292,20 @@ export default function PrintBudget() {
             <tbody>
               {items.map((item, index) => (
                 <tr key={index}>
-                  <td className="whitespace-pre-line border border-black px-2 py-2 align-top leading-5">
-                    {item.descripcion}
-                  </td>
                   <td className="border border-black px-2 py-2 text-center align-top">
                     {item.cantidad}
                   </td>
+                  <td className="whitespace-pre-line border border-black px-2 py-2 align-top leading-5">
+                    {item.descripcion}
+                  </td>
                   <td className="border border-black px-2 py-2 text-right align-top">
-                    {formatMoney(Number(item.importe || 0))}
+                    {formatMoney(Number(item.precioUnitario || 0))}
+                  </td>
+                  <td className="border border-black px-2 py-2 text-right align-top">
+                    {formatMoney(
+                      Number(item.cantidad || 0) *
+                        Number(item.precioUnitario || 0),
+                    )}
                   </td>
                 </tr>
               ))}
@@ -356,6 +377,36 @@ function Row({ label, value, strong = false }) {
 
 function formatMoney(value) {
   return eur.format(Number(value || 0));
+}
+
+function parseBudgetItems(itemsJson) {
+  if (!itemsJson) return [];
+
+  try {
+    const parsed = JSON.parse(itemsJson);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) => ({
+        descripcion: item.descripcion || item.Descripcion || "",
+        cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
+        precioUnitario: Number(
+          item.precioUnitario ??
+            item.PrecioUnitario ??
+            item.importe ??
+            item.Importe ??
+            0,
+        ),
+      }))
+      .filter(
+        (item) =>
+          item.descripcion.trim() &&
+          item.cantidad > 0 &&
+          item.precioUnitario >= 0,
+      );
+  } catch {
+    return [];
+  }
 }
 
 function formatDate(value) {

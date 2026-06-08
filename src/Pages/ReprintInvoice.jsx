@@ -252,14 +252,17 @@ export default function ReprintInvoice() {
             <table className="w-full border-collapse text-sm mt-2">
               <thead>
                 <tr style={{ backgroundColor: "#e2e8f0" }}>
+                  <th className="border border-black px-2 py-2 w-24 text-center">
+                    CANTIDAD
+                  </th>
                   <th className="border border-black px-2 py-2 text-center">
                     DESCRIPCION
                   </th>
-                  <th className="border border-black px-2 py-2 w-28 text-center">
-                    CANTIDAD
+                  <th className="border border-black px-2 py-2 w-36 text-right">
+                    PRECIO UNITARIO
                   </th>
                   <th className="border border-black px-2 py-2 w-36 text-right">
-                    IMPORTE IVA INCL.
+                    IMPORTE
                   </th>
                 </tr>
               </thead>
@@ -267,14 +270,19 @@ export default function ReprintInvoice() {
               <tbody>
                 {items.map((item, index) => (
                   <tr key={index}>
-                    <td className="border border-black px-2 py-2">
-                      {item.descripcion}
-                    </td>
                     <td className="border border-black px-2 py-2 text-center">
                       {item.cantidad}
                     </td>
+                    <td className="border border-black px-2 py-2">
+                      {item.descripcion}
+                    </td>
                     <td className="border border-black px-2 py-2 text-right">
                       {formatMoney(Number(item.importe || 0))}
+                    </td>
+                    <td className="border border-black px-2 py-2 text-right">
+                      {formatMoney(
+                        Number(item.cantidad || 0) * Number(item.importe || 0),
+                      )}
                     </td>
                   </tr>
                 ))}
