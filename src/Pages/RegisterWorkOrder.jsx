@@ -3,7 +3,14 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
-import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
+import PartPicker, {
+  getPartDisplayName,
+  getPartId,
+  getPartProviderId,
+  getPartProviderName,
+  getPartPurchasePrice,
+  getPartSalePrice,
+} from "../Components/PartPicker";
 import { amountInput } from "../utils/currency";
 
 const EMPTY_ORDER = {
@@ -154,11 +161,12 @@ export default function RegisterWorkOrder() {
     }));
   };
 
-  const createDetailItem = (descripcion, cantidad = 1, precioUnitario = 0) => ({
+  const createDetailItem = (descripcion, cantidad = 1, precioUnitario = 0, extra = {}) => ({
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     descripcion,
     cantidad,
     precioUnitario: Number(precioUnitario || 0).toFixed(2),
+    ...extra,
   });
 
   const setDetailItemField = (id, field, value) => {
@@ -218,7 +226,13 @@ export default function RegisterWorkOrder() {
           : name,
         Items: [
           ...(Array.isArray(prev.Items) ? prev.Items : []),
-          createDetailItem(name, 1, price),
+          createDetailItem(name, 1, price, {
+            kind: "repuesto",
+            repuestoStockId: getPartId(part),
+            idProveedor: getPartProviderId(part),
+            nombreProveedor: getPartProviderName(part),
+            precioCompra: getPartPurchasePrice(part),
+          }),
         ],
         Repuestos: nextParts,
       };
@@ -293,6 +307,16 @@ export default function RegisterWorkOrder() {
               item.importe ??
               item.Importe ??
               0,
+            kind: item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? null,
+            repuestoStockId:
+              item.repuestoStockId ??
+              item.RepuestoStockId ??
+              item.idRepuesto ??
+              item.IdRepuesto ??
+              null,
+            idProveedor: item.idProveedor ?? item.IdProveedor ?? null,
+            nombreProveedor: item.nombreProveedor ?? item.NombreProveedor ?? null,
+            precioCompra: item.precioCompra ?? item.PrecioCompra ?? null,
           }))
         : [];
     } catch {
@@ -621,6 +645,11 @@ export default function RegisterWorkOrder() {
           descripcion: String(item.descripcion || "").trim(),
           cantidad: Number(item.cantidad || 1),
           precioUnitario: Number(item.precioUnitario || 0),
+          kind: item.kind || null,
+          repuestoStockId: item.repuestoStockId || null,
+          idProveedor: item.idProveedor || null,
+          nombreProveedor: item.nombreProveedor || null,
+          precioCompra: item.precioCompra != null ? Number(item.precioCompra || 0) : null,
         }));
       const laborTotal = normalizedItems
         .filter((item) => item.descripcion.trim().toLowerCase() === "mano de obra")

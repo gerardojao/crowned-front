@@ -4,7 +4,14 @@ import { ArrowLeft, Plus, Trash2, Printer, Wrench } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
 import { useBusinessTerminology } from "../utils/businessTerminology";
-import PartPicker, { getPartDisplayName, getPartSalePrice } from "../Components/PartPicker";
+import PartPicker, {
+  getPartDisplayName,
+  getPartId,
+  getPartProviderId,
+  getPartProviderName,
+  getPartPurchasePrice,
+  getPartSalePrice,
+} from "../Components/PartPicker";
 import { amountInput } from "../utils/currency";
 
 const EMPTY_ITEM = {
@@ -317,6 +324,11 @@ export default function WorkshopInvoice() {
         descripcion,
         cantidad: 1,
         importe: getPartSalePrice(part).toFixed(2),
+        kind: "repuesto",
+        repuestoStockId: getPartId(part),
+        idProveedor: getPartProviderId(part),
+        nombreProveedor: getPartProviderName(part),
+        precioCompra: getPartPurchasePrice(part),
       },
     ]);
   };
@@ -962,6 +974,16 @@ function parseOrderItems(itemsJson) {
             item.Importe ??
             0,
         ),
+        kind: item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? null,
+        repuestoStockId:
+          item.repuestoStockId ??
+          item.RepuestoStockId ??
+          item.idRepuesto ??
+          item.IdRepuesto ??
+          null,
+        idProveedor: item.idProveedor ?? item.IdProveedor ?? null,
+        nombreProveedor: item.nombreProveedor ?? item.NombreProveedor ?? null,
+        precioCompra: item.precioCompra ?? item.PrecioCompra ?? null,
       }))
       .filter(
         (item) =>

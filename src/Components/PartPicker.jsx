@@ -25,6 +25,22 @@ export function getPartSalePrice(part) {
   return Number(getPartValue(part, "precioVenta", 0) || 0);
 }
 
+export function getPartPurchasePrice(part) {
+  return Number(getPartValue(part, "precioCompra", 0) || 0);
+}
+
+export function getPartId(part) {
+  return getPartValue(part, "id", null);
+}
+
+export function getPartProviderId(part) {
+  return getPartValue(part, "idProveedor", null);
+}
+
+export function getPartProviderName(part) {
+  return getPartValue(part, "nombreProveedor", "");
+}
+
 export default function PartPicker({
   onSelect,
   placeholder = "Buscar repuesto",
@@ -127,6 +143,7 @@ export default function PartPicker({
         const res = await api.get("/RepuestoStock", {
           params: {
             search: trimmedQuery || undefined,
+            esFacturado: false,
             page: 1,
             pageSize: 8,
           },
@@ -178,7 +195,7 @@ export default function PartPicker({
   const helperText = useMemo(() => {
     if (loading) return "Buscando repuestos...";
     if (!parts.length) return "No hay repuestos para mostrar.";
-    return "Selecciona un repuesto para traer su precio de venta.";
+    return "Selecciona un repuesto para traer sus precios.";
   }, [loading, parts.length]);
 
   const selectPart = (part) => {
@@ -311,7 +328,6 @@ export default function PartPicker({
                 const id = getPartValue(part, "id");
                 const name = getPartDisplayName(part);
                 const price = getPartSalePrice(part);
-                const stock = getPartValue(part, "cantidad", 0);
                 const provider = getPartValue(part, "nombreProveedor");
 
                 return (
@@ -326,7 +342,7 @@ export default function PartPicker({
                         {name || "Repuesto sin nombre"}
                       </span>
                       <span className="mt-0.5 block text-xs text-slate-500">
-                        {provider ? `${provider} · ` : ""}Stock: {stock}
+                        {provider ? `Proveedor: ${provider}` : "Referencia de repuesto"}
                       </span>
                     </span>
                     <span className="shrink-0 text-right">
