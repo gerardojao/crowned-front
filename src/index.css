@@ -53,6 +53,26 @@
   .container-app { @apply mx-auto max-w-screen-2xl px-4 sm:px-6 lg:px-8; }
 }
 
+@media screen and (max-width: 767px) {
+  .invoice-print {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .invoice-print .invoice-sheet {
+    width: 1024px;
+    min-width: 1024px;
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 16px;
+  }
+}
+
 @media print {
   * {
   -webkit-print-color-adjust: exact !important;
