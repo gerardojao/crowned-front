@@ -346,13 +346,13 @@ export default function Layout({ children }) {
                       >
                         Ver balance
                       </NavLink>
-                      <Link
+                      {/* <Link
                         to="/workshop-invoice"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
                         Facturar
-                      </Link>
+                      </Link> */}
                       {isSuperAdmin && (
                         <NavLink
                           to="/admin/workshops"

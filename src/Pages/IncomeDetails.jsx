@@ -8,6 +8,10 @@ import {
 } from "lucide-react";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
+const IVA_RATE = 0.21;
+const amountOf = (value) => Number(value ?? 0);
+const ivaOf = (value) => amountOf(value) * IVA_RATE;
+const totalWithIva = (value) => amountOf(value) + ivaOf(value);
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -103,7 +107,9 @@ export default function IncomeDetails() {
     loading: false,
   });
 
-  const total = useMemo(() => rows.reduce((acc, x) => acc + Number(x.importe ?? 0), 0), [rows]);
+  const total = useMemo(() => rows.reduce((acc, x) => acc + amountOf(x.importe), 0), [rows]);
+  const ivaTotal = total * IVA_RATE;
+  const totalConIva = total + ivaTotal;
 
   const loadTipos = useCallback(async () => {
     try {
@@ -415,7 +421,10 @@ export default function IncomeDetails() {
                   <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="font-semibold text-emerald-700">{eur.format(Number(r.importe ?? 0))}</div>
+                  <div className="font-semibold text-emerald-700">{eur.format(totalWithIva(r.importe))}</div>
+                  <div className="text-xs text-slate-500">
+                    Base {eur.format(amountOf(r.importe))} · IVA {eur.format(ivaOf(r.importe))}
+                  </div>
                 </div>
               </div>
             </article>
@@ -448,12 +457,14 @@ export default function IncomeDetails() {
                       <th className="py-2.5 px-3 font-semibold">Tipo</th>
                       <th className="py-2.5 px-3 font-semibold">Descripción</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Importe</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">IVA</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">Total</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {rows.length === 0 ? (
                       <tr>
-                        <td className="py-6 px-3 text-slate-500" colSpan={5}>
+                        <td className="py-6 px-3 text-slate-500" colSpan={7}>
                           Sin resultados
                         </td>
                       </tr>
@@ -467,7 +478,13 @@ export default function IncomeDetails() {
                           <td className="py-2.5 px-3">{r.tipo ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
-                            {eur.format(Number(r.importe ?? 0))}
+                            {eur.format(amountOf(r.importe))}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-slate-700 whitespace-nowrap">
+                            {eur.format(ivaOf(r.importe))}
+                          </td>
+                          <td className="py-2.5 px-3 text-right font-bold text-emerald-700 whitespace-nowrap">
+                            {eur.format(totalWithIva(r.importe))}
                           </td>
                         </tr>
                       ))
@@ -475,10 +492,12 @@ export default function IncomeDetails() {
                   </tbody>
                   <tfoot className="bg-slate-50">
                     <tr>
-                      <th className="py-2.5 px-3 text-right font-semibold" colSpan={5}>
+                      <th className="py-2.5 px-3 text-right font-semibold" colSpan={4}>
                         Total
                       </th>
                       <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(total)}</th>
+                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(ivaTotal)}</th>
+                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totalConIva)}</th>
                     </tr>
                   </tfoot>
                 </table>

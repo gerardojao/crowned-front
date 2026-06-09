@@ -76,10 +76,28 @@ export default function PartPicker({
     if (!input) return;
 
     const rect = input.getBoundingClientRect();
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const visualViewport = window.visualViewport;
+    const viewportHeight =
+      visualViewport?.height || window.innerHeight || document.documentElement.clientHeight;
+    const viewportWidth =
+      visualViewport?.width || window.innerWidth || document.documentElement.clientWidth;
+    const viewportTop = visualViewport?.offsetTop || 0;
+    const viewportLeft = visualViewport?.offsetLeft || 0;
     const gap = 6;
     const margin = 12;
+
+    if (viewportWidth < 640) {
+      setPanelStyle({
+        position: "fixed",
+        left: viewportLeft + margin,
+        top: viewportTop + margin,
+        width: viewportWidth - margin * 2,
+        maxHeight: viewportHeight - margin * 2,
+        zIndex: 100000,
+      });
+      return;
+    }
+
     const spaceBelow = viewportHeight - rect.bottom - margin;
     const spaceAbove = rect.top - margin;
     const below = spaceBelow >= 240 || spaceBelow >= spaceAbove;
@@ -126,10 +144,14 @@ export default function PartPicker({
       setOpen(false);
     };
 
+    window.visualViewport?.addEventListener("resize", updatePanelPosition);
+    window.visualViewport?.addEventListener("scroll", updatePanelPosition);
     window.addEventListener("resize", updatePanelPosition);
     window.addEventListener("scroll", onPageScroll, true);
 
     return () => {
+      window.visualViewport?.removeEventListener("resize", updatePanelPosition);
+      window.visualViewport?.removeEventListener("scroll", updatePanelPosition);
       window.removeEventListener("resize", updatePanelPosition);
       window.removeEventListener("scroll", onPageScroll, true);
     };
@@ -316,7 +338,7 @@ export default function PartPicker({
         <div
           ref={panelRef}
           style={panelStyle}
-          className="overflow-auto rounded-xl border border-slate-200 bg-white shadow-2xl"
+          className="overflow-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-2xl"
         >
           <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
             {helperText}

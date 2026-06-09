@@ -8,6 +8,11 @@ import { ArrowLeft } from "lucide-react";
 import { saveStatementSummary } from "../utils/statementStore";
 import KPIs from "../Components/Kpi";
 
+const IVA_RATE = 0.21;
+const amountOf = (value) => Number(value ?? 0);
+const ivaOf = (value) => amountOf(value) * IVA_RATE;
+const totalWithIva = (value) => amountOf(value) + ivaOf(value);
+
 export default function Statement() {
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -89,6 +94,8 @@ export default function Statement() {
     (s, x) => s + Number(x.total ?? x.Total ?? 0),
     0
   );
+  const totalIncomesIva = totalIncomes * IVA_RATE;
+  const totalIncomesWithIva = totalIncomes + totalIncomesIva;
 
   const totalExpenses = expenses.reduce(
     (s, x) => s + Number(x.total ?? x.Total ?? 0),
@@ -388,33 +395,55 @@ export default function Statement() {
                 <tr className="text-left text-slate-500">
                   <th className="th">Tipo</th>
                   <th className="th text-right">Participación</th>
+                  <th className="th text-right">Importe</th>
+                  <th className="th text-right">IVA</th>
                   <th className="th text-right">Total</th>
                 </tr>
               </thead>
 
               <tbody>
-                {incomes.map((i, idx) => (
-                  <tr key={idx} className="tr">
-                    <td className="td">
-                      {i.cuenta_Ingreso ?? i.Cuenta_Ingreso ?? i.nombre ?? "Sin tipo"}
-                    </td>
-                    <td className="td text-right text-slate-600">
-                      {formatPct(i.total ?? i.Total ?? 0, totalIncomes)}
-                    </td>
-                    <td className="td text-right font-semibold text-emerald-700">
-                      {currency(i.total ?? i.Total ?? 0)}
-                    </td>
-                  </tr>
-                ))}
+                {incomes.map((i, idx) => {
+                  const amount = amountOf(i.total ?? i.Total);
+
+                  return (
+                    <tr key={idx} className="tr">
+                      <td className="td">
+                        {i.cuenta_Ingreso ?? i.Cuenta_Ingreso ?? i.nombre ?? "Sin tipo"}
+                      </td>
+                      <td className="td text-right text-slate-600">
+                        {formatPct(amount, totalIncomes)}
+                      </td>
+                      <td className="td text-right font-semibold text-emerald-700">
+                        {currency(amount)}
+                      </td>
+                      <td className="td text-right font-semibold text-slate-700">
+                        {currency(ivaOf(amount))}
+                      </td>
+                      <td className="td text-right font-bold text-emerald-700">
+                        {currency(totalWithIva(amount))}
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {incomes.length === 0 && (
                   <tr>
-                    <td className="td text-slate-500" colSpan={3}>
+                    <td className="td text-slate-500" colSpan={5}>
                       Sin resultados
                     </td>
                   </tr>
                 )}
               </tbody>
+              {incomes.length > 0 && (
+                <tfoot className="bg-slate-50">
+                  <tr>
+                    <th className="th text-right" colSpan={2}>Total ingresos</th>
+                    <th className="th text-right">{currency(totalIncomes)}</th>
+                    <th className="th text-right">{currency(totalIncomesIva)}</th>
+                    <th className="th text-right">{currency(totalIncomesWithIva)}</th>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
@@ -500,6 +529,8 @@ function downloadProfitAndLossExcel(report, filename) {
           <td class="cell name" colspan="2">${escapeHtmlCell(name)}</td>
           <td class="cell percent">${escapeHtmlCell(formatPct(amount, report.totalIncomes))}</td>
           <td class="cell money positive">${formatMoneyCell(amount)}</td>
+          <td class="cell money">${formatMoneyCell(ivaOf(amount))}</td>
+          <td class="cell money positive">${formatMoneyCell(totalWithIva(amount))}</td>
         </tr>
       `;
     })
@@ -515,10 +546,10 @@ function downloadProfitAndLossExcel(report, filename) {
 
       return `
         <tr>
-          <td class="cell name">${escapeHtmlCell(name)}</td>
+          <td class="cell name" colspan="2">${escapeHtmlCell(name)}</td>
           <td class="cell center ${kind === "Fijo" ? "fixed" : "variable"}">${kind}</td>
           <td class="cell percent">${escapeHtmlCell(formatPct(amount, report.totalExpenses))}</td>
-          <td class="cell money negative">${formatMoneyCell(amount)}</td>
+          <td class="cell money negative" colspan="2">${formatMoneyCell(amount)}</td>
         </tr>
       `;
     })
@@ -565,7 +596,7 @@ function downloadProfitAndLossExcel(report, filename) {
           }
           .sheet {
             table-layout: fixed;
-            width: 680px;
+            width: 840px;
           }
           .title {
             background: #0f172a;
@@ -681,85 +712,91 @@ function downloadProfitAndLossExcel(report, filename) {
       <body>
         <table class="sheet">
           <colgroup>
-            <col style="width: 290px;" />
-            <col style="width: 105px;" />
-            <col style="width: 115px;" />
-            <col style="width: 170px;" />
+            <col style="width: 260px;" />
+            <col style="width: 90px;" />
+            <col style="width: 110px;" />
+            <col style="width: 120px;" />
+            <col style="width: 120px;" />
+            <col style="width: 140px;" />
           </colgroup>
           <tr>
-            <td class="title" colspan="4">Estado de Ganancias y Perdidas</td>
+            <td class="title" colspan="6">Estado de Ganancias y Perdidas</td>
           </tr>
           <tr>
-            <td class="subtitle" colspan="4">
+            <td class="subtitle" colspan="6">
               Periodo: ${escapeHtmlCell(report.from)} al ${escapeHtmlCell(report.to)} | Generado: ${escapeHtmlCell(generatedAt)}
             </td>
           </tr>
-          <tr class="spacer"><td colspan="4"></td></tr>
+          <tr class="spacer"><td colspan="6"></td></tr>
 
           <tr>
-            <td class="section" colspan="4">Resumen ejecutivo</td>
+            <td class="section" colspan="6">Resumen ejecutivo</td>
           </tr>
           <tr>
-            <td class="summary-label" colspan="3">Ingresos totales</td>
+            <td class="summary-label" colspan="5">Ingresos totales</td>
             <td class="summary-value positive">${formatMoneyCell(report.totalIncomes)}</td>
           </tr>
           <tr>
-            <td class="summary-label" colspan="3">Gastos variables</td>
+            <td class="summary-label" colspan="5">Gastos variables</td>
             <td class="summary-value negative">${formatMoneyCell(report.variableExpenses)}</td>
           </tr>
           <tr>
-            <td class="summary-label" colspan="3">Ganancia bruta</td>
+            <td class="summary-label" colspan="5">Ganancia bruta</td>
             <td class="summary-value ${report.grossProfit >= 0 ? "positive" : "negative"}">${formatMoneyCell(report.grossProfit)}</td>
           </tr>
           <tr>
-            <td class="summary-label" colspan="3">Gastos fijos</td>
+            <td class="summary-label" colspan="5">Gastos fijos</td>
             <td class="summary-value negative">${formatMoneyCell(report.fixedExpenses)}</td>
           </tr>
           <tr>
-            <td class="summary-label" colspan="3">Total gastos</td>
+            <td class="summary-label" colspan="5">Total gastos</td>
             <td class="summary-value negative">${formatMoneyCell(report.totalExpenses)}</td>
           </tr>
           <tr>
-            <td class="net-label" colspan="3">Resultado neto</td>
+            <td class="net-label" colspan="5">Resultado neto</td>
             <td class="net-value ${resultClass}">${formatMoneyCell(report.netResult)}</td>
           </tr>
 
-          <tr class="spacer"><td colspan="4"></td></tr>
+          <tr class="spacer"><td colspan="6"></td></tr>
 
           <tr>
-            <td class="section" colspan="4">Ingresos por categoria</td>
+            <td class="section" colspan="6">Ingresos por categoria</td>
           </tr>
           <tr>
             <td class="head" colspan="2">Categoria</td>
             <td class="head">Participacion</td>
             <td class="head">Importe</td>
+            <td class="head">IVA</td>
+            <td class="head">Total</td>
           </tr>
-          ${incomeRows || `<tr><td class="cell" colspan="4">Sin ingresos registrados en el periodo.</td></tr>`}
+          ${incomeRows || `<tr><td class="cell" colspan="6">Sin ingresos registrados en el periodo.</td></tr>`}
           <tr>
             <td class="summary-label" colspan="3">Total ingresos</td>
             <td class="summary-value positive">${formatMoneyCell(report.totalIncomes)}</td>
+            <td class="summary-value">${formatMoneyCell(ivaOf(report.totalIncomes))}</td>
+            <td class="summary-value positive">${formatMoneyCell(totalWithIva(report.totalIncomes))}</td>
           </tr>
 
-          <tr class="spacer"><td colspan="4"></td></tr>
+          <tr class="spacer"><td colspan="6"></td></tr>
 
           <tr>
-            <td class="section" colspan="4">Gastos por categoria</td>
+            <td class="section" colspan="6">Gastos por categoria</td>
           </tr>
           <tr>
-            <td class="head">Categoria</td>
+            <td class="head" colspan="2">Categoria</td>
             <td class="head">Clasificacion</td>
             <td class="head">Participacion</td>
-            <td class="head">Importe</td>
+            <td class="head" colspan="2">Importe</td>
           </tr>
-          ${expenseRows || `<tr><td class="cell" colspan="4">Sin gastos registrados en el periodo.</td></tr>`}
+          ${expenseRows || `<tr><td class="cell" colspan="6">Sin gastos registrados en el periodo.</td></tr>`}
           <tr>
-            <td class="summary-label" colspan="3">Total gastos</td>
-            <td class="summary-value negative">${formatMoneyCell(report.totalExpenses)}</td>
+            <td class="summary-label" colspan="4">Total gastos</td>
+            <td class="summary-value negative" colspan="2">${formatMoneyCell(report.totalExpenses)}</td>
           </tr>
 
-          <tr class="spacer"><td colspan="4"></td></tr>
+          <tr class="spacer"><td colspan="6"></td></tr>
           <tr>
-            <td class="note" colspan="4">
+            <td class="note" colspan="6">
               Los importes se muestran en euros. Este archivo se genera desde ZagaPro con la informacion registrada para el rango seleccionado.
             </td>
           </tr>
