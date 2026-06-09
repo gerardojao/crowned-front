@@ -289,7 +289,7 @@ export default function ReprintInvoice() {
               </tbody>
             </table>
 
-            <div className="mt-4 grid grid-cols-1 md:grid-cols-[1fr_280px] gap-6 items-start">
+            <div className="mt-2 grid grid-cols-[1fr_280px] gap-6 items-start">
               <div className="text-sm">
                 <p className="font-extrabold">GARANTIA DE 90 DIAS O 2000KM</p>
 
@@ -318,7 +318,7 @@ export default function ReprintInvoice() {
                 </div>
               </div>
 
-              <div className="border border-black text-sm">
+              <div className="text-sm">
                 <Row label="BASE IMPONIBLE" value={formatMoney(totals.subtotal)} />
                 <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
                 <Row label="IVA" value={formatMoney(totals.iva)} />
@@ -345,9 +345,11 @@ export default function ReprintInvoice() {
 
 function Row({ label, value, strong = false }) {
   return (
-    <div className="grid grid-cols-2 border-b border-black last:border-b-0">
-      <div className="px-3 py-2 font-bold italic bg-slate-50">{label}</div>
-      <div className={`px-3 py-2 text-right ${strong ? "font-extrabold" : ""}`}>
+    <div className="grid grid-cols-[1fr_140px] items-stretch">
+      <div className="px-3 py-2 text-right text-xs font-bold italic text-slate-700">
+        {label}
+      </div>
+      <div className={`border border-black bg-slate-50 px-3 py-2 text-right ${strong ? "font-extrabold" : ""}`}>
         {value}
       </div>
     </div>
