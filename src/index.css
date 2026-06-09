@@ -83,7 +83,7 @@
   background-color: #e2e8f0 !important;
 }
   @page {
-    size: A4 landscape;
+    size: letter landscape;
     margin: 8mm;
   }
 

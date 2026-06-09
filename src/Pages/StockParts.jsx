@@ -54,9 +54,7 @@ export default function StockParts() {
   const [providers, setProviders] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
-    nombre: "",
     idProveedor: "",
-    cantidad: "",
     precioCompra: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
@@ -155,9 +153,7 @@ export default function StockParts() {
     setNotice(null);
     setEditingId(getValue(row, "id"));
     setEditForm({
-      nombre: getValue(row, "nombre", ""),
       idProveedor: String(getValue(row, "idProveedor", "") || ""),
-      cantidad: String(getValue(row, "cantidad", 0) || ""),
       precioCompra: String(getValue(row, "precioCompra", 0) || ""),
     });
   };
@@ -165,9 +161,7 @@ export default function StockParts() {
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({
-      nombre: "",
       idProveedor: "",
-      cantidad: "",
       precioCompra: "",
     });
   };
@@ -180,9 +174,7 @@ export default function StockParts() {
       setNotice(null);
 
       const payload = {
-        nombre: editForm.nombre,
         idProveedor: editForm.idProveedor ? Number(editForm.idProveedor) : 0,
-        cantidad: Number(editForm.cantidad || 0),
         precioCompra: Number(editForm.precioCompra || 0),
       };
 
@@ -395,16 +387,7 @@ export default function StockParts() {
                         <td className="px-3 py-3 text-center text-slate-400">-</td>
                         <td className="px-3 py-3 text-center text-slate-400">-</td>
                         <td className="px-3 py-3 text-center font-semibold">
-                          {isEditing ? (
-                            <input
-                              value={editForm.nombre}
-                              onChange={(e) => setEditForm((current) => ({ ...current, nombre: e.target.value }))}
-                              className="w-56 rounded-lg border border-slate-300 px-2 py-1 text-sm"
-                              aria-label="Concepto"
-                            />
-                          ) : (
-                            getValue(row, "nombre", "-")
-                          )}
+                          {getValue(row, "nombre", "-")}
                         </td>
                         <td className="px-3 py-3 text-center">
                           {isEditing ? (
@@ -429,19 +412,7 @@ export default function StockParts() {
                           )}
                         </td>
                         <td className="px-3 py-3 text-center font-semibold">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              min="0.01"
-                              step="0.01"
-                              value={editForm.cantidad}
-                              onChange={(e) => setEditForm((current) => ({ ...current, cantidad: e.target.value }))}
-                              className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
-                              aria-label="Cantidad"
-                            />
-                          ) : (
-                            pct.format(totals.cantidad)
-                          )}
+                          {pct.format(totals.cantidad)}
                         </td>
                         <td className="px-3 py-3 text-center">
                           {isEditing ? (
