@@ -443,7 +443,7 @@ export default function IncomeDetails() {
                 Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
               </div>
               <div className="text-sm font-medium text-slate-600">
-                Total: <span className="text-slate-900">{eur.format(total)}</span>
+                Total: <span className="text-slate-900">{eur.format(totalConIva)}</span>
               </div>
             </div>
 
