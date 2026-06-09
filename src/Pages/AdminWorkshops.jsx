@@ -656,17 +656,32 @@ export default function AdminWorkshops() {
 }
 
 function Input({ label, value, onChange, type = "text", required = false, placeholder = "" }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
+
   return (
     <label className="block text-sm font-medium text-slate-700">
       {label}
-      <input
-        type={type}
-        required={required}
-        placeholder={placeholder}
-        value={value ?? ""}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-      />
+      <span className="relative mt-1 block">
+        <input
+          type={isPassword && showPassword ? "text" : type}
+          required={required}
+          placeholder={placeholder}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full rounded-xl border border-slate-300 px-3 py-2 text-sm ${isPassword ? "pr-10" : ""}`}
+        />
+        {isPassword && (
+          <button
+            type="button"
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-1 text-base text-slate-500 hover:text-slate-700"
+            onClick={() => setShowPassword((current) => !current)}
+            aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+          >
+            👁️
+          </button>
+        )}
+      </span>
     </label>
   );
 }

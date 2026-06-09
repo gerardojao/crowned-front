@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BarChart3, Eye, EyeOff, FileText, LogIn, ShieldCheck } from "lucide-react";
+import { BarChart3, FileText, LogIn, ShieldCheck } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../Components/AuthContext";
 import { API_BASE_URL } from "../Components/api";
@@ -13,7 +13,6 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
-  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -176,24 +175,14 @@ export default function Login() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">Contrasena</label>
-            <div className="relative">
-              <input
-                type={show ? "text" : "password"}
-                autoComplete="current-password"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                placeholder="********"
-                value={pwd}
-                onChange={(e) => setPwd(e.target.value)}
-              />
-              <button
-                type="button"
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
-                onClick={() => setShow((s) => !s)}
-                aria-label="Mostrar contrasena"
-              >
-                {show ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
-            </div>
+            <input
+              type="password"
+              autoComplete="current-password"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-400"
+              placeholder="********"
+              value={pwd}
+              onChange={(e) => setPwd(e.target.value)}
+            />
           </div>
 
           <button

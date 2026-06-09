@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Pencil, Save, Search, X } from "lucide-react";
 import api from "../Components/api";
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -51,6 +51,15 @@ export default function StockParts() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [providers, setProviders] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    nombre: "",
+    idProveedor: "",
+    cantidad: "",
+    precioCompra: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
   const pageSize = 20;
 
   const loadParts = async () => {
@@ -87,6 +96,16 @@ export default function StockParts() {
     loadParts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, dateFrom, dateTo, page]);
+
+  useEffect(() => {
+    api
+      .get("/Proveedor", { params: { page: 1, pageSize: 100 } })
+      .then((res) => setProviders(res?.data?.data?.[0]?.items || []))
+      .catch((err) => {
+        console.error(err);
+        setProviders([]);
+      });
+  }, []);
 
   const summary = useMemo(() => {
     return parts.reduce(
@@ -132,6 +151,70 @@ export default function StockParts() {
     return Array.from(map.values());
   }, [parts]);
 
+  const startEdit = (row) => {
+    setNotice(null);
+    setEditingId(getValue(row, "id"));
+    setEditForm({
+      nombre: getValue(row, "nombre", ""),
+      idProveedor: String(getValue(row, "idProveedor", "") || ""),
+      cantidad: String(getValue(row, "cantidad", 0) || ""),
+      precioCompra: String(getValue(row, "precioCompra", 0) || ""),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditForm({
+      nombre: "",
+      idProveedor: "",
+      cantidad: "",
+      precioCompra: "",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editingId || savingEdit) return;
+
+    try {
+      setSavingEdit(true);
+      setNotice(null);
+
+      const payload = {
+        nombre: editForm.nombre,
+        idProveedor: editForm.idProveedor ? Number(editForm.idProveedor) : 0,
+        cantidad: Number(editForm.cantidad || 0),
+        precioCompra: Number(editForm.precioCompra || 0),
+      };
+
+      const res = await api.patch(`/RepuestoStock/${editingId}/rentabilidad`, payload);
+      const updated = res?.data?.data?.[0];
+
+      if (updated) {
+        setParts((current) =>
+          current.map((row) =>
+            String(getValue(row, "id")) === String(editingId) ? updated : row,
+          ),
+        );
+      } else {
+        await loadParts();
+      }
+
+      cancelEdit();
+      setNotice({
+        type: "success",
+        text: "Linea de rentabilidad actualizada correctamente.",
+      });
+    } catch (err) {
+      console.error(err);
+      setNotice({
+        type: "error",
+        text: err?.response?.data?.message || err?.message || "No se pudo actualizar la linea.",
+      });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   return (
     <>
       <div className="mt-2 mb-6 flex items-center justify-between gap-3">
@@ -154,7 +237,11 @@ export default function StockParts() {
       </div>
 
       {notice && (
-        <div className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-200">
+        <div className={`mb-4 rounded-xl p-3 text-sm ring-1 ${
+          notice.type === "success"
+            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+            : "bg-rose-50 text-rose-700 ring-rose-200"
+        }`}>
           {notice.text}
         </div>
       )}
@@ -261,6 +348,7 @@ export default function StockParts() {
                 <th className="px-3 py-3 text-center">Venta</th>
                 <th className="px-3 py-3 text-center">Ganancia</th>
                 <th className="px-3 py-3 text-center">% utilidad</th>
+                <th className="px-3 py-3 text-center">Acciones</th>
               </tr>
             </thead>
 
@@ -268,7 +356,7 @@ export default function StockParts() {
               {invoiceGroups.map((group) => (
                 <React.Fragment key={group.numeroFactura}>
                   <tr className="border-t border-slate-200 bg-slate-100/80">
-                    <td colSpan={11} className="px-4 py-3">
+                    <td colSpan={12} className="px-4 py-3">
                       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                           <span className="font-bold text-slate-900">
@@ -298,6 +386,7 @@ export default function StockParts() {
                   {group.rows.map((row) => {
                     const id = getValue(row, "id");
                     const totals = getLineTotals(row);
+                    const isEditing = String(editingId) === String(id);
 
                     return (
                       <tr key={id} className="hover:bg-slate-50">
@@ -306,16 +395,68 @@ export default function StockParts() {
                         <td className="px-3 py-3 text-center text-slate-400">-</td>
                         <td className="px-3 py-3 text-center text-slate-400">-</td>
                         <td className="px-3 py-3 text-center font-semibold">
-                          {getValue(row, "nombre", "-")}
+                          {isEditing ? (
+                            <input
+                              value={editForm.nombre}
+                              onChange={(e) => setEditForm((current) => ({ ...current, nombre: e.target.value }))}
+                              className="w-56 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                              aria-label="Concepto"
+                            />
+                          ) : (
+                            getValue(row, "nombre", "-")
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          {getValue(row, "nombreProveedor", "-") || "-"}
+                          {isEditing ? (
+                            <select
+                              value={editForm.idProveedor}
+                              onChange={(e) => setEditForm((current) => ({ ...current, idProveedor: e.target.value }))}
+                              className="w-48 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                              aria-label="Proveedor"
+                            >
+                              <option value="">Sin proveedor</option>
+                              {providers.map((provider) => {
+                                const providerId = provider.id ?? provider.Id;
+                                return (
+                                  <option key={providerId} value={providerId}>
+                                    {provider.nombre ?? provider.Nombre}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          ) : (
+                            getValue(row, "nombreProveedor", "-") || "-"
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center font-semibold">
-                          {pct.format(totals.cantidad)}
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={editForm.cantidad}
+                              onChange={(e) => setEditForm((current) => ({ ...current, cantidad: e.target.value }))}
+                              className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
+                              aria-label="Cantidad"
+                            />
+                          ) : (
+                            pct.format(totals.cantidad)
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center">
-                          {eur.format(totals.compra)}
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={editForm.precioCompra}
+                              onChange={(e) => setEditForm((current) => ({ ...current, precioCompra: e.target.value }))}
+                              className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
+                              aria-label="Precio compra"
+                            />
+                          ) : (
+                            eur.format(totals.compra)
+                          )}
                         </td>
                         <td className="px-3 py-3 text-center">
                           {eur.format(totals.venta)}
@@ -326,6 +467,39 @@ export default function StockParts() {
                         <td className="px-3 py-3 text-center font-semibold">
                           {totals.utilidad == null ? "-" : `${pct.format(totals.utilidad)}%`}
                         </td>
+                        <td className="px-3 py-3 text-center">
+                          {isEditing ? (
+                            <div className="flex justify-center gap-2">
+                              <button
+                                type="button"
+                                disabled={savingEdit}
+                                onClick={saveEdit}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                              >
+                                <Save size={14} />
+                                Guardar
+                              </button>
+                              <button
+                                type="button"
+                                disabled={savingEdit}
+                                onClick={cancelEdit}
+                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+                              >
+                                <X size={14} />
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => startEdit(row)}
+                              className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                            >
+                              <Pencil size={14} />
+                              Editar
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     );
                   })}
@@ -334,7 +508,7 @@ export default function StockParts() {
 
               {!loading && parts.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500">
+                  <td colSpan={12} className="py-8 text-center text-slate-500">
                     No hay lineas facturadas para mostrar.
                   </td>
                 </tr>
@@ -342,7 +516,7 @@ export default function StockParts() {
 
               {loading && (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500">
+                  <td colSpan={12} className="py-8 text-center text-slate-500">
                     Cargando rentabilidad...
                   </td>
                 </tr>
