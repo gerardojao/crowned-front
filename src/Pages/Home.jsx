@@ -141,8 +141,7 @@ export default function Home() {
                     Órdenes de trabajo
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Crea órdenes, registra trabajos y controla el estado del
-                    {labels.assetSingular}.
+                    Crea órdenes, registra trabajos y controla su estado.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -174,8 +173,7 @@ export default function Home() {
                     Clientes
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Registra clientes con matrícula, modelo y datos del
-                    {labels.assetSingular}.
+                    Registra clientes con matrícula, modelo y todos sus datos.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
@@ -230,7 +228,7 @@ export default function Home() {
                     Finanzas
                   </h3>
                   <p className="text-sm text-slate-500 mt-1">
-                    Controla ingresos, gastos y balance general de la {labels.businessSingular}.
+                    Controla ingresos, gastos y balance general del negocio.
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">

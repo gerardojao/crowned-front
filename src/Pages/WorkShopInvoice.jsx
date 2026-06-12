@@ -29,6 +29,13 @@ const FREQUENT_SERVICES = [
   "Repuestos",
 ];
 
+const SERVICE_PREFIX = "Servicio ";
+const normalizeFrequentServiceName = (value) => {
+  const name = value.trim();
+  if (!name) return "";
+  return /^servicio\b/i.test(name) ? name : `${SERVICE_PREFIX}${name}`;
+};
+
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
@@ -49,6 +56,24 @@ const eur = new Intl.NumberFormat("es-ES", {
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+const PAYMENT_METHODS = [
+  { key: "efectivo", label: "Efectivo" },
+  { key: "transferencia", label: "Transferencia" },
+  { key: "tdc", label: "TDC" },
+  { key: "bizum", label: "Bizum" },
+];
+
+const EMPTY_PAYMENT_METHODS = PAYMENT_METHODS.reduce(
+  (acc, method) => ({
+    ...acc,
+    [method.key]: {
+      checked: false,
+      amount: "",
+    },
+  }),
+  {},
+);
+
 const inputCls = "rounded-xl border border-slate-300 px-3 py-2 text-sm";
 const lockedInputCls =
   "rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-600";
@@ -61,7 +86,7 @@ export default function WorkshopInvoice() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [frequentServices, setFrequentServices] = useState([]);
-  const [newServiceName, setNewServiceName] = useState("");
+  const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
 
   const [order, setOrder] = useState(null);
@@ -81,6 +106,7 @@ export default function WorkshopInvoice() {
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
+  const [paymentMethods, setPaymentMethods] = useState(EMPTY_PAYMENT_METHODS);
 
   const [items, setItems] = useState([
     { descripcion: "Repuestos", cantidad: 1, importe: 0 },
@@ -94,6 +120,7 @@ export default function WorkshopInvoice() {
     cliente: o.cliente ?? o.Cliente ?? "",
     dni: o.dni ?? o.Dni ?? "",
     telefono: o.telefono ?? o.Telefono ?? "",
+    direccionCliente: o.direccionCliente ?? o.DireccionCliente ?? "",
     matricula: o.matricula ?? o.Matricula ?? "",
     marca: o.marca ?? o.Marca ?? "",
     modelo: o.modelo ?? o.Modelo ?? "",
@@ -107,6 +134,49 @@ export default function WorkshopInvoice() {
     observaciones: o.observaciones ?? o.Observaciones ?? "",
     otros: Number(o.otros ?? o.Otros ?? 0),
   });
+
+  const normalizeCustomer = (c) => ({
+    nombre: c.nombre ?? c.Nombre ?? "",
+    dni: c.dni ?? c.Dni ?? "",
+    telefono: c.telefono ?? c.Telefono ?? "",
+    direccion: c.direccion ?? c.Direccion ?? "",
+    matricula: c.matricula ?? c.Matricula ?? "",
+  });
+
+  const findCustomerAddressForOrder = async (orderData) => {
+    const matricula = String(orderData.matricula || "").trim();
+    const cliente = String(orderData.cliente || "").trim();
+
+    try {
+      const res = await api.get("/Cliente", {
+        params: matricula
+          ? { matricula, page: 1, pageSize: 10 }
+          : { search: cliente, page: 1, pageSize: 10 },
+      });
+      const pack = res?.data?.data?.[0];
+      const customers = Array.isArray(pack?.items)
+        ? pack.items.map(normalizeCustomer)
+        : [];
+
+      const exactMatch =
+        customers.find(
+          (item) =>
+            matricula &&
+            item.matricula?.toUpperCase() === matricula.toUpperCase(),
+        ) ||
+        customers.find(
+          (item) =>
+            cliente &&
+            item.nombre?.trim().toLowerCase() === cliente.toLowerCase(),
+        ) ||
+        customers[0];
+
+      return exactMatch?.direccion || "";
+    } catch (err) {
+      console.error(err);
+      return "";
+    }
+  };
 
   // useEffect(() => {
   //   if (id) {
@@ -210,12 +280,15 @@ export default function WorkshopInvoice() {
 
       const o = normalizeOrder(raw);
       setOrder(o);
+      const direccionCliente =
+        o.direccionCliente || (await findCustomerAddressForOrder(o));
 
       setInvoice((prev) => ({
         ...prev,
         numero: numeroFacturaPrev,
         cliente: o.cliente,
         dni: o.dni,
+        direccionCliente,
         telefonoCliente: o.telefono,
         matricula: o.matricula,
         km: o.kilometraje || "",
@@ -278,10 +351,60 @@ export default function WorkshopInvoice() {
     return round2(subtotal + iva);
   }, [subtotal, iva]);
 
+  const selectedPaymentMethods = useMemo(
+    () =>
+      PAYMENT_METHODS.map((method) => ({
+        ...method,
+        amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
+        rawAmount: paymentMethods[method.key]?.amount || "",
+        checked: Boolean(paymentMethods[method.key]?.checked),
+      })).filter((method) => method.checked),
+    [paymentMethods],
+  );
+
+  const paymentTotal = useMemo(
+    () =>
+      round2(
+        selectedPaymentMethods.reduce(
+          (sum, method) => sum + Number(method.amount || 0),
+          0,
+        ),
+      ),
+    [selectedPaymentMethods],
+  );
+
+  const paymentDifference = useMemo(
+    () => round2(totalFinal - paymentTotal),
+    [totalFinal, paymentTotal],
+  );
+
+  const hasPaymentMethods = selectedPaymentMethods.length > 0;
+
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
       ...prev,
       [name]: value,
+    }));
+  };
+
+  const setPaymentMethodChecked = (key, checked) => {
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        checked,
+        amount: checked ? prev[key]?.amount || "" : "",
+      },
+    }));
+  };
+
+  const setPaymentMethodAmount = (key, amount) => {
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        amount,
+      },
     }));
   };
 
@@ -334,8 +457,8 @@ export default function WorkshopInvoice() {
   };
 
   const createFrequentService = async () => {
-    const nombre = newServiceName.trim();
-    if (!nombre) return;
+    const nombre = normalizeFrequentServiceName(newServiceName);
+    if (!nombre || nombre.toLowerCase() === "servicio") return;
 
     try {
       setSavingService(true);
@@ -347,7 +470,7 @@ export default function WorkshopInvoice() {
 
       await loadFrequentServices();
       addFrequentService(nombre);
-      setNewServiceName("");
+      setNewServiceName(SERVICE_PREFIX);
       setNotice("Servicio frecuente agregado.");
     } catch (err) {
       console.error(err);
@@ -398,6 +521,23 @@ const saveIssuedInvoice = async () => {
 
 const printInvoice = async () => {
   try {
+    if (!hasPaymentMethods) {
+      throw new Error("Selecciona al menos un metodo de pago.");
+    }
+
+    const paymentWithoutAmount = selectedPaymentMethods.find(
+      (method) => Number(method.amount || 0) <= 0,
+    );
+    if (paymentWithoutAmount) {
+      throw new Error(`Indica un importe mayor que 0 para ${paymentWithoutAmount.label}.`);
+    }
+
+    if (Math.abs(paymentDifference) >= 0.01) {
+      throw new Error(
+        `La suma de los metodos de pago (${formatMoney(paymentTotal)}) debe coincidir con el total de la factura (${formatMoney(totalFinal)}).`,
+      );
+    }
+
     const res = await saveIssuedInvoice();
     if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
       throw new Error(res?.data?.message || res?.data?.Message || "No se pudo guardar la factura.");
@@ -651,6 +791,77 @@ const printInvoice = async () => {
               onBlur={(e) => setInvoiceField("otros", amountInput(e.target.value))}
             />
           </div>
+
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h4 className="text-sm font-bold text-slate-800">
+                  Metodos de pago
+                </h4>
+                <p className="text-xs text-slate-500">
+                  La suma debe coincidir con el total antes de imprimir.
+                </p>
+              </div>
+              <div className="text-xs font-semibold text-slate-600">
+                Total factura: {formatMoney(totalFinal)}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {PAYMENT_METHODS.map((method) => {
+                const checked = Boolean(paymentMethods[method.key]?.checked);
+                return (
+                  <div
+                    key={method.key}
+                    className="rounded-xl bg-white p-3 ring-1 ring-slate-200"
+                  >
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) =>
+                          setPaymentMethodChecked(method.key, e.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      {method.label}
+                    </label>
+
+                    {checked && (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="Importe"
+                        value={paymentMethods[method.key]?.amount || ""}
+                        onChange={(e) =>
+                          setPaymentMethodAmount(method.key, e.target.value)
+                        }
+                        onBlur={(e) =>
+                          setPaymentMethodAmount(
+                            method.key,
+                            amountInput(e.target.value),
+                          )
+                        }
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ring-1 ${
+                hasPaymentMethods && Math.abs(paymentDifference) < 0.01
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-amber-50 text-amber-800 ring-amber-200"
+              }`}
+            >
+              Asignado: {formatMoney(paymentTotal)} · Diferencia:{" "}
+              {formatMoney(paymentDifference)}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -718,7 +929,11 @@ const printInvoice = async () => {
           <button
             type="button"
             onClick={createFrequentService}
-            disabled={savingService || !newServiceName.trim()}
+            disabled={
+              savingService ||
+              !newServiceName.trim() ||
+              newServiceName.trim().toLowerCase() === "servicio"
+            }
             className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
           >
             {savingService ? "Guardando..." : "Guardar servicio"}
@@ -904,7 +1119,22 @@ const printInvoice = async () => {
                 en contacto con nosotros.
               </p>
 
-              <p className="mt-4 text-center font-extrabold italic">
+              {selectedPaymentMethods.length > 0 && (
+                <div className="mt-6 text-center">
+                  <p className="text-left text-base font-semibold text-slate-700">
+                    Metodos de Pago:
+                  </p>
+                  <div className="mt-0 flex flex-wrap items-center justify-center gap-x-7  text-base font-semibold text-slate-700">
+                    {selectedPaymentMethods.map((method) => (
+                      <span key={method.key}>
+                        {method.label}: {formatMoney(method.amount)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <p className="mt-6 text-center font-extrabold italic">
                 GRACIAS POR SU CONFIANZA
               </p>
 

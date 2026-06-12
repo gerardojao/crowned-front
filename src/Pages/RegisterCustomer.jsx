@@ -353,6 +353,22 @@ export default function RegisterCustomer() {
                 placeholder="correo@email.com"
               />
             </div>
+            <div className="md:col-span-2">
+              <label
+                className="block text-sm font-medium text-slate-700 mb-1"
+              >
+                Dirección
+              </label>
+
+              <input
+                type="text"
+                name="Direccion"
+                value={customer.Direccion}
+                onChange={handleChange}
+                className={cls("Direccion")}
+                placeholder="Dirección del cliente"
+              />
+            </div>
           </div>
         </div>
 
@@ -374,7 +390,9 @@ export default function RegisterCustomer() {
                 value={customer.Matricula}
                 onChange={handleChange}
                 className={cls("Matricula")}
-                placeholder={labels.kind === "service" ? "CH-AC-001" : "1234ABC"}
+                placeholder={
+                  labels.kind === "service" ? "CH-AC-001" : "1234ABC"
+                }
               />
             </div>
 
@@ -404,7 +422,11 @@ export default function RegisterCustomer() {
                 value={customer.Modelo}
                 onChange={handleChange}
                 className={cls("Modelo")}
-                placeholder={labels.kind === "service" ? "Split, termo, caldera..." : "Corolla"}
+                placeholder={
+                  labels.kind === "service"
+                    ? "Split, termo, caldera..."
+                    : "Corolla"
+                }
               />
             </div>
 

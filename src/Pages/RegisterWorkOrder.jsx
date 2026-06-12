@@ -49,6 +49,13 @@ const DEFAULT_FREQUENT_SERVICES = [
   "Repuestos",
 ];
 
+const SERVICE_PREFIX = "Servicio ";
+const normalizeFrequentServiceName = (value) => {
+  const name = value.trim();
+  if (!name) return "";
+  return /^servicio\b/i.test(name) ? name : `${SERVICE_PREFIX}${name}`;
+};
+
 const getStateStyles = (estado) => {
   switch (estado) {
     case "Recibido":
@@ -77,13 +84,54 @@ const getStateStyles = (estado) => {
 const ensureOk = (res) => {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
-    throw new Error(data?.message || data?.Message || "La operacion no se pudo completar.");
+    throw new Error(
+      data?.message || data?.Message || "La operacion no se pudo completar.",
+    );
   }
   return data;
 };
 
 const isOrderEditLocked = (estado) =>
   ["Reparando", "Esperando repuesto", "Listo", "Entregado"].includes(estado);
+
+const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
+
+function normalizeWhatsAppPhone(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) return digits.slice(2);
+  if (digits.startsWith(DEFAULT_WHATSAPP_COUNTRY_PREFIX)) return digits;
+  if (digits.length === 9) return `${DEFAULT_WHATSAPP_COUNTRY_PREFIX}${digits}`;
+  return digits;
+}
+
+function openWhatsAppVehicleReady(order, businessName = "nuestro taller") {
+  const phone = normalizeWhatsAppPhone(order.Telefono);
+
+  if (!phone) {
+    alert("Este cliente no tiene teléfono registrado.");
+    return false;
+  }
+
+  const cliente = order.Cliente || "";
+  const matricula = order.Matricula || "";
+  const marca = order.Marca || "";
+  const modelo = order.Modelo || "";
+
+  const message = `Hola ${cliente}, le informamos desde ${businessName} que su vehículo${
+    matricula ? ` matrícula ${matricula}` : ""
+  }${marca || modelo ? ` (${marca} ${modelo})` : ""} ya está listo para retirar. Puede pasar por nuestras instalaciones cuando le resulte conveniente. ¡Gracias por confiar en nosotros!
+
+  ${businessName}`;
+
+  window.open(
+    `https://wa.me/${phone}?text=${encodeURIComponent(message)}`,
+    "_blank",
+    "noopener,noreferrer",
+  );
+
+  return true;
+}
 
 export default function RegisterWorkOrder() {
   const labels = useBusinessTerminology();
@@ -106,16 +154,45 @@ export default function RegisterWorkOrder() {
   const [orderPage, setOrderPage] = useState(1);
   const [orderTotal, setOrderTotal] = useState(0);
   const [frequentServices, setFrequentServices] = useState([]);
-  const [newServiceName, setNewServiceName] = useState("");
+  const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
+  const [readyWhatsappOrder, setReadyWhatsappOrder] = useState(null);
+  const [workshopName, setWorkshopName] = useState("nuestro taller");
+  const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const orderPageSize = 10;
   const detailItems = Array.isArray(order.Items) ? order.Items : [];
   const detailTotal = detailItems.reduce(
     (sum, item) =>
       sum +
-      Number(item.cantidad || 0) * Number(item.precioUnitario || item.importe || 0),
+      Number(item.cantidad || 0) *
+        Number(item.precioUnitario || item.importe || 0),
     0,
   );
+
+  const loadWorkshopName = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      const data = res?.data || {};
+
+      const enabled =
+        data.enableWhatsappAlerts ?? data.EnableWhatsappAlerts ?? false;
+
+      setWhatsappEnabled(enabled);
+
+      const name =
+        data.nombre ??
+        data.Nombre ??
+        data.razonSocial ??
+        data.RazonSocial ??
+        "nuestro taller";
+
+      setWorkshopName(name);
+    } catch (err) {
+      console.error(err);
+      setWorkshopName("nuestro taller");
+    }
+  };
+
   const total = detailItems.length
     ? detailTotal
     : Number(order.ManoObra || 0) +
@@ -136,9 +213,7 @@ export default function RegisterWorkOrder() {
     try {
       const res = await api.get("/ServicioFrecuente");
       const list = res?.data?.data?.[0] || [];
-      const names = list
-        .map((x) => x.nombre ?? x.Nombre)
-        .filter(Boolean);
+      const names = list.map((x) => x.nombre ?? x.Nombre).filter(Boolean);
       setFrequentServices(names.length ? names : DEFAULT_FREQUENT_SERVICES);
     } catch (err) {
       console.error(err);
@@ -161,7 +236,12 @@ export default function RegisterWorkOrder() {
     }));
   };
 
-  const createDetailItem = (descripcion, cantidad = 1, precioUnitario = 0, extra = {}) => ({
+  const createDetailItem = (
+    descripcion,
+    cantidad = 1,
+    precioUnitario = 0,
+    extra = {},
+  ) => ({
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     descripcion,
     cantidad,
@@ -242,8 +322,8 @@ export default function RegisterWorkOrder() {
   };
 
   const createFrequentService = async () => {
-    const nombre = newServiceName.trim();
-    if (!nombre) return;
+    const nombre = normalizeFrequentServiceName(newServiceName);
+    if (!nombre || nombre.toLowerCase() === "servicio") return;
 
     try {
       setSavingService(true);
@@ -252,7 +332,7 @@ export default function RegisterWorkOrder() {
       ensureOk(res);
       await loadFrequentServices();
       appendServiceToTrabajo(nombre);
-      setNewServiceName("");
+      setNewServiceName(SERVICE_PREFIX);
       setNotice("Servicio frecuente agregado.");
     } catch (err) {
       console.error(err);
@@ -315,7 +395,8 @@ export default function RegisterWorkOrder() {
               item.IdRepuesto ??
               null,
             idProveedor: item.idProveedor ?? item.IdProveedor ?? null,
-            nombreProveedor: item.nombreProveedor ?? item.NombreProveedor ?? null,
+            nombreProveedor:
+              item.nombreProveedor ?? item.NombreProveedor ?? null,
             precioCompra: item.precioCompra ?? item.PrecioCompra ?? null,
           }))
         : [];
@@ -347,7 +428,9 @@ export default function RegisterWorkOrder() {
       Matricula: customer.Matricula || prev.Matricula,
       Marca: customer.Marca || prev.Marca,
       Modelo: customer.Modelo || prev.Modelo,
-      Kilometraje: customer.Kilometraje ? String(customer.Kilometraje) : prev.Kilometraje,
+      Kilometraje: customer.Kilometraje
+        ? String(customer.Kilometraje)
+        : prev.Kilometraje,
     }));
     setCustomerSearch("");
     setCustomerMatches([]);
@@ -393,10 +476,14 @@ export default function RegisterWorkOrder() {
       },
     });
     const pack = res?.data?.data?.[0];
-    const items = Array.isArray(pack?.items) ? pack.items.map(normalizeCustomer) : [];
-    return items.find(
-      (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
-    ) || null;
+    const items = Array.isArray(pack?.items)
+      ? pack.items.map(normalizeCustomer)
+      : [];
+    return (
+      items.find(
+        (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
+      ) || null
+    );
   };
 
   const createCustomerFromOrder = async () => {
@@ -521,6 +608,7 @@ export default function RegisterWorkOrder() {
     if (window.location.hash === "#ordenes-recientes") {
       setShowOrders(true);
     }
+    loadWorkshopName();
     loadFrequentServices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -597,7 +685,9 @@ export default function RegisterWorkOrder() {
 
   const startEdit = (o) => {
     if (isOrderEditLocked(o.Estado)) {
-      setError("No se puede editar una orden en reparacion, lista o entregada.");
+      setError(
+        "No se puede editar una orden en reparacion, lista o entregada.",
+      );
       return;
     }
 
@@ -649,13 +739,18 @@ export default function RegisterWorkOrder() {
           repuestoStockId: item.repuestoStockId || null,
           idProveedor: item.idProveedor || null,
           nombreProveedor: item.nombreProveedor || null,
-          precioCompra: item.precioCompra != null ? Number(item.precioCompra || 0) : null,
+          precioCompra:
+            item.precioCompra != null ? Number(item.precioCompra || 0) : null,
         }));
       const laborTotal = normalizedItems
-        .filter((item) => item.descripcion.trim().toLowerCase() === "mano de obra")
+        .filter(
+          (item) => item.descripcion.trim().toLowerCase() === "mano de obra",
+        )
         .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
       const partsTotal = normalizedItems
-        .filter((item) => item.descripcion.trim().toLowerCase() !== "mano de obra")
+        .filter(
+          (item) => item.descripcion.trim().toLowerCase() !== "mano de obra",
+        )
         .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
 
       const payload = {
@@ -671,9 +766,13 @@ export default function RegisterWorkOrder() {
         itemsJson: normalizedItems.length
           ? JSON.stringify(normalizedItems)
           : null,
-        repuestos: normalizedItems.length ? partsTotal : Number(order.Repuestos || 0),
+        repuestos: normalizedItems.length
+          ? partsTotal
+          : Number(order.Repuestos || 0),
         cantidad: Number(order.Cantidad || 1),
-        manoObra: normalizedItems.length ? laborTotal : Number(order.ManoObra || 0),
+        manoObra: normalizedItems.length
+          ? laborTotal
+          : Number(order.ManoObra || 0),
         estado: order.Estado || "Recibido",
         observaciones: order.Observaciones || null,
       };
@@ -733,9 +832,7 @@ export default function RegisterWorkOrder() {
           <h2 className="text-2xl font-semibold text-slate-900">
             {labels.orderTitle}
           </h2>
-          <p className="text-sm text-slate-500 mt-1">
-            {labels.orderSubtitle}
-          </p>
+          <p className="text-sm text-slate-500 mt-1">{labels.orderSubtitle}</p>
         </div>
 
         <Link
@@ -750,6 +847,37 @@ export default function RegisterWorkOrder() {
       {notice && (
         <div className="mb-4 rounded-xl bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 p-3 text-sm">
           {notice}
+        </div>
+      )}
+
+      {readyWhatsappOrder && (
+        <div className="fixed bottom-6 right-6 z-[9999] w-[min(calc(100vw-2rem),420px)] rounded-2xl bg-green-50 p-4 text-green-800 shadow-2xl ring-1 ring-green-200">
+          <p className="font-bold">Orden lista para retirar</p>
+
+          <p className="mt-1 text-sm">
+            Notificale a {readyWhatsappOrder.Cliente} que ya puede retirar su vehículo.
+          </p>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                openWhatsAppVehicleReady(readyWhatsappOrder, workshopName);
+                setReadyWhatsappOrder(null);
+              }}
+              className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white hover:bg-green-700"
+            >
+              Avisar por WhatsApp
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setReadyWhatsappOrder(null)}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-green-700 ring-1 ring-green-200 hover:bg-green-100"
+            >
+              Cerrar
+            </button>
+          </div>
         </div>
       )}
 
@@ -813,14 +941,19 @@ export default function RegisterWorkOrder() {
             </div>
 
             {loadingCustomers && (
-              <p className="mt-3 text-sm text-slate-500">Buscando clientes...</p>
+              <p className="mt-3 text-sm text-slate-500">
+                Buscando clientes...
+              </p>
             )}
 
-            {!loadingCustomers && customerSearch.trim().length >= 2 && customerMatches.length === 0 && (
-              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
-                No encontramos ese cliente. Puedes completar los campos y usar "Registrar nuevo".
-              </div>
-            )}
+            {!loadingCustomers &&
+              customerSearch.trim().length >= 2 &&
+              customerMatches.length === 0 && (
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+                  No encontramos ese cliente. Puedes completar los campos y usar
+                  "Registrar nuevo".
+                </div>
+              )}
 
             {customerMatches.length > 0 && (
               <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -835,7 +968,9 @@ export default function RegisterWorkOrder() {
                       {customer.Nombre}
                     </span>
                     <span className="mt-1 block text-slate-600">
-                      {customer.Matricula || `Sin ${labels.referenceLabel.toLowerCase()}`} · {customer.Marca} {customer.Modelo}
+                      {customer.Matricula ||
+                        `Sin ${labels.referenceLabel.toLowerCase()}`}{" "}
+                      · {customer.Marca} {customer.Modelo}
                     </span>
                     <span className="mt-1 block text-xs text-slate-500">
                       {customer.Telefono || "Sin telefono"}
@@ -848,8 +983,9 @@ export default function RegisterWorkOrder() {
             {showNewCustomer && (
               <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600 ring-1 ring-slate-200">
                 <p>
-                  Completa nombre, telefono, matricula y modelo en los campos de abajo.
-                  Luego pulsa este boton para guardar el cliente en la base de datos.
+                  Completa nombre, telefono, matricula y modelo en los campos de
+                  abajo. Luego pulsa este boton para guardar el cliente en la
+                  base de datos.
                 </p>
                 <button
                   type="button"
@@ -858,7 +994,9 @@ export default function RegisterWorkOrder() {
                   className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
                   <UserPlus size={17} />
-                  {savingCustomer ? "Guardando cliente..." : "Guardar cliente nuevo"}
+                  {savingCustomer
+                    ? "Guardando cliente..."
+                    : "Guardar cliente nuevo"}
                 </button>
               </div>
             )}
@@ -995,7 +1133,11 @@ export default function RegisterWorkOrder() {
             <button
               type="button"
               onClick={createFrequentService}
-              disabled={savingService || !newServiceName.trim()}
+              disabled={
+                savingService ||
+                !newServiceName.trim() ||
+                newServiceName.trim().toLowerCase() === "servicio"
+              }
               className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
             >
               {savingService ? "Guardando..." : "Guardar servicio"}
@@ -1033,16 +1175,15 @@ export default function RegisterWorkOrder() {
                 Mano de obra (EUR)
               </label>
               <input
-              name="ManoObra"
-              type="number"
-              step="0.01"
-              value={order.ManoObra}
-              onChange={handleChange}
-              onBlur={(e) => upsertLaborItem(e.target.value)}
-              className={cls}
-              placeholder="Mano de obra €"
-            />
-
+                name="ManoObra"
+                type="number"
+                step="0.01"
+                value={order.ManoObra}
+                onChange={handleChange}
+                onBlur={(e) => upsertLaborItem(e.target.value)}
+                className={cls}
+                placeholder="Mano de obra €"
+              />
             </div>
 
             <textarea
@@ -1092,7 +1233,11 @@ export default function RegisterWorkOrder() {
                           step="0.01"
                           value={item.cantidad}
                           onChange={(e) =>
-                            setDetailItemField(item.id, "cantidad", e.target.value)
+                            setDetailItemField(
+                              item.id,
+                              "cantidad",
+                              e.target.value,
+                            )
                           }
                           className={cls}
                           placeholder="Cantidad"
@@ -1100,7 +1245,11 @@ export default function RegisterWorkOrder() {
                         <input
                           value={item.descripcion}
                           onChange={(e) =>
-                            setDetailItemField(item.id, "descripcion", e.target.value)
+                            setDetailItemField(
+                              item.id,
+                              "descripcion",
+                              e.target.value,
+                            )
                           }
                           className={cls}
                           placeholder="Descripcion"
@@ -1200,245 +1349,274 @@ export default function RegisterWorkOrder() {
           id="ordenes-recientes"
           className="mt-4 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6"
         >
-        <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,320px)_auto_auto_auto] md:items-end">
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-800">
-              Órdenes recientes
-            </h3>
+          <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,320px)_auto_auto_auto] md:items-end">
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-slate-800">
+                Órdenes recientes
+              </h3>
 
-            <p className="text-sm text-slate-500 mt-1">
-              Busca rápidamente una orden por matrícula.
-            </p>
-          </div>
-
-          <input
-            type="text"
-            value={plateSearch}
-            onChange={(e) => setPlateSearch(e.target.value)}
-            placeholder={labels.referenceSearchPlaceholder}
-            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
-            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
-
-          <input
-            type="date"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
-            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
-          />
-          {(plateSearch || dateFrom || dateTo) && (
-            <button
-              type="button"
-              onClick={() => {
-                setPlateSearch("");
-                setDateFrom("");
-                setDateTo("");
-                setOrderPage(1);
-              }}
-              className="w-full rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition md:w-auto"
-            >
-              Limpiar
-            </button>
-          )}
-        </div>
-
-        <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
-          {loadingOrders && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
-              Cargando ordenes...
-            </div>
-          )}
-
-          {filteredOrders.map((o) => (
-            <article
-              key={o.Id}
-              className={`rounded-2xl border p-4 shadow-sm hover:shadow-md transition sm:p-5 ${getStateStyles(o.Estado)}`}
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <h4 className="text-lg font-bold text-slate-900">
-                    {o.Matricula}
-                  </h4>
-
-                  <p className="text-sm text-slate-500">
-                    {o.Marca} {o.Modelo}
-                  </p>
-                </div>
-
-                <select
-                  value={o.Estado}
-                  onChange={async (e) => {
-                    const nuevoEstado = e.target.value;
-
-                    try {
-                      await api.put(`/OrdenTrabajo/estado/${o.Id}`, {
-                        estado: nuevoEstado,
-                      });
-
-                      setOrders((prev) =>
-                        prev.map((item) =>
-                          item.Id === o.Id
-                            ? { ...item, Estado: nuevoEstado }
-                            : item,
-                        ),
-                      );
-                    } catch (err) {
-                      console.error(err);
-                      setError(
-                        err?.response?.data?.message ||
-                          err?.message ||
-                          "No se pudo actualizar el estado.",
-                      );
-                    }
-                  }}
-                  className={`w-full rounded-full px-3 py-2 text-xs font-medium ring-1 bg-white sm:w-auto sm:py-1 ${
-                    o.Estado === "Entregado"
-                      ? "text-emerald-700 ring-emerald-200"
-                      : o.Estado === "Reparando"
-                        ? "text-amber-700 ring-amber-200"
-                        : "text-slate-700 ring-slate-200"
-                  }`}
-                >
-                  {states.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
-                <div className="min-w-0 rounded-xl bg-white/50 p-3 text-left sm:text-center">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Cliente
-                  </p>
-
-                  <p className="text-md break-words font-semibold text-slate-800 sm:truncate">
-                    {o.Cliente}
-                  </p>
-                </div>
-
-                <div className="min-w-0 rounded-xl bg-white/50 p-3 text-left sm:text-center">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Trabajo
-                  </p>
-
-                  <p className="text-md break-words text-slate-700 sm:line-clamp-2">
-                    {o.Trabajo}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Total
-                  </p>
-
-                  <p className="text-xl font-bold text-slate-900">
-                    {o.Total.toLocaleString("es-ES", {
-                      style: "currency",
-                      currency: "EUR",
-                    })}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
-                  <a
-                    href={`/print-order/${o.Id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
-                  >
-                    Imprimir
-                  </a>
-
-                  {!isOrderEditLocked(o.Estado) && (
-                    <button
-                      type="button"
-                      onClick={() => startEdit(o)}
-                      className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
-                    >
-                      Editar
-                    </button>
-                  )}
-
-                  {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
-                    <Link
-                      to={`/workshop-invoice/${o.Id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex justify-center rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
-                    >
-                      Facturar
-                    </Link>
-                  )}
-
-                  {(o.Facturada || o.facturada) && (
-                    // <span className="rounded-xl px-3 py-2 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium">
-                    //   Orden facturada
-                    // </span>
-                    <Link
-                      to={`/reprint-invoice/order/${o.Id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="col-span-2 inline-flex justify-center rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition sm:col-span-1"
-                    >
-                      Reimprimir factura
-                    </Link>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-
-          {!loadingOrders && filteredOrders.length === 0 && (
-            <div className="lg:col-span-2 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 text-2xl">
-                🚗
-              </div>
-
-              <h4 className="mt-4 text-lg font-semibold text-slate-800">
-                {plateSearch || dateFrom || dateTo
-                  ? "No se encontraron órdenes"
-                  : "No hay órdenes registradas"}
-              </h4>
-
-              <p className="mt-2 text-sm text-slate-500">
-                {plateSearch
-                  ? "Prueba buscando otra matrícula."
-                  : "Las nuevas órdenes aparecerán aquí automáticamente."}
+              <p className="text-sm text-slate-500 mt-1">
+                Busca rápidamente una orden por matrícula.
               </p>
             </div>
-          )}
-        </div>
 
-        <div className="mt-5 flex flex-col items-stretch justify-center gap-3 text-sm sm:flex-row sm:items-center">
-          <button
-            type="button"
-            disabled={orderPage <= 1 || loadingOrders}
-            onClick={() => loadOrders(orderPage - 1)}
-            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Anterior
-          </button>
-          <span className="text-center text-slate-600">
-            Pagina {orderPage} de {orderTotalPages} · {orderTotal} ordenes
-          </span>
-          <button
-            type="button"
-            disabled={orderPage >= orderTotalPages || loadingOrders}
-            onClick={() => loadOrders(orderPage + 1)}
-            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Siguiente
-          </button>
-        </div>
+            <input
+              type="text"
+              value={plateSearch}
+              onChange={(e) => setPlateSearch(e.target.value)}
+              placeholder={labels.referenceSearchPlaceholder}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+            />
+            {(plateSearch || dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPlateSearch("");
+                  setDateFrom("");
+                  setDateTo("");
+                  setOrderPage(1);
+                }}
+                className="w-full rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition md:w-auto"
+              >
+                Limpiar
+              </button>
+            )}
+          </div>
+
+          <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
+            {loadingOrders && (
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
+                Cargando ordenes...
+              </div>
+            )}
+
+            {filteredOrders.map((o) => (
+              <article
+                key={o.Id}
+                className={`rounded-2xl border p-4 shadow-sm hover:shadow-md transition sm:p-5 ${getStateStyles(o.Estado)}`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <h4 className="text-lg font-bold text-slate-900">
+                      {o.Matricula}
+                    </h4>
+
+                    <p className="text-sm text-slate-500">
+                      {o.Marca} {o.Modelo}
+                    </p>
+                  </div>
+
+                  <select
+                    value={o.Estado}
+                    onChange={async (e) => {
+                      const nuevoEstado = e.target.value;
+                      const estadoAnterior = o.Estado;
+
+                      try {
+                        await api.put(`/OrdenTrabajo/estado/${o.Id}`, {
+                          estado: nuevoEstado,
+                        });
+
+                        const updatedOrder = {
+                          ...o,
+                          Estado: nuevoEstado,
+                        };
+
+                        setOrders((prev) =>
+                          prev.map((item) =>
+                            item.Id === o.Id ? updatedOrder : item,
+                          ),
+                        );
+
+                        console.log("whatsappEnabled:", whatsappEnabled);
+                        console.log("estadoAnterior:", estadoAnterior);
+                        console.log("nuevoEstado:", nuevoEstado);
+
+                        if (
+                          whatsappEnabled &&
+                          estadoAnterior !== "Listo" &&
+                          nuevoEstado === "Listo"
+                        ) {
+                          if (whatsappEnabled) {
+                            setReadyWhatsappOrder(updatedOrder);
+                            setNotice(
+                              "Orden marcada como lista. Puedes avisar al cliente por WhatsApp.",
+                            );
+                          } else {
+                            setNotice("Orden marcada como lista.");
+                          }
+                          setTimeout(() => {
+                            window.scrollTo({
+                              top: 0,
+                              behavior: "smooth",
+                            });
+                          }, 100);
+                        }
+                      } catch (err) {
+                        console.error(err);
+                        setError(
+                          err?.response?.data?.message ||
+                            err?.message ||
+                            "No se pudo actualizar el estado.",
+                        );
+                      }
+                    }}
+                    className={`w-full rounded-full px-3 py-2 text-xs font-medium ring-1 bg-white sm:w-auto sm:py-1 ${
+                      o.Estado === "Entregado"
+                        ? "text-emerald-700 ring-emerald-200"
+                        : o.Estado === "Reparando"
+                          ? "text-amber-700 ring-amber-200"
+                          : "text-slate-700 ring-slate-200"
+                    }`}
+                  >
+                    {states.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+                  <div className="min-w-0 rounded-xl bg-white/50 p-3 text-left sm:text-center">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Cliente
+                    </p>
+
+                    <p className="text-md break-words font-semibold text-slate-800 sm:truncate">
+                      {o.Cliente}
+                    </p>
+                  </div>
+
+                  <div className="min-w-0 rounded-xl bg-white/50 p-3 text-left sm:text-center">
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Trabajo
+                    </p>
+
+                    <p className="text-md break-words text-slate-700 sm:line-clamp-2">
+                      {o.Trabajo}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Total
+                    </p>
+
+                    <p className="text-xl font-bold text-slate-900">
+                      {o.Total.toLocaleString("es-ES", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
+                    <a
+                      href={`/print-order/${o.Id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
+                    >
+                      Imprimir
+                    </a>
+
+                    {!isOrderEditLocked(o.Estado) && (
+                      <button
+                        type="button"
+                        onClick={() => startEdit(o)}
+                        className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+                      >
+                        Editar
+                      </button>
+                    )}
+
+                    {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
+                      <Link
+                        to={`/workshop-invoice/${o.Id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex justify-center rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
+                      >
+                        Facturar
+                      </Link>
+                    )}
+
+                    {(o.Facturada || o.facturada) && (
+                      // <span className="rounded-xl px-3 py-2 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium">
+                      //   Orden facturada
+                      // </span>
+                      <Link
+                        to={`/reprint-invoice/order/${o.Id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="col-span-2 inline-flex justify-center rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition sm:col-span-1"
+                      >
+                        Reimprimir factura
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+
+            {!loadingOrders && filteredOrders.length === 0 && (
+              <div className="lg:col-span-2 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 text-2xl">
+                  🚗
+                </div>
+
+                <h4 className="mt-4 text-lg font-semibold text-slate-800">
+                  {plateSearch || dateFrom || dateTo
+                    ? "No se encontraron órdenes"
+                    : "No hay órdenes registradas"}
+                </h4>
+
+                <p className="mt-2 text-sm text-slate-500">
+                  {plateSearch
+                    ? "Prueba buscando otra matrícula."
+                    : "Las nuevas órdenes aparecerán aquí automáticamente."}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 flex flex-col items-stretch justify-center gap-3 text-sm sm:flex-row sm:items-center">
+            <button
+              type="button"
+              disabled={orderPage <= 1 || loadingOrders}
+              onClick={() => loadOrders(orderPage - 1)}
+              className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-center text-slate-600">
+              Pagina {orderPage} de {orderTotalPages} · {orderTotal} ordenes
+            </span>
+            <button
+              type="button"
+              disabled={orderPage >= orderTotalPages || loadingOrders}
+              onClick={() => loadOrders(orderPage + 1)}
+              className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
         </section>
       )}
     </>

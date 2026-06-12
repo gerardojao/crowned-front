@@ -43,6 +43,13 @@ const DEFAULT_FREQUENT_SERVICES = [
   "Repuestos",
 ];
 
+const SERVICE_PREFIX = "Servicio ";
+const normalizeFrequentServiceName = (value) => {
+  const name = value.trim();
+  if (!name) return "";
+  return /^servicio\b/i.test(name) ? name : `${SERVICE_PREFIX}${name}`;
+};
+
 const ensureOk = (res) => {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
@@ -70,7 +77,7 @@ export default function RegisterBudget() {
   const [budgetPage, setBudgetPage] = useState(1);
   const [budgetTotal, setBudgetTotal] = useState(0);
   const [frequentServices, setFrequentServices] = useState([]);
-  const [newServiceName, setNewServiceName] = useState("");
+  const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
   const budgetPageSize = 10;
 
@@ -206,8 +213,8 @@ export default function RegisterBudget() {
   };
 
   const createFrequentService = async () => {
-    const nombre = newServiceName.trim();
-    if (!nombre) return;
+    const nombre = normalizeFrequentServiceName(newServiceName);
+    if (!nombre || nombre.toLowerCase() === "servicio") return;
 
     try {
       setSavingService(true);
@@ -216,7 +223,7 @@ export default function RegisterBudget() {
       ensureOk(res);
       await loadFrequentServices();
       appendServiceToTrabajo(nombre);
-      setNewServiceName("");
+      setNewServiceName(SERVICE_PREFIX);
       setNotice("Servicio frecuente agregado.");
     } catch (err) {
       console.error(err);
@@ -889,7 +896,11 @@ export default function RegisterBudget() {
               <button
                 type="button"
                 onClick={createFrequentService}
-                disabled={savingService || !newServiceName.trim()}
+                disabled={
+                  savingService ||
+                  !newServiceName.trim() ||
+                  newServiceName.trim().toLowerCase() === "servicio"
+                }
                 className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {savingService ? "Guardando..." : "Guardar servicio"}
