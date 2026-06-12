@@ -3,6 +3,7 @@ import { Bell, CheckCircle2, Phone, X } from "lucide-react";
 import api from "./api";
 
 const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
+const READY_ORDER_ALERTS_KEY = "tc:ready-order-alerts";
 
 function getAlertField(alerta, field) {
   if (!alerta) return "";
@@ -23,6 +24,11 @@ function buildWhatsAppAlertUrl(alerta, workshopName) {
   const phone = normalizeWhatsAppPhone(getAlertField(alerta, "telefono"));
   if (!phone) return "";
 
+  const customText = getAlertField(alerta, "whatsappText");
+  if (customText) {
+    return `https://wa.me/${phone}?text=${encodeURIComponent(customText)}`;
+  }
+
   const cliente = getAlertField(alerta, "cliente");
   const saludo = cliente ? `Hola ${cliente},` : "Hola,";
   const sender = workshopName ? ` desde ${workshopName}` : "";
@@ -36,6 +42,21 @@ function openWhatsAppAlert(alerta, workshopName) {
   if (!url) return false;
   window.open(url, "_blank", "noopener,noreferrer");
   return true;
+}
+
+function readReadyOrderAlerts() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(READY_ORDER_ALERTS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function removeReadyOrderAlert(id) {
+  const next = readReadyOrderAlerts().filter((item) => String(item.id) !== String(id));
+  localStorage.setItem(READY_ORDER_ALERTS_KEY, JSON.stringify(next));
+  return next;
 }
 
 export default function ClientAlertModal({ workshop }) {
@@ -58,15 +79,20 @@ export default function ClientAlertModal({ workshop }) {
   const loadAlertas = useCallback(async () => {
     try {
       const res = await api.get("/AlertaCliente/pendientes");
-      const list = res?.data?.data?.[0] || [];
+      const serverList = res?.data?.data?.[0] || [];
+      const list = [...readReadyOrderAlerts(), ...serverList];
 
       setAlertas(list);
       publishCount(list);
       setCurrent((prev) => {
-        if (prev && list.some((x) => (x.id ?? x.Id) === (prev.id ?? prev.Id))) {
+        if (
+          prev &&
+          !(prev.local ?? prev.Local) &&
+          list.some((x) => (x.id ?? x.Id) === (prev.id ?? prev.Id))
+        ) {
           return prev;
         }
-        return list[0] || null;
+        return list.find((item) => !(item.local ?? item.Local)) || null;
       });
     } catch (err) {
       console.error(err);
@@ -112,9 +138,9 @@ export default function ClientAlertModal({ workshop }) {
   useEffect(() => {
     const onOpen = () => {
       setPanelOpen(true);
-      const active = current || alertas[0] || null;
+      const active = current || alertas.find((item) => !(item.local ?? item.Local)) || null;
       if (active) setDismissedAlertId(active.id ?? active.Id);
-      setCurrent((prev) => prev || alertas[0] || null);
+      setCurrent((prev) => prev || active);
     };
     window.addEventListener("tc:client-alerts:open", onOpen);
     return () => window.removeEventListener("tc:client-alerts:open", onOpen);
@@ -131,8 +157,15 @@ export default function ClientAlertModal({ workshop }) {
 
     try {
       const id = alerta.id ?? alerta.Id;
-      await api.put(`/AlertaCliente/${id}/atendida`);
       const workshopName = workshop?.nombre ?? workshop?.Nombre ?? "";
+      const isLocal = Boolean(alerta.local ?? alerta.Local);
+
+      if (isLocal) {
+        removeReadyOrderAlert(id);
+      } else {
+        await api.put(`/AlertaCliente/${id}/atendida`);
+      }
+
       if (whatsappEnabled) {
         openWhatsAppAlert(alerta, workshopName);
       }
@@ -152,13 +185,14 @@ export default function ClientAlertModal({ workshop }) {
     }
   };
 
-  if (!current && !done) return null;
+  if (!current && !done && !panelOpen) return null;
 
   const activeMessage = current?.mensaje ?? current?.Mensaje;
   const activeClient = current?.cliente ?? current?.Cliente;
   const activePhone = current?.telefono ?? current?.Telefono ?? "Sin telefono";
   const activeId = current?.id ?? current?.Id;
   const doneClient = done?.cliente ?? done?.Cliente;
+  const doneIsLocal = Boolean(done?.local ?? done?.Local);
 
   return (
     <>
@@ -169,8 +203,11 @@ export default function ClientAlertModal({ workshop }) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold">Alerta atendida</p>
               <p className="mt-0.5 text-sm">
-                Se registro la llamada pendiente de {doneClient || "cliente"}
-                {whatsappEnabled ? " y se preparo el mensaje de WhatsApp." : "."}
+                {doneIsLocal
+                  ? `Se preparo el mensaje de WhatsApp para ${doneClient || "cliente"}.`
+                  : `Se registro la llamada pendiente de ${doneClient || "cliente"}${
+                      whatsappEnabled ? " y se preparo el mensaje de WhatsApp." : "."
+                    }`}
               </p>
             </div>
             <button
@@ -228,6 +265,7 @@ export default function ClientAlertModal({ workshop }) {
                   const cliente = alerta.cliente ?? alerta.Cliente;
                   const telefono = alerta.telefono ?? alerta.Telefono ?? "Sin telefono";
                   const mensaje = alerta.mensaje ?? alerta.Mensaje;
+                  const isLocal = Boolean(alerta.local ?? alerta.Local);
 
                   return (
                     <div
@@ -252,7 +290,11 @@ export default function ClientAlertModal({ workshop }) {
                           onClick={() => marcarAtendida(alerta)}
                           className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700"
                         >
-                          {whatsappEnabled ? "Aceptar y abrir WhatsApp" : "Aceptar llamada realizada"}
+                          {isLocal
+                            ? "Abrir WhatsApp"
+                            : whatsappEnabled
+                              ? "Aceptar y abrir WhatsApp"
+                              : "Aceptar llamada realizada"}
                         </button>
                       </div>
                     </div>

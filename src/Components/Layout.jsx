@@ -598,7 +598,24 @@ export default function Layout({ children }) {
       >
         {children}
       </main>
-          <ClientAlertModal workshop={activeWorkshop} />
+      <ClientAlertModal workshop={activeWorkshop} />
+
+      {isAuthed && !isAuthRoute && !isPrintRoute && (
+        <button
+          type="button"
+          onClick={openClientAlerts}
+          className="fixed bottom-5 right-5 z-[70] inline-flex h-14 w-14 items-center justify-center rounded-full bg-orange-600 text-white shadow-2xl ring-4 ring-white md:hidden"
+          aria-label={`Alertas pendientes: ${alertCount}`}
+          title={`Alertas pendientes: ${alertCount}`}
+        >
+          <Bell size={22} />
+          {alertCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex min-h-6 min-w-6 items-center justify-center rounded-full bg-rose-600 px-1 text-[11px] font-bold text-white ring-2 ring-white">
+              {alertCount > 99 ? "99+" : alertCount}
+            </span>
+          )}
+        </button>
+      )}
 
       {helpOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">

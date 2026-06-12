@@ -95,6 +95,7 @@ const isOrderEditLocked = (estado) =>
   ["Reparando", "Esperando repuesto", "Listo", "Entregado"].includes(estado);
 
 const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
+const READY_ORDER_ALERTS_KEY = "tc:ready-order-alerts";
 
 function normalizeWhatsAppPhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
@@ -131,6 +132,45 @@ function openWhatsAppVehicleReady(order, businessName = "nuestro taller") {
   );
 
   return true;
+}
+
+function readReadyOrderAlerts() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(READY_ORDER_ALERTS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function buildReadyOrderAlertMessage(order, businessName = "nuestro taller") {
+  const cliente = order.Cliente || "";
+  const matricula = order.Matricula || "";
+  const marca = order.Marca || "";
+  const modelo = order.Modelo || "";
+
+  return `Hola ${cliente}, le informamos desde ${businessName} que su vehículo${
+    matricula ? ` matrícula ${matricula}` : ""
+  }${marca || modelo ? ` (${marca} ${modelo})` : ""} ya está listo para retirar. Puede pasar por nuestras instalaciones cuando le resulte conveniente. ¡Gracias por confiar en nosotros!
+
+  ${businessName}`;
+}
+
+function saveReadyOrderAlert(order, businessName = "nuestro taller") {
+  const id = `ready-order-${order.Id}`;
+  const alert = {
+    id,
+    local: true,
+    kind: "vehicle-ready",
+    cliente: order.Cliente || "",
+    telefono: order.Telefono || "",
+    mensaje: `Orden lista para retirar. Notifica a ${order.Cliente || "cliente"} que ya puede retirar su vehículo.`,
+    whatsappText: buildReadyOrderAlertMessage(order, businessName),
+    fechaAviso: new Date().toISOString(),
+  };
+  const next = [alert, ...readReadyOrderAlerts().filter((item) => item.id !== id)];
+  localStorage.setItem(READY_ORDER_ALERTS_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event("tc:client-alerts:refresh"));
 }
 
 export default function RegisterWorkOrder() {
@@ -872,7 +912,11 @@ export default function RegisterWorkOrder() {
 
             <button
               type="button"
-              onClick={() => setReadyWhatsappOrder(null)}
+              onClick={() => {
+                saveReadyOrderAlert(readyWhatsappOrder, workshopName);
+                setReadyWhatsappOrder(null);
+                setNotice("Notificacion guardada en la campanita.");
+              }}
               className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-green-700 ring-1 ring-green-200 hover:bg-green-100"
             >
               Cerrar
