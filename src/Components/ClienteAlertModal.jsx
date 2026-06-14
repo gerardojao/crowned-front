@@ -1,9 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Bell, CheckCircle2, Phone, X } from "lucide-react";
-import api from "./api";
+import api, { getCurrentWorkshopId } from "./api";
 
 const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
-const READY_ORDER_ALERTS_KEY = "tc:ready-order-alerts";
+const READY_ORDER_ALERTS_KEY_PREFIX = "tc:ready-order-alerts";
+
+function getReadyOrderAlertsKey() {
+  const workshopId = getCurrentWorkshopId();
+  return workshopId
+    ? `${READY_ORDER_ALERTS_KEY_PREFIX}:${workshopId}`
+    : READY_ORDER_ALERTS_KEY_PREFIX;
+}
 
 function getAlertField(alerta, field) {
   if (!alerta) return "";
@@ -46,7 +53,11 @@ function openWhatsAppAlert(alerta, workshopName) {
 
 function readReadyOrderAlerts() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(READY_ORDER_ALERTS_KEY) || "[]");
+    const workshopId = getCurrentWorkshopId();
+    if (workshopId) {
+      localStorage.removeItem(READY_ORDER_ALERTS_KEY_PREFIX);
+    }
+    const parsed = JSON.parse(localStorage.getItem(getReadyOrderAlertsKey()) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -55,7 +66,7 @@ function readReadyOrderAlerts() {
 
 function removeReadyOrderAlert(id) {
   const next = readReadyOrderAlerts().filter((item) => String(item.id) !== String(id));
-  localStorage.setItem(READY_ORDER_ALERTS_KEY, JSON.stringify(next));
+  localStorage.setItem(getReadyOrderAlertsKey(), JSON.stringify(next));
   return next;
 }
 

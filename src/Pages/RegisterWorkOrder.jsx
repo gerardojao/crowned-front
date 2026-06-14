@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
-import api from "../Components/api";
+import api, { getCurrentWorkshopId } from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import PartPicker, {
   getPartDisplayName,
@@ -96,7 +96,14 @@ const isOrderEditLocked = (estado) =>
   ["Reparando", "Esperando repuesto", "Listo", "Entregado"].includes(estado);
 
 const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
-const READY_ORDER_ALERTS_KEY = "tc:ready-order-alerts";
+const READY_ORDER_ALERTS_KEY_PREFIX = "tc:ready-order-alerts";
+
+function getReadyOrderAlertsKey() {
+  const workshopId = getCurrentWorkshopId();
+  return workshopId
+    ? `${READY_ORDER_ALERTS_KEY_PREFIX}:${workshopId}`
+    : READY_ORDER_ALERTS_KEY_PREFIX;
+}
 
 function normalizeWhatsAppPhone(phone) {
   const digits = String(phone || "").replace(/\D/g, "");
@@ -137,7 +144,7 @@ function openWhatsAppVehicleReady(order, businessName = "nuestro taller") {
 
 function readReadyOrderAlerts() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(READY_ORDER_ALERTS_KEY) || "[]");
+    const parsed = JSON.parse(localStorage.getItem(getReadyOrderAlertsKey()) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -170,7 +177,7 @@ function saveReadyOrderAlert(order, businessName = "nuestro taller") {
     fechaAviso: new Date().toISOString(),
   };
   const next = [alert, ...readReadyOrderAlerts().filter((item) => item.id !== id)];
-  localStorage.setItem(READY_ORDER_ALERTS_KEY, JSON.stringify(next));
+  localStorage.setItem(getReadyOrderAlertsKey(), JSON.stringify(next));
   window.dispatchEvent(new Event("tc:client-alerts:refresh"));
 }
 
