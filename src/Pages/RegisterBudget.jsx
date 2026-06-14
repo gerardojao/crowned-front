@@ -18,6 +18,7 @@ const EMPTY_BUDGET = {
   Cliente: "",
   Dni: "",
   Telefono: "",
+  Direccion: "",
   Matricula: "",
   Marca: "",
   Modelo: "",
@@ -311,6 +312,7 @@ export default function RegisterBudget() {
       Cliente: customer.Nombre || prev.Cliente,
       Dni: customer.Dni || prev.Dni,
       Telefono: customer.Telefono || prev.Telefono,
+      Direccion: customer.Direccion || prev.Direccion,
       Matricula: customer.Matricula || prev.Matricula,
       Marca: customer.Marca || prev.Marca,
       Modelo: customer.Modelo || prev.Modelo,
@@ -374,7 +376,7 @@ export default function RegisterBudget() {
       dni: budget.Dni || null,
       telefono: budget.Telefono,
       email: null,
-      direccion: null,
+      direccion: budget.Direccion || null,
       matricula: budget.Matricula,
       marca: budget.Marca || null,
       modelo: budget.Modelo,
@@ -793,6 +795,13 @@ export default function RegisterBudget() {
             placeholder="Teléfono"
           />
 
+          <input
+            name="Direccion"
+            value={budget.Direccion}
+            onChange={handleChange}
+            className={`${cls} md:col-span-2`}
+            placeholder="Dirección del cliente"
+          />
           <input
             name="Matricula"
             value={budget.Matricula}

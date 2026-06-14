@@ -17,6 +17,7 @@ const EMPTY_ORDER = {
   Cliente: "",
   Dni: "",
   Telefono: "",
+  Direccion: "",
   Matricula: "",
   Marca: "",
   Modelo: "",
@@ -465,6 +466,7 @@ export default function RegisterWorkOrder() {
       Cliente: customer.Nombre || prev.Cliente,
       Dni: customer.Dni || prev.Dni,
       Telefono: customer.Telefono || prev.Telefono,
+      Direccion: customer.Direccion || prev.Direccion,
       Matricula: customer.Matricula || prev.Matricula,
       Marca: customer.Marca || prev.Marca,
       Modelo: customer.Modelo || prev.Modelo,
@@ -534,7 +536,7 @@ export default function RegisterWorkOrder() {
       dni: order.Dni || null,
       telefono: order.Telefono,
       email: null,
-      direccion: null,
+      direccion: order.Direccion || null,
       matricula: order.Matricula,
       marca: order.Marca || null,
       modelo: order.Modelo,
@@ -1072,6 +1074,13 @@ export default function RegisterWorkOrder() {
               placeholder="Teléfono"
             />
 
+            <input
+              name="Direccion"
+              value={order.Direccion}
+              onChange={handleChange}
+              className={`${cls} md:col-span-2`}
+              placeholder="Dirección del cliente"
+            />
             <input
               name="Matricula"
               value={order.Matricula}
