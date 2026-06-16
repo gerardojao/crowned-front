@@ -742,7 +742,7 @@ export default function Layout({ children }) {
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center justify-center gap-3 py-4 md:py-6 text-sm text-slate-500 md:flex-row md:justify-between">
               <div className="order-2 md:order-1 text-center md:text-left">
-               `© ${new Date().getFullYear()} ZagaPro. Todos los derechos reservados.`
+               `© {new Date().getFullYear()} ZagaPro. Todos los derechos reservados.`
               </div>
 
               <nav className="order-1 md:order-2 w-full md:w-auto">

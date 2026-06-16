@@ -6,6 +6,8 @@ import { API_BASE_URL } from "../Components/api";
 import { supportMailto } from "../Components/support";
 import zagaProLogo from "../assets/logozagapro.png";
 
+const APP_VERSION = "v1.1.0";
+
 export default function Login() {
   const nav = useNavigate();
   const location = useLocation();
@@ -206,6 +208,11 @@ export default function Login() {
           <a href={supportMailto("Soporte acceso ZagaPro")} className="text-slate-600 hover:text-slate-900">
             Necesitas soporte?
           </a>
+        </div>
+        <div className="mt-5 border-t border-slate-200 pt-4 text-center">
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 ring-1 ring-slate-200">
+            Version {APP_VERSION}
+          </span>
         </div>
       </div>
     </div>
