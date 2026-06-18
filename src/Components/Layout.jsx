@@ -32,6 +32,7 @@ const heroBtnIcon =
   "flex h-12 w-12 items-center justify-center rounded-xl bg-white/20";
 
 const mobileLink = "px-3 py-2 rounded-lg hover:bg-slate-100";
+const DEMO_SITE_URL = "https://demo.zagapro.store";
 
 export default function Layout({ children }) {
   const [open, setOpen] = useState(false);
@@ -452,6 +453,26 @@ export default function Layout({ children }) {
 
                   {!isAuthed && (
                     <>
+                      <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4 text-center shadow-sm">
+                        <p className="text-sm font-black text-slate-950">
+                          Todavia no usas ZagaPro?
+                        </p>
+                        <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-600">
+                          Solicita una demo gratuita de 15 minutos y descubre como
+                          recuperar tiempo en la gestion de tu taller desde una
+                          sola plataforma.
+                        </p>
+                        <a
+                          href={DEMO_SITE_URL}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700"
+                        >
+                          Solicitar demo gratuita
+                          <ArrowRight size={16} />
+                        </a>
+                      </div>
+
                       <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs font-bold text-slate-700">
                         <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Clientes</span>
                         <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Documentos</span>
