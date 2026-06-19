@@ -212,7 +212,7 @@ export default function StockParts() {
       <div className="mt-2 mb-6 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Rentabilidad de lineas facturadas
+            Ganancias por reparación
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             Margen real por concepto vendido desde facturas emitidas.
