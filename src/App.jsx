@@ -35,6 +35,7 @@ import RegisterIncomeType from "./Pages/RegisterIncomeType.jsx";
 import RegisterBudget from "./Pages/RegisterBudget.jsx";
 import PrintBudget from "./Pages/PrintBudget.jsx";
 import AdminWorkshops from "./Pages/AdminWorkshops.jsx";
+import AccountsReceivable from "./Pages/AccountsReceivable.jsx";
 
 function App() {
   const protectedElement = (element) => (
@@ -92,6 +93,7 @@ function App() {
             <Route path="/register-expense-type" element={protectedElement(<RegisterExpenseType />)} />
             <Route path="/register-income-type" element={protectedElement(<RegisterIncomeType />)} />
             <Route path="/presupuestos" element={protectedElement(<RegisterBudget />)} />
+            <Route path="/accounts-receivable" element={protectedElement(<AccountsReceivable />)} />
             <Route path="/print-budget/:id" element={protectedElement(<PrintBudget />)} />
             <Route
               path="/admin/workshops"

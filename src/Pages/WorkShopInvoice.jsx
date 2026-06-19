@@ -103,6 +103,9 @@ export default function WorkshopInvoice() {
     observaciones: "",
     ivaPct: 21,
     otros: "",
+    tipoPago: "Contado",
+    plazoCreditoDias: 30,
+    fechaVencimiento: "",
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
@@ -379,6 +382,19 @@ export default function WorkshopInvoice() {
   );
 
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
+  const isCredit = invoice.tipoPago === "Credito";
+
+  useEffect(() => {
+    if (!isCredit) return;
+
+    const baseDate = invoice.fecha || new Date().toISOString().slice(0, 10);
+    const due = new Date(`${baseDate}T00:00:00`);
+    due.setDate(due.getDate() + Number(invoice.plazoCreditoDias || 30));
+    setInvoice((prev) => ({
+      ...prev,
+      fechaVencimiento: due.toISOString().slice(0, 10),
+    }));
+  }, [isCredit, invoice.fecha, invoice.plazoCreditoDias]);
 
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
@@ -406,6 +422,19 @@ export default function WorkshopInvoice() {
         amount,
       },
     }));
+  };
+
+  const setTipoPago = (tipoPago) => {
+    setInvoice((prev) => ({
+      ...prev,
+      tipoPago,
+      plazoCreditoDias: tipoPago === "Credito" ? prev.plazoCreditoDias || 30 : 30,
+      fechaVencimiento: tipoPago === "Credito" ? prev.fechaVencimiento : "",
+    }));
+
+    if (tipoPago === "Credito") {
+      setPaymentMethods(EMPTY_PAYMENT_METHODS);
+    }
   };
 
   const setItemField = (index, name, value) => {
@@ -513,6 +542,10 @@ const saveIssuedInvoice = async () => {
     ivaPct: Number(invoice.ivaPct || 21),
     serie: taller.serieFactura || "A",
     observaciones: invoice.observaciones || null,
+    tipoPago: invoice.tipoPago,
+    totalAbonado: isCredit ? paymentTotal : totalFinal,
+    plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
+    fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
     items: billableItems,
   };
 
@@ -521,7 +554,7 @@ const saveIssuedInvoice = async () => {
 
 const printInvoice = async () => {
   try {
-    if (!hasPaymentMethods) {
+    if (!isCredit && !hasPaymentMethods) {
       throw new Error("Selecciona al menos un metodo de pago.");
     }
 
@@ -532,10 +565,14 @@ const printInvoice = async () => {
       throw new Error(`Indica un importe mayor que 0 para ${paymentWithoutAmount.label}.`);
     }
 
-    if (Math.abs(paymentDifference) >= 0.01) {
+    if (!isCredit && Math.abs(paymentDifference) >= 0.01) {
       throw new Error(
         `La suma de los metodos de pago (${formatMoney(paymentTotal)}) debe coincidir con el total de la factura (${formatMoney(totalFinal)}).`,
       );
+    }
+
+    if (isCredit && paymentTotal > totalFinal) {
+      throw new Error("El abono inicial no puede superar el total de la factura.");
     }
 
     const res = await saveIssuedInvoice();
@@ -790,6 +827,48 @@ const printInvoice = async () => {
               onChange={(e) => setInvoiceField("otros", e.target.value)}
               onBlur={(e) => setInvoiceField("otros", amountInput(e.target.value))}
             />
+
+            <label className="block text-sm font-semibold text-slate-700">
+              Tipo de pago
+              <select
+                className={`mt-1 w-full ${inputCls}`}
+                value={invoice.tipoPago}
+                onChange={(e) => setTipoPago(e.target.value)}
+              >
+                <option value="Contado">Contado</option>
+                <option value="Credito">Credito</option>
+              </select>
+            </label>
+
+            {isCredit && (
+              <>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Plan de credito
+                  <select
+                    className={`mt-1 w-full ${inputCls}`}
+                    value={invoice.plazoCreditoDias}
+                    onChange={(e) =>
+                      setInvoiceField("plazoCreditoDias", Number(e.target.value))
+                    }
+                  >
+                    <option value={30}>30 dias</option>
+                    <option value={60}>60 dias</option>
+                  </select>
+                </label>
+
+                <label className="block text-sm font-semibold text-slate-700">
+                  Fecha de vencimiento
+                  <input
+                    type="date"
+                    className={`mt-1 w-full ${inputCls}`}
+                    value={invoice.fechaVencimiento}
+                    onChange={(e) =>
+                      setInvoiceField("fechaVencimiento", e.target.value)
+                    }
+                  />
+                </label>
+              </>
+            )}
           </div>
 
           <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -799,7 +878,9 @@ const printInvoice = async () => {
                   Metodos de pago
                 </h4>
                 <p className="text-xs text-slate-500">
-                  La suma debe coincidir con el total antes de imprimir.
+                  {isCredit
+                    ? "Registra el abono inicial si el cliente paga una parte."
+                    : "La suma debe coincidir con el total antes de imprimir."}
                 </p>
               </div>
               <div className="text-xs font-semibold text-slate-600">
@@ -853,13 +934,15 @@ const printInvoice = async () => {
 
             <div
               className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ring-1 ${
-                hasPaymentMethods && Math.abs(paymentDifference) < 0.01
+                isCredit || (hasPaymentMethods && Math.abs(paymentDifference) < 0.01)
                   ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
                   : "bg-amber-50 text-amber-800 ring-amber-200"
               }`}
             >
-              Asignado: {formatMoney(paymentTotal)} · Diferencia:{" "}
-              {formatMoney(paymentDifference)}
+              {isCredit ? "Abono inicial" : "Asignado"}:{" "}
+              {formatMoney(paymentTotal)} ·{" "}
+              {isCredit ? "Saldo pendiente" : "Diferencia"}:{" "}
+              {formatMoney(Math.max(0, paymentDifference))}
             </div>
           </div>
         </div>
@@ -1025,6 +1108,16 @@ const printInvoice = async () => {
 
                 <p className="font-bold">N. FACTURA:</p>
                 <p className="text-xl font-extrabold">{invoice.numero}</p>
+
+                <p className="font-bold">TIPO PAGO:</p>
+                <p>{invoice.tipoPago}</p>
+
+                {isCredit && (
+                  <>
+                    <p className="font-bold">VENCIMIENTO:</p>
+                    <p>{formatDate(invoice.fechaVencimiento)}</p>
+                  </>
+                )}
 
                 <p className="font-bold">FACTURAR A:</p>
                 <p className="font-bold">{invoice.cliente}</p>

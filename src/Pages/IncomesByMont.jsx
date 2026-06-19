@@ -3,6 +3,10 @@ import React, { useEffect, useState } from "react";
 import api from "../Components/api";
 import { Link } from "react-router-dom";
 import {
+  appendAccountsReceivableSummary,
+  fetchAccountsReceivableIncome,
+} from "../utils/accountsReceivableIncome";
+import {
   Chart as ChartJS, Colors, ArcElement, Tooltip, Legend
 } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
@@ -17,14 +21,16 @@ export default function IncomeByMonth() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const fetchData = async () => {
+  const fetchData = async (nextFrom = from, nextTo = to) => {
     try {
       const url =
-        from && to
-          ? `/Ingreso/totalesPorMes?fechaInicio=${from}&fechaFin=${to}`
+        nextFrom && nextTo
+          ? `/Ingreso/totalesPorMes?fechaInicio=${nextFrom}&fechaFin=${nextTo}`
           : `/Ingreso/totales`;
       const res = await api.get(url);
-      setRows(res.data?.data?.[0] ?? []);
+      const baseRows = res.data?.data?.[0] ?? [];
+      const cxc = await fetchAccountsReceivableIncome({ from: nextFrom, to: nextTo });
+      setRows(appendAccountsReceivableSummary(baseRows, cxc));
     } catch (e) {
       console.error(e);
       setRows([]);
@@ -48,7 +54,7 @@ export default function IncomeByMonth() {
   };
 
   const onSubmit = (e) => { e.preventDefault(); fetchData(); };
-  const onClear  = () => { setFrom(""); setTo(""); fetchData(); };
+  const onClear  = () => { setFrom(""); setTo(""); fetchData("", ""); };
 
   return (
     <>

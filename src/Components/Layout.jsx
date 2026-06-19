@@ -129,6 +129,10 @@ export default function Layout({ children }) {
     : "ZagaPro - Gestion inteligente de negocios";
   const labels = getBusinessTerminology(activeWorkshop);
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
+  const accountsReceivableEnabled =
+    activeWorkshop?.enableAccountsReceivable ??
+    activeWorkshop?.EnableAccountsReceivable ??
+    false;
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
   };
@@ -347,6 +351,15 @@ export default function Layout({ children }) {
                       >
                         Ver balance
                       </NavLink>
+                      {accountsReceivableEnabled && (
+                        <NavLink
+                          to="/accounts-receivable"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          Finanzas / Cuentas por cobrar
+                        </NavLink>
+                      )}
                       {/* <Link
                         to="/workshop-invoice"
                         className={mobileLink}
@@ -590,6 +603,7 @@ export default function Layout({ children }) {
 
                       <span className="text-xl opacity-80">›</span>
                     </Link>
+
                   </>
                 ) : (
                   <div className="xl:col-span-4 flex justify-center">

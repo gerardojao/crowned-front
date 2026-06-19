@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "./api";
 import { useAuth } from "./AuthContext";
 import { TrendingUp, TrendingDown, Scale } from "lucide-react";
+import {
+  appendAccountsReceivableSummary,
+  fetchAccountsReceivableIncome,
+} from "../utils/accountsReceivableIncome";
 
 export default function KPIs({ from, to, className, refreshKey = 0 }) {
   const { token } = useAuth();
@@ -41,10 +45,14 @@ export default function KPIs({ from, to, className, refreshKey = 0 }) {
 
         const inList = rIng.data?.data?.[0] ?? [];
         const egList = rEgr.data?.data?.[0] ?? [];
+        const cxc = await fetchAccountsReceivableIncome({
+          from: hasRange ? isoFrom : "",
+          to: hasRange ? isoTo : "",
+        });
 
         if (!alive) return;
 
-        setTotIn(sumTotals(inList));
+        setTotIn(sumTotals(appendAccountsReceivableSummary(inList, cxc)));
         setTotEg(sumTotals(egList));
       } catch (e) {
         if (!alive) return;

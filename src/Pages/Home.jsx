@@ -5,6 +5,8 @@ import {
   Users,
   Truck,
   Wallet,
+  Wrench,
+  HandCoins,
   ReceiptText,
   BarChart3,
   ArrowRight,
@@ -30,6 +32,11 @@ const pickDataList = (res) => {
   const pack = res?.data?.data ?? res?.data?.Data ?? [];
   if (Array.isArray(pack)) return Array.isArray(pack[0]) ? pack[0] : pack;
   return [];
+};
+
+const pickPagingTotal = (res) => {
+  const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? {};
+  return Number(pack.total ?? pack.Total ?? 0);
 };
 
 const moduleCard =
@@ -64,6 +71,14 @@ export default function Home() {
   const { isAuthed } = useAuth();
   const labels = useBusinessTerminology();
   const [ordenes, setOrdenes] = useState([]);
+  const [vehiculosReparacion, setVehiculosReparacion] = useState(0);
+  const [vehiculosReparacionLoading, setVehiculosReparacionLoading] =
+    useState(true);
+  const [saldoCuentasPorCobrar, setSaldoCuentasPorCobrar] = useState(0);
+  const [dashboardFeatures, setDashboardFeatures] = useState({
+    enableDashboardRepairVehicles: false,
+    enableAccountsReceivable: false,
+  });
   const [lastStatement, setLastStatement] = useState(null);
 
   const ts = (d) => (d ? new Date(d).getTime() : 0);
@@ -79,22 +94,64 @@ export default function Home() {
   useEffect(() => {
     if (!isAuthed) {
       setOrdenes([]);
+      setVehiculosReparacion(0);
+      setSaldoCuentasPorCobrar(0);
+      setVehiculosReparacionLoading(false);
+      setDashboardFeatures({
+        enableDashboardRepairVehicles: false,
+        enableAccountsReceivable: false,
+      });
       setLastStatement(null);
       return;
     }
 
     (async () => {
+      setVehiculosReparacionLoading(true);
+
       try {
-        const [movRes] = await Promise.all([
+        const [movRes, reparacionRes, settingsRes] = await Promise.all([
           api.get("/OrdenTrabajo/ultimas", { params: { take: 10 } }),
+          api.get("/OrdenTrabajo", {
+            params: { estado: "Reparando", page: 1, pageSize: 1 },
+          }),
+          api.get("/WorkshopSettings"),
         ]);
 
+        const settings = settingsRes?.data || {};
+        const enableAccountsReceivable =
+          settings.enableAccountsReceivable ??
+          settings.EnableAccountsReceivable ??
+          false;
+
         setOrdenes(pickDataList(movRes));
+        setVehiculosReparacion(pickPagingTotal(reparacionRes));
+        if (enableAccountsReceivable) {
+          const cxcRes = await api.get("/FacturaEmitida/cxc");
+          setSaldoCuentasPorCobrar(
+            pickDataList(cxcRes).reduce(
+              (sum, item) =>
+                sum + Number(item.saldoPendiente ?? item.SaldoPendiente ?? 0),
+              0,
+            ),
+          );
+        } else {
+          setSaldoCuentasPorCobrar(0);
+        }
+        setDashboardFeatures({
+          enableDashboardRepairVehicles:
+            settings.enableDashboardRepairVehicles ??
+            settings.EnableDashboardRepairVehicles ??
+            false,
+          enableAccountsReceivable,
+        });
       } catch (err) {
         console.error(err);
 
         setOrdenes([]);
+        setVehiculosReparacion(0);
+        setSaldoCuentasPorCobrar(0);
       } finally {
+        setVehiculosReparacionLoading(false);
         setLastStatement(loadStatementSummary());
       }
     })();
@@ -104,9 +161,71 @@ export default function Home() {
     return null;
   }
 
+  const showDashboardModules =
+    dashboardFeatures.enableDashboardRepairVehicles ||
+    dashboardFeatures.enableAccountsReceivable;
+
   return (
     <>
       <KPIs />
+
+      {showDashboardModules && (
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {dashboardFeatures.enableDashboardRepairVehicles && (
+            <Link
+              to="/register-work-order#ordenes-recientes"
+              className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-center gap-5">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-amber-50">
+                  <Wrench size={46} className="text-amber-700" />
+                </div>
+
+                <div>
+                  <p className="text-xl text-left font-semibold text-slate-900">
+                    Vehículos en reparación
+                  </p>
+
+                  <div className="mt-2 text-3xl font-extrabold text-amber-700">
+                    {vehiculosReparacionLoading ? "..." : vehiculosReparacion}
+                  </div>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Órdenes con estado Reparando
+                  </p>
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {dashboardFeatures.enableAccountsReceivable && (
+            <Link
+              to="/accounts-receivable"
+              className="rounded-3xl border border-sky-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-center gap-5">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-sky-50">
+                  <HandCoins size={46} className="text-sky-700" />
+                </div>
+
+                <div>
+                  <p className="text-xl text-left font-semibold text-slate-900">
+                    Cuentas por cobrar
+                  </p>
+
+                  <div className="mt-2 text-3xl font-extrabold text-sky-700">
+                    {currency(saldoCuentasPorCobrar)}
+                  </div>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Importe pendiente de cobro
+                  </p>
+                </div>
+              </div>
+            </Link>
+          )}
+        </section>
+      )}
 
       <section className="rounded-3xl bg-white/80 backdrop-blur ring-1 ring-slate-200 shadow-sm p-5 md:p-6">
         <div className="rounded-3xl bg-white/80 backdrop-blur ring-1 ring-slate-200 shadow-sm p-5 md:p-6">
@@ -243,6 +362,11 @@ export default function Home() {
                     <Link to="/statement" className={actionLink}>
                       Ver balance <ArrowRight size={15} />
                     </Link>
+                    {dashboardFeatures.enableAccountsReceivable && (
+                      <Link to="/accounts-receivable" className={actionLink}>
+                        Cuentas por cobrar <ArrowRight size={15} />
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

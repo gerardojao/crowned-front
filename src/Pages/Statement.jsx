@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import api from "../Components/api";
 import { Link } from "react-router-dom";
@@ -7,6 +6,10 @@ import { currency } from "../utils/currency";
 import { ArrowLeft } from "lucide-react";
 import { saveStatementSummary } from "../utils/statementStore";
 import KPIs from "../Components/Kpi";
+import {
+  appendAccountsReceivableSummary,
+  fetchAccountsReceivableIncome,
+} from "../utils/accountsReceivableIncome";
 
 const IVA_RATE = 0.21;
 const amountOf = (value) => Number(value ?? 0);
@@ -38,7 +41,13 @@ export default function Statement() {
         })
       : await api.get("/Ingreso/totales");
 
-    setIncomes(res?.data?.data?.[0] || []);
+    const cxc = await fetchAccountsReceivableIncome({
+      from: appliedFrom,
+      to: appliedTo,
+    });
+    setIncomes(
+      appendAccountsReceivableSummary(res?.data?.data?.[0] || [], cxc),
+    );
   };
 
   const getExpenses = async () => {
@@ -59,7 +68,8 @@ export default function Statement() {
 
       return {
         ...item,
-        cuenta_Egreso: originalName === "Transporte" ? "Gastos casa" : originalName,
+        cuenta_Egreso:
+          originalName === "Transporte" ? "Gastos casa" : originalName,
       };
     });
 
@@ -71,14 +81,22 @@ export default function Statement() {
       setLoading(true);
       setErr("");
       const settingsPromise = api.get("/WorkshopSettings");
-      const [, , settingsRes] = await Promise.all([getIncomes(), getExpenses(), settingsPromise]);
+      const [, , settingsRes] = await Promise.all([
+        getIncomes(),
+        getExpenses(),
+        settingsPromise,
+      ]);
       const settings = settingsRes?.data || {};
       setFeatures({
-        enableInvoiceExport: settings.enableInvoiceExport ?? settings.EnableInvoiceExport ?? true,
-        enableProfitAndLoss: settings.enableProfitAndLoss ?? settings.EnableProfitAndLoss ?? true,
+        enableInvoiceExport:
+          settings.enableInvoiceExport ?? settings.EnableInvoiceExport ?? true,
+        enableProfitAndLoss:
+          settings.enableProfitAndLoss ?? settings.EnableProfitAndLoss ?? true,
       });
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "Error cargando relación");
+      setErr(
+        e?.response?.data?.message || e.message || "Error cargando relación",
+      );
       setIncomes([]);
       setExpenses([]);
     } finally {
@@ -92,14 +110,14 @@ export default function Statement() {
 
   const totalIncomes = incomes.reduce(
     (s, x) => s + Number(x.total ?? x.Total ?? 0),
-    0
+    0,
   );
   const totalIncomesIva = totalIncomes * IVA_RATE;
   const totalIncomesWithIva = totalIncomes + totalIncomesIva;
 
   const totalExpenses = expenses.reduce(
     (s, x) => s + Number(x.total ?? x.Total ?? 0),
-    0
+    0,
   );
 
   const variableExpenses = expenses.reduce((s, x) => {
@@ -155,7 +173,9 @@ export default function Statement() {
 
   const generateProfitAndLoss = async () => {
     if (!from || !to) {
-      setErr("Selecciona fecha desde y fecha hasta para generar el estado de resultados.");
+      setErr(
+        "Selecciona fecha desde y fecha hasta para generar el estado de resultados.",
+      );
       return;
     }
 
@@ -176,17 +196,29 @@ export default function Statement() {
         }),
       ]);
 
-      const reportIncomes = incomeRes?.data?.data?.[0] || [];
+      const cxc = await fetchAccountsReceivableIncome({ from, to });
+      const reportIncomes = appendAccountsReceivableSummary(
+        incomeRes?.data?.data?.[0] || [],
+        cxc,
+      );
       const reportExpenses = expenseRes?.data?.data?.[0] || [];
 
       const reportTotalIncomes = sumRows(reportIncomes);
       const reportVariableExpenses = reportExpenses.reduce((sum, item) => {
-        const kind = String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase();
-        return kind === "fijo" ? sum : sum + Number(item.total ?? item.Total ?? 0);
+        const kind = String(
+          item.tipoGasto ?? item.TipoGasto ?? "variable",
+        ).toLowerCase();
+        return kind === "fijo"
+          ? sum
+          : sum + Number(item.total ?? item.Total ?? 0);
       }, 0);
       const reportFixedExpenses = reportExpenses.reduce((sum, item) => {
-        const kind = String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase();
-        return kind === "fijo" ? sum + Number(item.total ?? item.Total ?? 0) : sum;
+        const kind = String(
+          item.tipoGasto ?? item.TipoGasto ?? "variable",
+        ).toLowerCase();
+        return kind === "fijo"
+          ? sum + Number(item.total ?? item.Total ?? 0)
+          : sum;
       }, 0);
       const reportTotalExpenses = reportVariableExpenses + reportFixedExpenses;
       const reportGrossProfit = reportTotalIncomes - reportVariableExpenses;
@@ -210,13 +242,19 @@ export default function Statement() {
       setAppliedFrom(from);
       setAppliedTo(to);
     } catch (e) {
-      setErr(e?.response?.data?.message || e.message || "No se pudo generar el estado de resultados.");
+      setErr(
+        e?.response?.data?.message ||
+          e.message ||
+          "No se pudo generar el estado de resultados.",
+      );
     }
   };
 
   const downloadInvoices = async () => {
     if (!from || !to) {
-      setErr("Selecciona fecha desde y fecha hasta para descargar las facturas.");
+      setErr(
+        "Selecciona fecha desde y fecha hasta para descargar las facturas.",
+      );
       return;
     }
 
@@ -354,35 +392,35 @@ export default function Statement() {
       </section>
 
       <KPIs from={appliedFrom} to={appliedTo} className="mb-6" />
-<section className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-  <Link
-    to="/register-income"
-    className="rounded-2xl bg-emerald-600 text-white px-4 py-3 text-center font-semibold hover:bg-emerald-700 transition"
-  >
-    Nuevo ingreso
-  </Link>
+      <section className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <Link
+          to="/register-income"
+          className="rounded-2xl bg-emerald-600 text-white px-4 py-3 text-center font-semibold hover:bg-emerald-700 transition"
+        >
+          Nuevo ingreso
+        </Link>
 
-  <Link
-    to="/ingresos-detalle"
-    className="rounded-2xl bg-white text-emerald-700 px-4 py-3 text-center font-semibold ring-1 ring-emerald-200 hover:bg-emerald-50 transition"
-  >
-    Detalle ingresos
-  </Link>
+        <Link
+          to="/ingresos-detalle"
+          className="rounded-2xl bg-white text-emerald-700 px-4 py-3 text-center font-semibold ring-1 ring-emerald-200 hover:bg-emerald-50 transition"
+        >
+          Detalle ingresos
+        </Link>
 
-  <Link
-    to="/register-expense"
-    className="rounded-2xl bg-rose-600 text-white px-4 py-3 text-center font-semibold hover:bg-rose-700 transition"
-  >
-    Nuevo gasto
-  </Link>
+        <Link
+          to="/register-expense"
+          className="rounded-2xl bg-rose-600 text-white px-4 py-3 text-center font-semibold hover:bg-rose-700 transition"
+        >
+          Nuevo gasto
+        </Link>
 
-  <Link
-    to="/egresos-detalle"
-    className="rounded-2xl bg-white text-rose-700 px-4 py-3 text-center font-semibold ring-1 ring-rose-200 hover:bg-rose-50 transition"
-  >
-    Detalle gastos
-  </Link>
-</section>
+        <Link
+          to="/egresos-detalle"
+          className="rounded-2xl bg-white text-rose-700 px-4 py-3 text-center font-semibold ring-1 ring-rose-200 hover:bg-rose-50 transition"
+        >
+          Detalle gastos
+        </Link>
+      </section>
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="card p-4">
           <h3 className="text-lg font-semibold text-slate-900 mb-3">
@@ -408,7 +446,10 @@ export default function Statement() {
                   return (
                     <tr key={idx} className="tr">
                       <td className="td">
-                        {i.cuenta_Ingreso ?? i.Cuenta_Ingreso ?? i.nombre ?? "Sin tipo"}
+                        {i.cuenta_Ingreso ??
+                          i.Cuenta_Ingreso ??
+                          i.nombre ??
+                          "Sin tipo"}
                       </td>
                       <td className="td text-right text-slate-600">
                         {formatPct(amount, totalIncomes)}
@@ -437,10 +478,16 @@ export default function Statement() {
               {incomes.length > 0 && (
                 <tfoot className="bg-slate-50">
                   <tr>
-                    <th className="th text-right" colSpan={2}>Total ingresos</th>
+                    <th className="th text-right" colSpan={2}>
+                      Total ingresos
+                    </th>
                     <th className="th text-right">{currency(totalIncomes)}</th>
-                    <th className="th text-right">{currency(totalIncomesIva)}</th>
-                    <th className="th text-right">{currency(totalIncomesWithIva)}</th>
+                    <th className="th text-right">
+                      {currency(totalIncomesIva)}
+                    </th>
+                    <th className="th text-right">
+                      {currency(totalIncomesWithIva)}
+                    </th>
                   </tr>
                 </tfoot>
               )}
@@ -449,9 +496,7 @@ export default function Statement() {
         </div>
 
         <div className="card p-4">
-          <h3 className="text-lg font-semibold text-slate-900 mb-3">
-            Gastos
-          </h3>
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Gastos</h3>
 
           <div className="table-wrap">
             <table className="table">
@@ -468,15 +513,26 @@ export default function Statement() {
                 {expenses.map((e, idx) => (
                   <tr key={idx} className="tr">
                     <td className="td">
-                      {e.cuenta_Egreso ?? e.Cuenta_Egreso ?? e.nombre ?? "Sin tipo"}
+                      {e.cuenta_Egreso ??
+                        e.Cuenta_Egreso ??
+                        e.nombre ??
+                        "Sin tipo"}
                     </td>
                     <td className="td">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
-                        String(e.tipoGasto ?? e.TipoGasto ?? "variable").toLowerCase() === "fijo"
-                          ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
-                          : "bg-amber-50 text-amber-700 ring-amber-200"
-                      }`}>
-                        {String(e.tipoGasto ?? e.TipoGasto ?? "variable").toLowerCase() === "fijo" ? "Fijo" : "Variable"}
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
+                          String(
+                            e.tipoGasto ?? e.TipoGasto ?? "variable",
+                          ).toLowerCase() === "fijo"
+                            ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
+                            : "bg-amber-50 text-amber-700 ring-amber-200"
+                        }`}
+                      >
+                        {String(
+                          e.tipoGasto ?? e.TipoGasto ?? "variable",
+                        ).toLowerCase() === "fijo"
+                          ? "Fijo"
+                          : "Variable"}
                       </span>
                     </td>
                     <td className="td text-right text-slate-600">
@@ -515,14 +571,18 @@ function formatPct(value, total) {
 }
 
 function sumRows(rows) {
-  return rows.reduce((sum, item) => sum + Number(item.total ?? item.Total ?? 0), 0);
+  return rows.reduce(
+    (sum, item) => sum + Number(item.total ?? item.Total ?? 0),
+    0,
+  );
 }
 
 function downloadProfitAndLossExcel(report, filename) {
   const incomeRows = report.incomes
     .map((item) => {
       const amount = Number(item.total ?? item.Total ?? 0);
-      const name = item.cuenta_Ingreso ?? item.Cuenta_Ingreso ?? item.nombre ?? "Sin tipo";
+      const name =
+        item.cuenta_Ingreso ?? item.Cuenta_Ingreso ?? item.nombre ?? "Sin tipo";
 
       return `
         <tr>
@@ -539,10 +599,13 @@ function downloadProfitAndLossExcel(report, filename) {
   const expenseRows = report.expenses
     .map((item) => {
       const amount = Number(item.total ?? item.Total ?? 0);
-      const name = item.cuenta_Egreso ?? item.Cuenta_Egreso ?? item.nombre ?? "Sin tipo";
-      const kind = String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase() === "fijo"
-        ? "Fijo"
-        : "Variable";
+      const name =
+        item.cuenta_Egreso ?? item.Cuenta_Egreso ?? item.nombre ?? "Sin tipo";
+      const kind =
+        String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase() ===
+        "fijo"
+          ? "Fijo"
+          : "Variable";
 
       return `
         <tr>
@@ -582,8 +645,8 @@ function downloadProfitAndLossExcel(report, filename) {
         <![endif]-->
         <style>
           @page {
-            margin: 0.35in 0.35in 0.35in 0.35in;
-            mso-page-orientation: portrait;
+              margin: 0.25in;
+              mso-page-orientation: landscape;
           }
           body {
             font-family: Arial, sans-serif;
@@ -596,47 +659,49 @@ function downloadProfitAndLossExcel(report, filename) {
           }
           .sheet {
             table-layout: fixed;
-            width: 840px;
+            width: 100%;
           }
-          .title {
-            background: #0f172a;
-            color: #ffffff;
-            font-size: 18px;
-            font-weight: 700;
-            padding: 12px;
-            text-align: center;
-          }
-          .subtitle {
-            background: #e0f2fe;
-            color: #075985;
-            font-size: 10px;
-            padding: 7px;
-            text-align: center;
-          }
+.title {
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  padding: 8px;
+  text-align: center;
+}
+.subtitle {
+  background: #e0f2fe;
+  color: #075985;
+  font-size: 9px;
+  padding: 5px;
+  text-align: center;
+}
           .spacer td {
             height: 10px;
             border: none;
           }
-          .section {
-            background: #334155;
-            color: #ffffff;
-            font-weight: 700;
-            padding: 7px;
-            text-transform: uppercase;
-          }
-          .head {
-            background: #f1f5f9;
-            color: #334155;
-            font-weight: 700;
-            padding: 6px;
-            border: 1px solid #cbd5e1;
-            font-size: 10px;
-          }
-          .cell {
-            border: 1px solid #dbe3ee;
-            padding: 6px;
-            font-size: 10px;
-          }
+.section {
+  background: #334155;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 5px;
+  text-transform: uppercase;
+  font-size: 9px;
+}
+.head {
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 700;
+  padding: 5px;
+  border: 1px solid #cbd5e1;
+  font-size: 9px;
+  text-align: center;
+}
+    .cell {
+  border: 1px solid #dbe3ee;
+  padding: 5px;
+  font-size: 9px;
+}
           .name {
             color: #111827;
             font-weight: 600;
@@ -672,36 +737,38 @@ function downloadProfitAndLossExcel(report, filename) {
             color: #9a3412;
             font-weight: 700;
           }
-          .summary-label {
-            background: #f8fafc;
-            border: 1px solid #dbe3ee;
-            color: #475569;
-            font-weight: 700;
-            padding: 6px;
-            font-size: 10px;
-          }
-          .summary-value {
-            border: 1px solid #dbe3ee;
-            padding: 6px;
-            text-align: right;
-            font-weight: 700;
-            font-size: 10px;
-          }
-          .net-label {
-            background: #0f172a;
-            color: #ffffff;
-            border: 1px solid #0f172a;
-            font-size: 11px;
-            font-weight: 700;
-            padding: 8px;
-          }
-          .net-value {
-            background: #0f172a;
-            border: 1px solid #0f172a;
-            font-size: 11px;
-            padding: 8px;
-            text-align: right;
-          }
+.summary-label {
+  background: #f8fafc;
+  border: 1px solid #dbe3ee;
+  color: #475569;
+  font-weight: 700;
+  padding: 5px;
+  font-size: 9px;
+}
+.summary-value {
+  border: 1px solid #dbe3ee;
+  padding: 5px;
+  text-align: right;
+  font-weight: 700;
+  font-size: 9px;
+  white-space: nowrap;
+}
+.net-label {
+  background: #0f172a;
+  color: #ffffff;
+  border: 1px solid #0f172a;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px;
+}
+.net-value {
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  font-size: 10px;
+  padding: 6px;
+  text-align: right;
+  white-space: nowrap;
+}
           .note {
             color: #64748b;
             font-size: 9px;
@@ -712,12 +779,12 @@ function downloadProfitAndLossExcel(report, filename) {
       <body>
         <table class="sheet">
           <colgroup>
-            <col style="width: 260px;" />
-            <col style="width: 90px;" />
-            <col style="width: 110px;" />
-            <col style="width: 120px;" />
-            <col style="width: 120px;" />
-            <col style="width: 140px;" />
+              <col style="width: 32%;" />
+              <col style="width: 13%;" />
+              <col style="width: 13%;" />
+              <col style="width: 14%;" />
+              <col style="width: 14%;" />
+              <col style="width: 14%;" />
           </colgroup>
           <tr>
             <td class="title" colspan="6">Estado de Ganancias y Perdidas</td>
@@ -805,7 +872,9 @@ function downloadProfitAndLossExcel(report, filename) {
     </html>
   `;
 
-  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+  const blob = new Blob([html], {
+    type: "application/vnd.ms-excel;charset=utf-8;",
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -820,10 +889,12 @@ function formatMoneyCell(value) {
   const amount = Number(value || 0);
   const safeAmount = Number.isFinite(amount) ? amount : 0;
 
-  return escapeHtmlCell(safeAmount.toLocaleString("es-ES", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }));
+  return escapeHtmlCell(
+    safeAmount.toLocaleString("es-ES", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }),
+  );
 }
 
 function downloadBlob(blob, filename) {
@@ -854,9 +925,13 @@ async function readBlobError(error) {
 
 function escapeHtmlCell(value) {
   if (value === null || value === undefined) return "";
-  return (typeof value === "number"
-    ? value.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : String(value)
+  return (
+    typeof value === "number"
+      ? value.toLocaleString("es-ES", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })
+      : String(value)
   )
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

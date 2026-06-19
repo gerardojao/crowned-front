@@ -35,6 +35,8 @@ const emptyWorkshop = {
   enableWhatsappAlerts: true,
   enableInvoiceExport: true,
   enableProfitAndLoss: true,
+  enableDashboardRepairVehicles: true,
+  enableAccountsReceivable: true,
   ownerEmail: "",
   ownerPassword: "",
   ownerFullName: "",
@@ -76,6 +78,8 @@ export default function AdminWorkshops() {
     enableWhatsappAlerts: true,
     enableInvoiceExport: true,
     enableProfitAndLoss: true,
+    enableDashboardRepairVehicles: true,
+    enableAccountsReceivable: true,
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -122,6 +126,8 @@ export default function AdminWorkshops() {
         enableWhatsappAlerts: true,
         enableInvoiceExport: true,
         enableProfitAndLoss: true,
+        enableDashboardRepairVehicles: true,
+        enableAccountsReceivable: true,
       });
       setUsers([]);
       return;
@@ -147,6 +153,14 @@ export default function AdminWorkshops() {
       enableWhatsappAlerts: selectedWorkshop.enableWhatsappAlerts ?? selectedWorkshop.EnableWhatsappAlerts ?? true,
       enableInvoiceExport: selectedWorkshop.enableInvoiceExport ?? selectedWorkshop.EnableInvoiceExport ?? true,
       enableProfitAndLoss: selectedWorkshop.enableProfitAndLoss ?? selectedWorkshop.EnableProfitAndLoss ?? true,
+      enableDashboardRepairVehicles:
+        selectedWorkshop.enableDashboardRepairVehicles ??
+        selectedWorkshop.EnableDashboardRepairVehicles ??
+        true,
+      enableAccountsReceivable:
+        selectedWorkshop.enableAccountsReceivable ??
+        selectedWorkshop.EnableAccountsReceivable ??
+        true,
     });
     setForm({
       nombre: selectedWorkshop.nombre ?? selectedWorkshop.Nombre ?? "",
@@ -168,6 +182,14 @@ export default function AdminWorkshops() {
       enableWhatsappAlerts: selectedWorkshop.enableWhatsappAlerts ?? selectedWorkshop.EnableWhatsappAlerts ?? true,
       enableInvoiceExport: selectedWorkshop.enableInvoiceExport ?? selectedWorkshop.EnableInvoiceExport ?? true,
       enableProfitAndLoss: selectedWorkshop.enableProfitAndLoss ?? selectedWorkshop.EnableProfitAndLoss ?? true,
+      enableDashboardRepairVehicles:
+        selectedWorkshop.enableDashboardRepairVehicles ??
+        selectedWorkshop.EnableDashboardRepairVehicles ??
+        true,
+      enableAccountsReceivable:
+        selectedWorkshop.enableAccountsReceivable ??
+        selectedWorkshop.EnableAccountsReceivable ??
+        true,
       ownerEmail: "",
       ownerPassword: "",
       ownerFullName: "",
@@ -721,27 +743,49 @@ function Textarea({ label, value, onChange }) {
 
 function FeatureSwitches({ values, onChange }) {
   return (
-    <div>
-      <p className="mb-2 text-sm font-bold text-slate-800">Modulos comerciales</p>
+    <div className="space-y-4">
+      <div>
+        <p className="mb-2 text-sm font-bold text-slate-800">Modulos comerciales</p>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <Switch
+            label="Alertas WhatsApp"
+            description="Abre WhatsApp al atender alertas de cliente."
+            checked={values.enableWhatsappAlerts}
+            onChange={(checked) => onChange("enableWhatsappAlerts", checked)}
+          />
+          <Switch
+            label="Exportacion de facturas"
+            description="Permite descargar facturas por periodo."
+            checked={values.enableInvoiceExport}
+            onChange={(checked) => onChange("enableInvoiceExport", checked)}
+          />
+          <Switch
+            label="Estado de resultados"
+            description="Permite generar el reporte financiero."
+            checked={values.enableProfitAndLoss}
+            onChange={(checked) => onChange("enableProfitAndLoss", checked)}
+          />
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-bold text-slate-800">Modulos del dashboard</p>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         <Switch
-          label="Alertas WhatsApp"
-          description="Abre WhatsApp al atender alertas de cliente."
-          checked={values.enableWhatsappAlerts}
-          onChange={(checked) => onChange("enableWhatsappAlerts", checked)}
+          label="Vehiculos en reparacion"
+          description="Muestra el contador de ordenes en estado Reparando."
+          checked={values.enableDashboardRepairVehicles}
+          onChange={(checked) =>
+            onChange("enableDashboardRepairVehicles", checked)
+          }
         />
         <Switch
-          label="Exportacion de facturas"
-          description="Permite descargar facturas por periodo."
-          checked={values.enableInvoiceExport}
-          onChange={(checked) => onChange("enableInvoiceExport", checked)}
+          label="Cuentas por cobrar"
+          description="Muestra el modulo de importes pendientes de cobro."
+          checked={values.enableAccountsReceivable}
+          onChange={(checked) => onChange("enableAccountsReceivable", checked)}
         />
-        <Switch
-          label="Estado de resultados"
-          description="Permite generar el reporte financiero."
-          checked={values.enableProfitAndLoss}
-          onChange={(checked) => onChange("enableProfitAndLoss", checked)}
-        />
+      </div>
       </div>
     </div>
   );

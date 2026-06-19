@@ -3,6 +3,10 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import Loader from "../Components/Loader";
 import api from "../Components/api";
+import {
+  appendAccountsReceivableSummary,
+  fetchAccountsReceivableIncome,
+} from "../utils/accountsReceivableIncome";
 
 import {
   Chart as ChartJS,
@@ -50,7 +54,8 @@ export default function ShowIncomes() {
     try {
       const res = await api.get("/Ingreso/totales");
       const arr = Array.isArray(res?.data?.data) ? res.data.data[0] ?? [] : [];
-      setData(Array.isArray(arr) ? arr : []);
+      const cxc = await fetchAccountsReceivableIncome();
+      setData(appendAccountsReceivableSummary(Array.isArray(arr) ? arr : [], cxc));
     } catch {
       setData([]);
     } finally {

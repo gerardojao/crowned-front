@@ -326,8 +326,8 @@ export default function StockParts() {
         </div>
 
         <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-600">
+          <table className="w-full text-sm text-center">
+            <thead className="bg-slate-50 text-slate-600 text-center">
               <tr>
                 <th className="px-3 py-3 text-center">Fecha</th>
                 <th className="px-3 py-3 text-center">Factura</th>
@@ -352,10 +352,10 @@ export default function StockParts() {
                       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                           <span className="font-bold text-slate-900">
-                            {group.numeroFactura}
+                            {group.fechaFactura ? formatDate(group.fechaFactura) : "Sin fecha"}
                           </span>
                           <span className="text-slate-600">
-                            {formatDate(group.fechaFactura)}
+                            <strong>{group.numeroFactura}</strong>
                           </span>
                           <span className="text-slate-700">
                             {group.cliente}

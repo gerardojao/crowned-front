@@ -6,6 +6,7 @@ import { soloFecha } from "../utils/date";
 import {
   Search, RotateCcw, ArrowLeft, CalendarDays, XCircle,
 } from "lucide-react";
+import { fetchAccountsReceivableIncome } from "../utils/accountsReceivableIncome";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const IVA_RATE = 0.21;
@@ -139,7 +140,10 @@ export default function IncomeDetails() {
 
         const res = await api.get(`/Ingreso/detalle?${params.toString()}`);
         const list = res.data?.data?.[0] ?? [];
-        setRows(Array.isArray(list) ? list : []);
+        const cxc = tid
+          ? { rows: [] }
+          : await fetchAccountsReceivableIncome({ from: f, to: t });
+        setRows([...(Array.isArray(list) ? list : []), ...(cxc.rows || [])]);
       } catch (e) {
         setRows([]);
         setNotice({
@@ -244,6 +248,10 @@ export default function IncomeDetails() {
   const confirmDelete = async () => {
     const row = confirmState.row;
     if (!row) return;
+    if (row.source === "cxc") {
+      setConfirmState({ open: false, row: null, loading: false });
+      return;
+    }
     try {
       setConfirmState((s) => ({ ...s, loading: true }));
       await api.delete(`/Ingreso/detalle/${row.id}`);
