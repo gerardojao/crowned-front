@@ -490,7 +490,7 @@ const handleCreateRectification = (row) => {
                   Email
                 </button>
 
-                {!r.isRectification && (
+                {/* {!r.isRectification && (
                   <button
                     type="button"
                     onClick={() => handleCreateRectification(r)}
@@ -498,7 +498,7 @@ const handleCreateRectification = (row) => {
                   >
                     Rectificar
                   </button>
-                )}
+                )} */}
               </div>
             </article>
           ))
@@ -641,7 +641,7 @@ const handleCreateRectification = (row) => {
                                 <Mail size={16} />
                               </button>
 
-                              {!r.isRectification && (
+                              {/* {!r.isRectification && (
                                 <button
                                   type="button"
                                   title="Crear rectificativa"
@@ -650,7 +650,7 @@ const handleCreateRectification = (row) => {
                                 >
                                   <FileWarning size={16} />
                                 </button>
-                              )}
+                              )} */}
                             </div>
                           </td>
                         </tr>
