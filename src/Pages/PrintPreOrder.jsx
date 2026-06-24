@@ -216,7 +216,7 @@ export default function PrintPreOrder() {
           margin-bottom: 2mm;
         }
         .po-title { font-size: 17px; font-weight: 800; margin: 0 0 5mm; }
-        .po-meta { width: 38mm; border-collapse: collapse; font-size: 9px; }
+        .po-meta { width: 38mm; border-collapse: collapse; font-size: 11px; }
         .po-meta th { width: 21mm; background: #b7b7b7; border: 1px solid #b7b7b7; padding: 2.1mm 1.4mm; text-align: left; font-weight: 800; }
         .po-meta td { border: 1px solid transparent; padding: 2.1mm 1.4mm; font-weight: 700; }
 

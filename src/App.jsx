@@ -40,6 +40,7 @@ import PrintBudget from "./Pages/PrintBudget.jsx";
 import AdminWorkshops from "./Pages/AdminWorkshops.jsx";
 import AccountsReceivable from "./Pages/AccountsReceivable.jsx";
 import Ledger from "./Pages/Ledger.jsx";
+import InvoiceHistory from "./Pages/InvoiceHistory.jsx";
 
 function App() {
   const protectedElement = (element) => (
@@ -83,6 +84,7 @@ function App() {
             <Route path="/print-order/:id" element={protectedElement(<PrintWorkOrder />)} />
             <Route path="/print-pre-order/:id" element={protectedElement(<PrintPreOrder />)} />
             <Route path="/workshop-invoice/:id" element={protectedElement(<WorkshopInvoice />)} />
+            <Route path="/invoices-history" element={protectedElement(<InvoiceHistory />)} />
 
             <Route path="/workshop-invoice" element={protectedElement(<WorkshopInvoice />)} />
             <Route path="/special-invoices/parts" element={protectedElement(<SpecialPartsInvoice />)} />

@@ -393,13 +393,13 @@ export default function Layout({ children }) {
                           Finanzas / Mayor
                         </NavLink>
                       )}
-                      {/* <Link
-                        to="/workshop-invoice"
+                      <Link
+                        to="/invoices-history"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
-                        Facturar
-                      </Link> */}
+                        Listado de facturas
+                      </Link>
                       {specialInvoicesEnabled && (
                         <Link
                           to="/special-invoices/parts"
