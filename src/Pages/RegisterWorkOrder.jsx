@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
 import api, { getCurrentWorkshopId } from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
@@ -11,6 +11,7 @@ import PartPicker, {
   getPartPurchasePrice,
   getPartSalePrice,
 } from "../Components/PartPicker";
+import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import { amountInput } from "../utils/currency";
 
 const EMPTY_ORDER = {
@@ -23,6 +24,8 @@ const EMPTY_ORDER = {
   Modelo: "",
   Kilometraje: "",
   Fecha: new Date().toISOString().slice(0, 10),
+  FechaPrevistaEntrega: "",
+  TiempoEstimadoHoras: "",
   Trabajo: "",
   Items: [],
   Repuestos: "",
@@ -183,6 +186,7 @@ function saveReadyOrderAlert(order, businessName = "nuestro taller") {
 
 export default function RegisterWorkOrder() {
   const labels = useBusinessTerminology();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [orders, setOrders] = useState([]);
   const [notice, setNotice] = useState("");
@@ -207,6 +211,9 @@ export default function RegisterWorkOrder() {
   const [readyWhatsappOrder, setReadyWhatsappOrder] = useState(null);
   const [workshopName, setWorkshopName] = useState("nuestro taller");
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
+  const [useZagaDocuments, setUseZagaDocuments] = useState(false);
+  const [preOrdersEnabled, setPreOrdersEnabled] = useState(false);
+  const [preOrderSourceId, setPreOrderSourceId] = useState(null);
   const orderPageSize = 10;
   const detailItems = Array.isArray(order.Items) ? order.Items : [];
   const detailTotal = detailItems.reduce(
@@ -226,6 +233,11 @@ export default function RegisterWorkOrder() {
         data.enableWhatsappAlerts ?? data.EnableWhatsappAlerts ?? false;
 
       setWhatsappEnabled(enabled);
+      const zagaDocuments = usesZagaInvoiceTemplate(data);
+      const preOrderModuleEnabled =
+        data.enablePreOrders ?? data.EnablePreOrders ?? true;
+      setUseZagaDocuments(zagaDocuments);
+      setPreOrdersEnabled(zagaDocuments && preOrderModuleEnabled);
 
       const name =
         data.nombre ??
@@ -399,11 +411,14 @@ export default function RegisterWorkOrder() {
     Cliente: o.cliente ?? o.Cliente,
     Dni: o.dni ?? o.Dni ?? "",
     Telefono: o.telefono ?? o.Telefono,
+    Direccion: o.direccion ?? o.Direccion ?? "",
     Matricula: o.matricula ?? o.Matricula,
     Marca: o.marca ?? o.Marca,
     Modelo: o.modelo ?? o.Modelo,
     Kilometraje: o.kilometraje ?? o.Kilometraje,
     Fecha: o.fecha ?? o.Fecha,
+    FechaPrevistaEntrega: o.fechaPrevistaEntrega ?? o.FechaPrevistaEntrega ?? "",
+    TiempoEstimadoHoras: o.tiempoEstimadoHoras ?? o.TiempoEstimadoHoras ?? "",
     Trabajo: o.trabajo ?? o.Trabajo,
     Repuestos: o.repuestos ?? o.Repuestos ?? 0,
     Cantidad: o.cantidad ?? o.Cantidad ?? 1,
@@ -573,8 +588,10 @@ export default function RegisterWorkOrder() {
       setError("");
       const existing = await findExistingCustomerByPlate(payload.matricula);
       if (existing) {
-        fillOrderFromCustomer(existing);
-        setNotice("Cliente ya registrado; se cargaron sus datos en la orden.");
+        setNotice("");
+        setError(
+          `La matricula ${payload.matricula.trim().toUpperCase()} ya esta registrada para ${existing.Nombre}. No se registro un cliente nuevo para evitar duplicar el vehiculo. Selecciona ese cliente en el buscador o usa otra matricula.`,
+        );
         return;
       }
 
@@ -663,6 +680,80 @@ export default function RegisterWorkOrder() {
   }, []);
 
   useEffect(() => {
+    const preOrdenId = searchParams.get("preOrdenId");
+    if (!preOrdenId) return;
+
+    let alive = true;
+    (async () => {
+      try {
+        setError("");
+        const res = await api.get(`/PreOrdenTrabajo/${preOrdenId}`);
+        const data = res?.data?.data?.[0];
+        if (!alive || !data) return;
+
+        const motivo = data.motivoRecepcion ?? data.MotivoRecepcion ?? "";
+        const diagnostico =
+          data.diagnosticoMecanico ?? data.DiagnosticoMecanico ?? "";
+        const repuestos =
+          data.repuestosNecesarios ?? data.RepuestosNecesarios ?? "";
+        const fechaPrevista =
+          data.fechaPrevistaEntrega ?? data.FechaPrevistaEntrega ?? "";
+        const tiempoEstimado =
+          data.tiempoEstimadoHoras ?? data.TiempoEstimadoHoras ?? "";
+        const tiempoEstimadoNumero = Number(tiempoEstimado || 0);
+        const observaciones = [
+          motivo ? `Motivo recibido: ${motivo}` : "",
+          repuestos ? `Repuestos indicados en pre-orden: ${repuestos}` : "",
+          data.observaciones ?? data.Observaciones ?? "",
+        ]
+          .filter(Boolean)
+          .join("\n");
+
+        setPreOrderSourceId(preOrdenId);
+        setEditingId(null);
+        setOrder({
+          ...EMPTY_ORDER,
+          Cliente: data.cliente ?? data.Cliente ?? "",
+          Dni: data.dni ?? data.Dni ?? "",
+          Telefono: data.telefono ?? data.Telefono ?? "",
+          Direccion: data.direccion ?? data.Direccion ?? "",
+          Matricula: data.matricula ?? data.Matricula ?? "",
+          Marca: data.marca ?? data.Marca ?? "",
+          Modelo: data.modelo ?? data.Modelo ?? "",
+          Kilometraje: data.kilometraje ?? data.Kilometraje ?? "",
+          Fecha: new Date().toISOString().slice(0, 10),
+          FechaPrevistaEntrega: fechaPrevista ? String(fechaPrevista).slice(0, 10) : "",
+          TiempoEstimadoHoras: tiempoEstimado ?? "",
+          Trabajo: diagnostico || motivo,
+          Items: tiempoEstimadoNumero > 0
+            ? [
+                createDetailItem(diagnostico || motivo || "Trabajo mecanico", tiempoEstimadoNumero, 0, {
+                  kind: "labor",
+                }),
+              ]
+            : [],
+          Observaciones: observaciones,
+        });
+        setNotice("Pre-orden cargada. Completa la orden y guardala.");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err) {
+        console.error(err);
+        if (alive) {
+          setError(
+            err?.response?.data?.message ||
+              err?.message ||
+              "No se pudo cargar la pre-orden.",
+          );
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [searchParams]);
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       loadCustomers(customerSearch);
     }, 300);
@@ -746,6 +837,7 @@ export default function RegisterWorkOrder() {
       Cliente: o.Cliente || "",
       Dni: o.Dni || "",
       Telefono: o.Telefono || "",
+      Direccion: o.Direccion || "",
       Matricula: o.Matricula || "",
       Marca: o.Marca || "",
       Modelo: o.Modelo || "",
@@ -753,6 +845,10 @@ export default function RegisterWorkOrder() {
       Fecha: o.Fecha
         ? String(o.Fecha).slice(0, 10)
         : new Date().toISOString().slice(0, 10),
+      FechaPrevistaEntrega: o.FechaPrevistaEntrega
+        ? String(o.FechaPrevistaEntrega).slice(0, 10)
+        : "",
+      TiempoEstimadoHoras: o.TiempoEstimadoHoras || "",
       Trabajo: o.Trabajo || "",
       Items: o.Items || [],
       Repuestos: o.Repuestos || "",
@@ -806,11 +902,16 @@ export default function RegisterWorkOrder() {
         cliente: order.Cliente,
         dni: order.Dni || null,
         telefono: order.Telefono || null,
+        direccion: order.Direccion || null,
         matricula: order.Matricula,
         marca: order.Marca || null,
         modelo: order.Modelo,
         kilometraje: order.Kilometraje ? Number(order.Kilometraje) : null,
         fecha: order.Fecha,
+        fechaPrevistaEntrega: order.FechaPrevistaEntrega || null,
+        tiempoEstimadoHoras: order.TiempoEstimadoHoras
+          ? Number(order.TiempoEstimadoHoras)
+          : null,
         trabajo: order.Trabajo,
         itemsJson: normalizedItems.length
           ? JSON.stringify(normalizedItems)
@@ -826,12 +927,28 @@ export default function RegisterWorkOrder() {
         observaciones: order.Observaciones || null,
       };
 
+      let savedOrderId = editingId;
       if (editingId) {
         ensureOk(await api.put(`/OrdenTrabajo/${editingId}`, payload));
         setNotice("Orden actualizada correctamente.");
       } else {
-        ensureOk(await api.post("/OrdenTrabajo", payload));
+        const created = ensureOk(await api.post("/OrdenTrabajo", payload));
+        savedOrderId =
+          created?.data?.[0]?.id ??
+          created?.data?.[0]?.Id ??
+          created?.Data?.[0]?.id ??
+          created?.Data?.[0]?.Id ??
+          null;
         setNotice("Orden registrada correctamente.");
+      }
+
+      if (!editingId && preOrderSourceId && savedOrderId) {
+        await api.put(`/PreOrdenTrabajo/${preOrderSourceId}/convertida`, {
+          idOrdenTrabajo: savedOrderId,
+        });
+        setNotice("Orden registrada y pre-orden marcada como convertida.");
+        setPreOrderSourceId(null);
+        setSearchParams({});
       }
 
       setOrder(EMPTY_ORDER);
@@ -1131,6 +1248,28 @@ export default function RegisterWorkOrder() {
               className={cls}
             />
 
+            <input
+              name="FechaPrevistaEntrega"
+              type="date"
+              value={order.FechaPrevistaEntrega}
+              onChange={handleChange}
+              className={cls}
+              aria-label="Fecha prevista de entrega"
+              title="Fecha prevista de entrega"
+            />
+
+            <input
+              name="TiempoEstimadoHoras"
+              type="number"
+              min="0"
+              step="0.25"
+              value={order.TiempoEstimadoHoras}
+              onChange={handleChange}
+              className={cls}
+              aria-label="Tiempo estimado en horas"
+              placeholder="Tiempo estimado horas"
+            />
+
             <select
               name="Estado"
               value={order.Estado}
@@ -1376,6 +1515,8 @@ export default function RegisterWorkOrder() {
             onClick={() => {
               setOrder(EMPTY_ORDER);
               setEditingId(null);
+              setPreOrderSourceId(null);
+              setSearchParams({});
               setCustomerSearch("");
               setCustomerMatches([]);
               setShowNewCustomer(false);
@@ -1595,6 +1736,30 @@ export default function RegisterWorkOrder() {
                     >
                       Imprimir
                     </a>
+
+                    {useZagaDocuments && (
+                      <>
+                        {preOrdersEnabled && (
+                          <a
+                            href={`/print-order/${o.Id}?type=preorden`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
+                          >
+                            Pre-orden
+                          </a>
+                        )}
+
+                        <a
+                          href={`/print-order/${o.Id}?type=resguardo`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-700 hover:bg-slate-800 text-sm font-medium text-white transition"
+                        >
+                          Resguardo
+                        </a>
+                      </>
+                    )}
 
                     {!isOrderEditLocked(o.Estado) && (
                       <button

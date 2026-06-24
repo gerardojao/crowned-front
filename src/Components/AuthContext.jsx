@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "./api";
+import { WORKSHOP_STORAGE_KEY } from "./api";
 
 const AuthCtx = createContext({
   user: null,
@@ -161,6 +162,7 @@ export default function AuthProvider({ children }) {
 
     localStorage.setItem("fa_token", tok);
     if (usr) localStorage.setItem("fa_user", JSON.stringify(usr));
+    localStorage.removeItem(WORKSHOP_STORAGE_KEY);
     setToken(tok);
     setUser(usr ?? null);
 

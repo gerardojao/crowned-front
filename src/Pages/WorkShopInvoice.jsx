@@ -4,6 +4,9 @@ import { ArrowLeft, Plus, Trash2, Printer, Wrench } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import ZagaInvoiceDocument, {
+  usesZagaInvoiceTemplate,
+} from "../Components/ZagaInvoiceDocument";
 import PartPicker, {
   getPartDisplayName,
   getPartId,
@@ -46,6 +49,8 @@ const DEFAULT_TALLER = {
   iban: "ES69 2100 4014 9122 0012 3843",
   serieFactura: "A",
   logoUrl: "",
+  documentTemplateKey: "",
+  allowInvoiceClientEdit: false,
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -109,6 +114,8 @@ export default function WorkshopInvoice() {
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedBankId, setSelectedBankId] = useState("");
   const [paymentMethods, setPaymentMethods] = useState(EMPTY_PAYMENT_METHODS);
 
   const [items, setItems] = useState([
@@ -116,7 +123,7 @@ export default function WorkshopInvoice() {
     { descripcion: "Mano de obra", cantidad: 1, importe: 0 },
   ]);
 
-  const clientFieldsLocked = Boolean(id);
+  const clientFieldsLocked = Boolean(id) && !taller.allowInvoiceClientEdit;
 
   const normalizeOrder = (o) => ({
     id: o.id ?? o.Id,
@@ -193,6 +200,7 @@ export default function WorkshopInvoice() {
     let alive = true;
     const init = async () => {
       const settings = await loadWorkshopSettings();
+      if (alive) await loadBankAccounts();
       if (alive) await loadFrequentServices();
       if (alive) await loadInvoice(settings?.serieFactura || "A");
     };
@@ -231,6 +239,14 @@ export default function WorkshopInvoice() {
         iban: data.iban ?? data.Iban ?? DEFAULT_TALLER.iban,
         serieFactura: data.serieFactura ?? data.SerieFactura ?? DEFAULT_TALLER.serieFactura,
         logoUrl: data.logoUrl ?? data.LogoUrl ?? DEFAULT_TALLER.logoUrl,
+        documentTemplateKey:
+          data.documentTemplateKey ??
+          data.DocumentTemplateKey ??
+          DEFAULT_TALLER.documentTemplateKey,
+        allowInvoiceClientEdit:
+          data.allowInvoiceClientEdit ??
+          data.AllowInvoiceClientEdit ??
+          DEFAULT_TALLER.allowInvoiceClientEdit,
       };
       setTaller(next);
       return next;
@@ -383,6 +399,7 @@ export default function WorkshopInvoice() {
 
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
   const isCredit = invoice.tipoPago === "Credito";
+  const useZagaTemplate = usesZagaInvoiceTemplate(taller);
 
   useEffect(() => {
     if (!isCredit) return;
@@ -424,6 +441,30 @@ export default function WorkshopInvoice() {
     }));
   };
 
+  const loadBankAccounts = async () => {
+    try {
+      const res = await api.get("/WorkshopBankAccounts");
+      const banks = Array.isArray(res?.data) ? res.data : [];
+      setBankAccounts(banks);
+
+      const main = banks.find((x) => x.esPrincipal ?? x.EsPrincipal) || banks[0];
+      const mainId = main?.id ?? main?.Id ?? "";
+      const mainIban = main?.iban ?? main?.Iban ?? "";
+      if (mainId) setSelectedBankId(String(mainId));
+      if (mainIban) {
+        setTaller((prev) => ({
+          ...prev,
+          iban: mainIban,
+        }));
+      }
+      return banks;
+    } catch (err) {
+      console.error(err);
+      setBankAccounts([]);
+      return [];
+    }
+  };
+
   const setTipoPago = (tipoPago) => {
     setInvoice((prev) => ({
       ...prev,
@@ -434,6 +475,18 @@ export default function WorkshopInvoice() {
 
     if (tipoPago === "Credito") {
       setPaymentMethods(EMPTY_PAYMENT_METHODS);
+    }
+  };
+
+  const setInvoiceBank = (bankId) => {
+    setSelectedBankId(bankId);
+    const bank = bankAccounts.find((item) => String(item.id ?? item.Id) === String(bankId));
+    const iban = bank?.iban ?? bank?.Iban ?? "";
+    if (iban) {
+      setTaller((prev) => ({
+        ...prev,
+        iban,
+      }));
     }
   };
 
@@ -546,6 +599,7 @@ const saveIssuedInvoice = async () => {
     totalAbonado: isCredit ? paymentTotal : totalFinal,
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
     fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
+    bankAccountId: selectedBankId ? Number(selectedBankId) : null,
     items: billableItems,
   };
 
@@ -573,6 +627,10 @@ const printInvoice = async () => {
 
     if (isCredit && paymentTotal > totalFinal) {
       throw new Error("El abono inicial no puede superar el total de la factura.");
+    }
+
+    if (bankAccounts.length > 1 && !selectedBankId) {
+      throw new Error("Selecciona el banco para esta factura.");
     }
 
     const res = await saveIssuedInvoice();
@@ -737,6 +795,29 @@ const printInvoice = async () => {
               value={taller.iban}
               readOnly
             />
+
+            {bankAccounts.length > 1 && (
+              <label className="block text-sm font-semibold text-slate-700">
+                Banco para esta factura
+                <select
+                  className={`mt-1 w-full ${inputCls}`}
+                  value={selectedBankId}
+                  onChange={(e) => setInvoiceBank(e.target.value)}
+                >
+                  <option value="">Selecciona banco</option>
+                  {bankAccounts.map((bank) => {
+                    const id = bank.id ?? bank.Id;
+                    const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                    const iban = bank.iban ?? bank.Iban ?? "";
+                    return (
+                      <option key={id} value={id}>
+                        {name} - {iban}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            )}
           </div>
         </div>
 
@@ -769,16 +850,18 @@ const printInvoice = async () => {
             />
 
             <input
-              className={inputCls}
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
               placeholder="DNI/NIE/NIF"
               value={invoice.dni}
+              readOnly={clientFieldsLocked}
               onChange={(e) => setInvoiceField("dni", e.target.value)}
             />
 
             <input
-              className={`md:col-span-2 ${inputCls}`}
+              className={`md:col-span-2 ${clientFieldsLocked ? lockedInputCls : inputCls}`}
               placeholder="Direccion cliente"
               value={invoice.direccionCliente}
+              readOnly={clientFieldsLocked}
               onChange={(e) =>
                 setInvoiceField("direccionCliente", e.target.value)
               }
@@ -1076,6 +1159,26 @@ const printInvoice = async () => {
         </datalist>
       </section>
 
+      {useZagaTemplate && (
+        <ZagaInvoiceDocument
+          taller={taller}
+          invoice={{
+            ...invoice,
+            idOrdenTrabajo: id || "",
+            marcaModelo: [order?.marca, order?.modelo].filter(Boolean).join(" "),
+          }}
+          items={items}
+          totals={{
+            subtotal,
+            iva,
+            otros,
+            total: totalFinal,
+          }}
+          selectedPaymentMethods={selectedPaymentMethods}
+        />
+      )}
+
+      {!useZagaTemplate && (
       <section className="invoice-print bg-white text-black">
         <div className="invoice-sheet mx-auto max-w-5xl">
           <div className="grid grid-cols-[150px_1fr_310px] items-start gap-6 border-b-2 border-black pb-4">
@@ -1260,6 +1363,7 @@ const printInvoice = async () => {
           </div>
         </div>
       </section>
+      )}
     </>
   );
 }

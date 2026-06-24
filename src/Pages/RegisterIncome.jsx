@@ -8,7 +8,7 @@ const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto
 
 const EMPTY_INCOME = {
   Id: "", Foto: "", Fecha: "", Mes: "", Importe: "",
-  NombreIngreso: "", IngresoId: "", Descripcion: "",
+  NombreIngreso: "", IngresoId: "", Descripcion: "", BankAccountId: "",
 };
 
 // --- UI auxiliares ---
@@ -55,6 +55,7 @@ export default function RegisterIncome({ income, setIncome }) {
   const isEdit = Boolean(state.edit === true && (state.id || record?.id));
 
   const [incTypes, setIncTypes] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   // errores por campo
@@ -94,6 +95,24 @@ export default function RegisterIncome({ income, setIncome }) {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get("/WorkshopBankAccounts");
+        const banks = Array.isArray(res?.data) ? res.data : [];
+        setBankAccounts(banks);
+        const main = banks.find((x) => x.esPrincipal ?? x.EsPrincipal) || banks[0];
+        const mainId = main?.id ?? main?.Id ?? "";
+        if (mainId && !income?.BankAccountId) {
+          setField("BankAccountId", String(mainId));
+        }
+      } catch {
+        setBankAccounts([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Reset/prefill
   useEffect(() => {
     if (!isEdit) {
@@ -110,6 +129,7 @@ export default function RegisterIncome({ income, setIncome }) {
       IngresoId: r.tipoId ?? "",
       NombreIngreso: r.tipo ?? "",
       Descripcion: r.descripcion ?? "",
+      BankAccountId: r.bankAccountId ?? r.BankAccountId ?? "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
@@ -130,6 +150,9 @@ export default function RegisterIncome({ income, setIncome }) {
         else if (isNaN(Number(value))) msg = "Formato inválido.";
         else if (Number(value) <= 0) msg = "Debe ser mayor que 0.";
         break;
+      case "BankAccountId":
+        if (bankAccounts.length > 1 && !value) msg = REQUIRED;
+        break;
       default:
         break;
     }
@@ -139,6 +162,7 @@ export default function RegisterIncome({ income, setIncome }) {
 
   const validateAll = () => {
     const fields = ["IngresoId", "Mes", "Fecha", "Importe"];
+    if (bankAccounts.length > 1) fields.push("BankAccountId");
     const next = {};
     for (const f of fields) {
       const ok = validateField(f, income[f]);
@@ -148,7 +172,7 @@ export default function RegisterIncome({ income, setIncome }) {
       }
     }
     // enfocar el primero con error
-    const firstError = ["IngresoId", "Mes", "Fecha", "Importe"].find(f => next[f]);
+    const firstError = ["IngresoId", "Mes", "Fecha", "Importe", "BankAccountId"].find(f => next[f]);
     if (firstError) {
       const el = document.getElementById(firstError === "IngresoId" ? "TipoIngreso" : firstError);
       el?.focus();
@@ -197,6 +221,7 @@ export default function RegisterIncome({ income, setIncome }) {
           descripcion: income.Descripcion ?? null,
           importe: Number(income.Importe ?? 0),
           foto: income.Foto ?? null,
+          ...(income.BankAccountId ? { bankAccountId: Number(income.BankAccountId) } : {}),
         });
         setNotice({
           type: "success",
@@ -217,6 +242,7 @@ export default function RegisterIncome({ income, setIncome }) {
         Importe: Number(income.Importe),
         NombreIngreso: Number(income.IngresoId),     // FK esperado
         Descripcion: income.Descripcion || null,
+        BankAccountId: income.BankAccountId ? Number(income.BankAccountId) : null,
       });
 
       setIncome(EMPTY_INCOME);
@@ -310,6 +336,31 @@ export default function RegisterIncome({ income, setIncome }) {
         </div> */}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {bankAccounts.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="BankAccountId">Banco</label>
+              <select
+                id="BankAccountId"
+                name="BankAccountId"
+                className={cls("BankAccountId")}
+                value={income.BankAccountId ?? ""}
+                onChange={handleChange}
+                onBlur={onBlurValidate}
+                aria-invalid={!!errors.BankAccountId}
+                aria-describedby={errors.BankAccountId ? "BankAccountId-error" : undefined}
+              >
+                <option value="">Selecciona...</option>
+                {bankAccounts.map((bank) => {
+                  const id = bank.id ?? bank.Id;
+                  const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                  const iban = bank.iban ?? bank.Iban ?? "";
+                  return <option key={id} value={id}>{name} - {iban}</option>;
+                })}
+              </select>
+              {errors.BankAccountId && <FieldError id="BankAccountId-error">{errors.BankAccountId}</FieldError>}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Fecha">Fecha{REQUIRE_FECHA && " *"}</label>
             <input

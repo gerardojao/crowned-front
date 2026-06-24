@@ -1,6 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Pencil, Save, Search, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Edit3,
+  PackagePlus,
+  RefreshCcw,
+  Save,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 import api from "../Components/api";
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -8,14 +17,52 @@ const eur = new Intl.NumberFormat("es-ES", {
   currency: "EUR",
 });
 
+const qty = new Intl.NumberFormat("es-ES", {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+});
+
 const pct = new Intl.NumberFormat("es-ES", {
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
+const emptyPartForm = {
+  codigoReferencia: "",
+  nombre: "",
+  marca: "",
+  categoria: "",
+  cantidad: "0",
+  stockMinimo: "3",
+  precioCompra: "0",
+  precioVenta: "",
+  ubicacion: "",
+  observaciones: "",
+  idProveedor: "",
+};
+
 function getValue(row, field, fallback = "") {
   const pascal = field.charAt(0).toUpperCase() + field.slice(1);
   return row?.[field] ?? row?.[pascal] ?? fallback;
+}
+
+function getProviderId(provider) {
+  return provider?.id ?? provider?.Id;
+}
+
+function getProviderName(provider) {
+  return provider?.nombre ?? provider?.Nombre ?? "";
+}
+
+function getPartLabel(row) {
+  const ref = getValue(row, "codigoReferencia");
+  const name = getValue(row, "nombre", "-");
+  return [ref, name].filter(Boolean).join(" - ");
+}
+
+function toNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function formatDate(value) {
@@ -42,43 +89,121 @@ function getLineTotals(row) {
   };
 }
 
+function toPayload(form) {
+  return {
+    codigoReferencia: form.codigoReferencia.trim(),
+    nombre: form.nombre.trim(),
+    marca: form.marca.trim(),
+    categoria: form.categoria.trim(),
+    cantidad: toNumber(form.cantidad),
+    stockMinimo: Math.max(0, Math.trunc(toNumber(form.stockMinimo, 3))),
+    precioCompra: toNumber(form.precioCompra),
+    precioVenta: form.precioVenta === "" ? null : toNumber(form.precioVenta),
+    ubicacion: form.ubicacion.trim(),
+    observaciones: form.observaciones.trim(),
+    idProveedor: form.idProveedor ? Number(form.idProveedor) : null,
+  };
+}
+
 export default function StockParts() {
-  const [parts, setParts] = useState([]);
-  const [search, setSearch] = useState("");
+  const [tab, setTab] = useState("inventory");
+  const [providers, setProviders] = useState([]);
+  const [notice, setNotice] = useState(null);
+
+  const [inventoryParts, setInventoryParts] = useState([]);
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [inventoryTotal, setInventoryTotal] = useState(0);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [showLowOnly, setShowLowOnly] = useState(false);
+
+  const [form, setForm] = useState(emptyPartForm);
+  const [editingPartId, setEditingPartId] = useState(null);
+  const [savingPart, setSavingPart] = useState(false);
+
+  const [billedParts, setBilledParts] = useState([]);
+  const [billedSearch, setBilledSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [notice, setNotice] = useState(null);
-  const [providers, setProviders] = useState([]);
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({
+  const [billedPage, setBilledPage] = useState(1);
+  const [billedTotal, setBilledTotal] = useState(0);
+  const [billedLoading, setBilledLoading] = useState(false);
+  const [editingBilledId, setEditingBilledId] = useState(null);
+  const [billedEditForm, setBilledEditForm] = useState({
     idProveedor: "",
     precioCompra: "",
   });
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [savingBilled, setSavingBilled] = useState(false);
+
   const pageSize = 20;
 
-  const loadParts = async () => {
+  const loadProviders = async () => {
     try {
-      setLoading(true);
-      setNotice(null);
+      const res = await api.get("/Proveedor", {
+        params: { page: 1, pageSize: 100 },
+      });
+      setProviders(res?.data?.data?.[0]?.items || []);
+    } catch (err) {
+      console.error(err);
+      setProviders([]);
+    }
+  };
 
+  const loadInventory = async () => {
+    try {
+      setInventoryLoading(true);
+      const endpoint = showLowOnly
+        ? "/RepuestoStock/stock-bajo"
+        : "/RepuestoStock";
+      const res = await api.get(endpoint, {
+        params: showLowOnly
+          ? undefined
+          : {
+              search: inventorySearch || undefined,
+              esFacturado: false,
+              page: inventoryPage,
+              pageSize,
+            },
+      });
+
+      if (showLowOnly) {
+        const list = res?.data?.data?.[0] || [];
+        setInventoryParts(list);
+        setInventoryTotal(list.length);
+        return;
+      }
+
+      const pack = res?.data?.data?.[0];
+      setInventoryParts(pack?.items || []);
+      setInventoryTotal(pack?.total || 0);
+    } catch (err) {
+      console.error(err);
+      setNotice({
+        type: "error",
+        text: "No se pudo cargar el inventario de repuestos.",
+      });
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
+  const loadBilled = async () => {
+    try {
+      setBilledLoading(true);
       const res = await api.get("/RepuestoStock", {
         params: {
-          search: search || undefined,
+          search: billedSearch || undefined,
           esFacturado: true,
           fechaInicio: dateFrom || undefined,
           fechaFin: dateTo || undefined,
-          page,
+          page: billedPage,
           pageSize,
         },
       });
 
       const pack = res?.data?.data?.[0];
-      setParts(pack?.items || []);
-      setTotal(pack?.total || 0);
+      setBilledParts(pack?.items || []);
+      setBilledTotal(pack?.total || 0);
     } catch (err) {
       console.error(err);
       setNotice({
@@ -86,30 +211,45 @@ export default function StockParts() {
         text: "No se pudo cargar la rentabilidad de repuestos facturados.",
       });
     } finally {
-      setLoading(false);
+      setBilledLoading(false);
     }
   };
 
   useEffect(() => {
-    loadParts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [search, dateFrom, dateTo, page]);
-
-  useEffect(() => {
-    api
-      .get("/Proveedor", { params: { page: 1, pageSize: 100 } })
-      .then((res) => setProviders(res?.data?.data?.[0]?.items || []))
-      .catch((err) => {
-        console.error(err);
-        setProviders([]);
-      });
+    loadProviders();
   }, []);
 
-  const summary = useMemo(() => {
-    return parts.reduce(
+  useEffect(() => {
+    loadInventory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventorySearch, inventoryPage, showLowOnly]);
+
+  useEffect(() => {
+    if (tab !== "billed") return;
+    loadBilled();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, billedSearch, dateFrom, dateTo, billedPage]);
+
+  const inventorySummary = useMemo(() => {
+    return inventoryParts.reduce(
+      (acc, row) => {
+        const cantidad = Number(getValue(row, "cantidad", 0));
+        const compra = Number(getValue(row, "precioCompra", 0));
+        const venta = Number(getValue(row, "precioVenta", 0));
+        acc.unidades += cantidad;
+        acc.valorCompra += compra * cantidad;
+        acc.valorVenta += venta * cantidad;
+        if (getValue(row, "stockBajo", false)) acc.stockBajo += 1;
+        return acc;
+      },
+      { unidades: 0, valorCompra: 0, valorVenta: 0, stockBajo: 0 },
+    );
+  }, [inventoryParts]);
+
+  const billedSummary = useMemo(() => {
+    return billedParts.reduce(
       (acc, row) => {
         const totals = getLineTotals(row);
-
         acc.cantidad += totals.cantidad;
         acc.compra += totals.totalCompra;
         acc.venta += totals.totalVenta;
@@ -118,15 +258,14 @@ export default function StockParts() {
       },
       { cantidad: 0, compra: 0, venta: 0, ganancia: 0 },
     );
-  }, [parts]);
-
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  }, [billedParts]);
 
   const invoiceGroups = useMemo(() => {
     const map = new Map();
 
-    for (const row of parts) {
-      const invoiceNumber = getValue(row, "numeroFactura", "Sin factura") || "Sin factura";
+    for (const row of billedParts) {
+      const invoiceNumber =
+        getValue(row, "numeroFactura", "Sin factura") || "Sin factura";
       const existing = map.get(invoiceNumber) || {
         numeroFactura: invoiceNumber,
         fechaFactura: getValue(row, "fechaFactura"),
@@ -147,51 +286,196 @@ export default function StockParts() {
     }
 
     return Array.from(map.values());
-  }, [parts]);
+  }, [billedParts]);
 
-  const startEdit = (row) => {
+  const inventoryTotalPages = Math.max(1, Math.ceil(inventoryTotal / pageSize));
+  const billedTotalPages = Math.max(1, Math.ceil(billedTotal / pageSize));
+
+  const resetPartForm = () => {
+    setEditingPartId(null);
+    setForm(emptyPartForm);
+  };
+
+  const startPartEdit = (row) => {
     setNotice(null);
-    setEditingId(getValue(row, "id"));
-    setEditForm({
+    setEditingPartId(getValue(row, "id"));
+    setForm({
+      codigoReferencia: String(getValue(row, "codigoReferencia", "") || ""),
+      nombre: String(getValue(row, "nombre", "") || ""),
+      marca: String(getValue(row, "marca", "") || ""),
+      categoria: String(getValue(row, "categoria", "") || ""),
+      cantidad: String(getValue(row, "cantidad", 0) ?? 0),
+      stockMinimo: String(getValue(row, "stockMinimo", 3) ?? 3),
+      precioCompra: String(getValue(row, "precioCompra", 0) ?? 0),
+      precioVenta:
+        getValue(row, "precioVenta", "") == null
+          ? ""
+          : String(getValue(row, "precioVenta", "")),
+      ubicacion: String(getValue(row, "ubicacion", "") || ""),
+      observaciones: String(getValue(row, "observaciones", "") || ""),
+      idProveedor: String(getValue(row, "idProveedor", "") || ""),
+    });
+  };
+
+  const savePart = async (event) => {
+    event.preventDefault();
+    if (savingPart) return;
+
+    const payload = toPayload(form);
+    if (!payload.nombre) {
+      setNotice({
+        type: "error",
+        text: "El nombre del repuesto es requerido.",
+      });
+      return;
+    }
+
+    try {
+      setSavingPart(true);
+      setNotice(null);
+
+      if (editingPartId) {
+        await api.put(`/RepuestoStock/${editingPartId}`, payload);
+        setNotice({
+          type: "success",
+          text: "Repuesto actualizado correctamente.",
+        });
+      } else {
+        await api.post("/RepuestoStock", payload);
+        setNotice({
+          type: "success",
+          text: "Repuesto registrado correctamente.",
+        });
+      }
+
+      resetPartForm();
+      await loadInventory();
+    } catch (err) {
+      console.error(err);
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo guardar el repuesto.",
+      });
+    } finally {
+      setSavingPart(false);
+    }
+  };
+
+  const updateQuantity = async (row, mode) => {
+    const id = getValue(row, "id");
+    const current = Number(getValue(row, "cantidad", 0));
+    const raw = window.prompt(
+      mode === "set" ? "Nueva cantidad en stock" : "Cantidad a sumar o restar",
+      mode === "set" ? String(current) : "1",
+    );
+
+    if (raw == null) return;
+    const value = Number(raw.replace(",", "."));
+    if (!Number.isFinite(value)) {
+      setNotice({ type: "error", text: "Cantidad invalida." });
+      return;
+    }
+
+    const next = mode === "set" ? value : current + value;
+    if (next < 0) {
+      setNotice({
+        type: "error",
+        text: "El stock no puede quedar en negativo.",
+      });
+      return;
+    }
+
+    try {
+      setNotice(null);
+      await api.patch(`/RepuestoStock/${id}/cantidad`, next);
+      await loadInventory();
+      setNotice({
+        type: "success",
+        text: "Cantidad actualizada correctamente.",
+      });
+    } catch (err) {
+      console.error(err);
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message || "No se pudo actualizar la cantidad.",
+      });
+    }
+  };
+
+  const deletePart = async (row) => {
+    const id = getValue(row, "id");
+    if (!window.confirm(`Eliminar ${getPartLabel(row)} del inventario?`))
+      return;
+
+    try {
+      setNotice(null);
+      await api.delete(`/RepuestoStock/${id}`);
+      await loadInventory();
+      setNotice({ type: "success", text: "Repuesto eliminado correctamente." });
+    } catch (err) {
+      console.error(err);
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message || "No se pudo eliminar el repuesto.",
+      });
+    }
+  };
+
+  const startBilledEdit = (row) => {
+    setNotice(null);
+    setEditingBilledId(getValue(row, "id"));
+    setBilledEditForm({
       idProveedor: String(getValue(row, "idProveedor", "") || ""),
       precioCompra: String(getValue(row, "precioCompra", 0) || ""),
     });
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm({
+  const cancelBilledEdit = () => {
+    setEditingBilledId(null);
+    setBilledEditForm({
       idProveedor: "",
       precioCompra: "",
     });
   };
 
-  const saveEdit = async () => {
-    if (!editingId || savingEdit) return;
+  const saveBilledEdit = async () => {
+    if (!editingBilledId || savingBilled) return;
 
     try {
-      setSavingEdit(true);
+      setSavingBilled(true);
       setNotice(null);
 
       const payload = {
-        idProveedor: editForm.idProveedor ? Number(editForm.idProveedor) : 0,
-        precioCompra: Number(editForm.precioCompra || 0),
+        idProveedor: billedEditForm.idProveedor
+          ? Number(billedEditForm.idProveedor)
+          : 0,
+        precioCompra: Number(billedEditForm.precioCompra || 0),
       };
 
-      const res = await api.patch(`/RepuestoStock/${editingId}/rentabilidad`, payload);
+      const res = await api.patch(
+        `/RepuestoStock/${editingBilledId}/rentabilidad`,
+        payload,
+      );
       const updated = res?.data?.data?.[0];
 
       if (updated) {
-        setParts((current) =>
+        setBilledParts((current) =>
           current.map((row) =>
-            String(getValue(row, "id")) === String(editingId) ? updated : row,
+            String(getValue(row, "id")) === String(editingBilledId)
+              ? updated
+              : row,
           ),
         );
       } else {
-        await loadParts();
+        await loadBilled();
       }
 
-      cancelEdit();
+      cancelBilledEdit();
       setNotice({
         type: "success",
         text: "Linea de rentabilidad actualizada correctamente.",
@@ -200,28 +484,36 @@ export default function StockParts() {
       console.error(err);
       setNotice({
         type: "error",
-        text: err?.response?.data?.message || err?.message || "No se pudo actualizar la linea.",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo actualizar la linea.",
       });
     } finally {
-      setSavingEdit(false);
+      setSavingBilled(false);
     }
   };
 
   return (
     <>
-      <div className="mt-2 mb-6 flex items-center justify-between gap-3">
+      <div className="mt-2 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Ganancias por reparación
+            {tab === "billed"
+              ? "Ganancias por reparación"
+              : "Stock de repuestos"}
           </h2>
+
           <p className="mt-1 text-sm text-slate-500">
-            Margen real por concepto vendido desde facturas emitidas.
+            {tab === "billed"
+              ? "Margen real por concepto vendido desde facturas emitidas."
+              : "Inventario, stock mínimo y rentabilidad de repuestos facturados."}
           </p>
         </div>
 
         <Link
           to="/"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-white transition hover:bg-slate-800"
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-white transition hover:bg-slate-800"
         >
           <ArrowLeft size={18} />
           Volver
@@ -229,295 +521,719 @@ export default function StockParts() {
       </div>
 
       {notice && (
-        <div className={`mb-4 rounded-xl p-3 text-sm ring-1 ${
-          notice.type === "success"
-            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-            : "bg-rose-50 text-rose-700 ring-rose-200"
-        }`}>
+        <div
+          className={`mb-4 rounded-xl p-3 text-sm ring-1 ${
+            notice.type === "success"
+              ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+              : "bg-rose-50 text-rose-700 ring-rose-200"
+          }`}
+        >
           {notice.text}
         </div>
       )}
 
-      <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Total venta
-          </p>
-          <p className="mt-2 text-xl font-bold text-slate-900">
-            {eur.format(summary.venta)}
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Total compra
-          </p>
-          <p className="mt-2 text-xl font-bold text-slate-900">
-            {eur.format(summary.compra)}
-          </p>
-        </div>
-        <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Ganancia
-          </p>
-          <p className={`mt-2 text-xl font-bold ${summary.ganancia >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-            {eur.format(summary.ganancia)}
-          </p>
-        </div>
-      </section>
+      <div className="mb-5 inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200">
+        <button
+          type="button"
+          onClick={() => setTab("inventory")}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            tab === "inventory"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600"
+          }`}
+        >
+          Inventario
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("billed")}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+            tab === "billed"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600"
+          }`}
+        >
+          Facturados
+        </button>
+      </div>
 
-      <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
-        <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <h3 className="text-lg font-semibold text-slate-800">
-            Lineas facturadas
-          </h3>
+      {tab === "inventory" ? (
+        <>
+          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <MetricCard
+              label="Unidades"
+              value={qty.format(inventorySummary.unidades)}
+            />
+            <MetricCard
+              label="Valor compra"
+              value={eur.format(inventorySummary.valorCompra)}
+            />
+            <MetricCard
+              label="Stock bajo"
+              value={inventorySummary.stockBajo}
+              danger={inventorySummary.stockBajo > 0}
+            />
+          </section>
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-[160px_160px_minmax(260px,1fr)_auto]">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setPage(1);
-                setDateFrom(e.target.value);
-              }}
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              aria-label="Fecha inicio"
-            />
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => {
-                setPage(1);
-                setDateTo(e.target.value);
-              }}
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              aria-label="Fecha fin"
-            />
-            <div className="relative">
-              <Search
-                size={16}
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-              />
-              <input
-                type="search"
-                placeholder="Buscar factura, cliente, matricula o concepto..."
-                value={search}
-                onChange={(e) => {
-                  setPage(1);
-                  setSearch(e.target.value);
-                }}
-                className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm"
-              />
+          <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <PackagePlus size={18} className="text-slate-500" />
+              <h3 className="text-lg font-semibold text-slate-800">
+                {editingPartId ? "Editar repuesto" : "Registrar repuesto"}
+              </h3>
             </div>
-            {(dateFrom || dateTo || search) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPage(1);
-                  setDateFrom("");
-                  setDateTo("");
-                  setSearch("");
-                }}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-sm text-center">
-            <thead className="bg-slate-50 text-slate-600 text-center">
-              <tr>
-                <th className="px-3 py-3 text-center">Fecha</th>
-                <th className="px-3 py-3 text-center">Factura</th>
-                <th className="px-3 py-3 text-center">Cliente</th>
-                <th className="px-3 py-3 text-center">Matricula</th>
-                <th className="px-3 py-3 text-center">Concepto</th>
-                <th className="px-3 py-3 text-center">Proveedor</th>
-                <th className="px-3 py-3 text-center">Cant.</th>
-                <th className="px-3 py-3 text-center">Compra</th>
-                <th className="px-3 py-3 text-center">Venta</th>
-                <th className="px-3 py-3 text-center">Ganancia</th>
-                <th className="px-3 py-3 text-center">% utilidad</th>
-                <th className="px-3 py-3 text-center">Acciones</th>
-              </tr>
-            </thead>
+            <form
+              onSubmit={savePart}
+              className="grid grid-cols-1 gap-3 lg:grid-cols-4"
+            >
+              <Input
+                label="Referencia"
+                value={form.codigoReferencia}
+                onChange={(v) =>
+                  setForm((f) => ({ ...f, codigoReferencia: v }))
+                }
+              />
+              <Input
+                label="Nombre *"
+                value={form.nombre}
+                onChange={(v) => setForm((f) => ({ ...f, nombre: v }))}
+              />
+              <Input
+                label="Marca"
+                value={form.marca}
+                onChange={(v) => setForm((f) => ({ ...f, marca: v }))}
+              />
+              <Input
+                label="Categoria"
+                value={form.categoria}
+                onChange={(v) => setForm((f) => ({ ...f, categoria: v }))}
+              />
+              <Input
+                type="number"
+                step="0.01"
+                label="Cantidad"
+                value={form.cantidad}
+                onChange={(v) => setForm((f) => ({ ...f, cantidad: v }))}
+              />
+              <Input
+                type="number"
+                step="1"
+                label="Stock minimo"
+                value={form.stockMinimo}
+                onChange={(v) => setForm((f) => ({ ...f, stockMinimo: v }))}
+              />
+              <Input
+                type="number"
+                step="0.01"
+                label="Precio compra"
+                value={form.precioCompra}
+                onChange={(v) => setForm((f) => ({ ...f, precioCompra: v }))}
+              />
+              <Input
+                type="number"
+                step="0.01"
+                label="Precio venta"
+                value={form.precioVenta}
+                onChange={(v) => setForm((f) => ({ ...f, precioVenta: v }))}
+              />
+              <Input
+                label="Ubicacion"
+                value={form.ubicacion}
+                onChange={(v) => setForm((f) => ({ ...f, ubicacion: v }))}
+              />
 
-            <tbody className="divide-y divide-slate-100">
-              {invoiceGroups.map((group) => (
-                <React.Fragment key={group.numeroFactura}>
-                  <tr className="border-t border-slate-200 bg-slate-100/80">
-                    <td colSpan={12} className="px-4 py-3">
-                      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                          <span className="font-bold text-slate-900">
-                            {group.fechaFactura ? formatDate(group.fechaFactura) : "Sin fecha"}
-                          </span>
-                          <span className="text-slate-600">
-                            <strong>{group.numeroFactura}</strong>
-                          </span>
-                          <span className="text-slate-700">
-                            {group.cliente}
-                          </span>
-                          <span className="text-slate-500">
-                            {group.matricula}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                          <span>Venta: <strong>{eur.format(group.venta)}</strong></span>
-                          <span>Compra: <strong>{eur.format(group.compra)}</strong></span>
-                          <span className={group.ganancia >= 0 ? "text-emerald-700" : "text-rose-700"}>
-                            Ganancia: <strong>{eur.format(group.ganancia)}</strong>
-                          </span>
-                        </div>
-                      </div>
-                    </td>
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                Proveedor
+                <select
+                  value={form.idProveedor}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, idProveedor: e.target.value }))
+                  }
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Sin proveedor</option>
+                  {providers.map((provider) => {
+                    const id = getProviderId(provider);
+                    return (
+                      <option key={id} value={id}>
+                        {getProviderName(provider)}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 lg:col-span-2">
+                Observaciones
+                <input
+                  value={form.observaciones}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, observaciones: e.target.value }))
+                  }
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                />
+              </label>
+
+              <div className="flex flex-wrap items-end gap-2 lg:col-span-4">
+                <button
+                  type="submit"
+                  disabled={savingPart}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <Save size={17} />
+                  {editingPartId ? "Guardar cambios" : "Registrar repuesto"}
+                </button>
+                {editingPartId && (
+                  <button
+                    type="button"
+                    disabled={savingPart}
+                    onClick={resetPartForm}
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    <X size={17} />
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
+            <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <h3 className="text-lg font-semibold text-slate-800">
+                Inventario actual
+              </h3>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(260px,1fr)_auto_auto]">
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    type="search"
+                    placeholder="Buscar referencia, nombre, marca, categoria o proveedor..."
+                    value={inventorySearch}
+                    onChange={(e) => {
+                      setInventoryPage(1);
+                      setInventorySearch(e.target.value);
+                    }}
+                    disabled={showLowOnly}
+                    className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm disabled:bg-slate-100"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInventoryPage(1);
+                    setShowLowOnly((value) => !value);
+                  }}
+                  className={`rounded-xl px-4 py-2 text-sm font-semibold ring-1 ${
+                    showLowOnly
+                      ? "bg-amber-100 text-amber-800 ring-amber-200"
+                      : "bg-white text-slate-700 ring-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  Stock bajo
+                </button>
+                <button
+                  type="button"
+                  onClick={loadInventory}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                >
+                  <RefreshCcw size={16} />
+                  Actualizar
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-sm text-center">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-3">Referencia</th>
+                    <th className="px-3 py-3">Repuesto</th>
+                    <th className="px-3 py-3">Marca</th>
+                    <th className="px-3 py-3">Proveedor</th>
+                    <th className="px-3 py-3">Stock</th>
+                    <th className="px-3 py-3">Minimo</th>
+                    <th className="px-3 py-3">Compra</th>
+                    <th className="px-3 py-3">Venta</th>
+                    <th className="px-3 py-3">Ubicacion</th>
+                    <th className="px-3 py-3">Acciones</th>
                   </tr>
-
-                  {group.rows.map((row) => {
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {inventoryParts.map((row) => {
                     const id = getValue(row, "id");
-                    const totals = getLineTotals(row);
-                    const isEditing = String(editingId) === String(id);
+                    const stockBajo = Boolean(
+                      getValue(row, "stockBajo", false),
+                    );
 
                     return (
-                      <tr key={id} className="hover:bg-slate-50">
-                        <td className="px-3 py-3 text-center text-slate-400">-</td>
-                        <td className="px-3 py-3 text-center text-slate-400">-</td>
-                        <td className="px-3 py-3 text-center text-slate-400">-</td>
-                        <td className="px-3 py-3 text-center text-slate-400">-</td>
-                        <td className="px-3 py-3 text-center font-semibold">
+                      <tr
+                        key={id}
+                        className={
+                          stockBajo ? "bg-amber-50/70" : "hover:bg-slate-50"
+                        }
+                      >
+                        <td className="px-3 py-3 font-semibold text-slate-800">
+                          {getValue(row, "codigoReferencia", "-") || "-"}
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-slate-900">
                           {getValue(row, "nombre", "-")}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          {isEditing ? (
-                            <select
-                              value={editForm.idProveedor}
-                              onChange={(e) => setEditForm((current) => ({ ...current, idProveedor: e.target.value }))}
-                              className="w-48 rounded-lg border border-slate-300 px-2 py-1 text-sm"
-                              aria-label="Proveedor"
-                            >
-                              <option value="">Sin proveedor</option>
-                              {providers.map((provider) => {
-                                const providerId = provider.id ?? provider.Id;
-                                return (
-                                  <option key={providerId} value={providerId}>
-                                    {provider.nombre ?? provider.Nombre}
-                                  </option>
-                                );
-                              })}
-                            </select>
-                          ) : (
-                            getValue(row, "nombreProveedor", "-") || "-"
-                          )}
+                        <td className="px-3 py-3">
+                          {getValue(row, "marca", "-") || "-"}
                         </td>
-                        <td className="px-3 py-3 text-center font-semibold">
-                          {pct.format(totals.cantidad)}
+                        <td className="px-3 py-3">
+                          {getValue(row, "nombreProveedor", "-") || "-"}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={editForm.precioCompra}
-                              onChange={(e) => setEditForm((current) => ({ ...current, precioCompra: e.target.value }))}
-                              className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
-                              aria-label="Precio compra"
-                            />
-                          ) : (
-                            eur.format(totals.compra)
-                          )}
+                        <td
+                          className={`px-3 py-3 font-bold ${stockBajo ? "text-amber-800" : "text-slate-900"}`}
+                        >
+                          {qty.format(Number(getValue(row, "cantidad", 0)))}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          {eur.format(totals.venta)}
+                        <td className="px-3 py-3">
+                          {getValue(row, "stockMinimo", 0)}
                         </td>
-                        <td className={`px-3 py-3 text-center font-semibold ${totals.ganancia >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                          {eur.format(totals.ganancia)}
+                        <td className="px-3 py-3">
+                          {eur.format(Number(getValue(row, "precioCompra", 0)))}
                         </td>
-                        <td className="px-3 py-3 text-center font-semibold">
-                          {totals.utilidad == null ? "-" : `${pct.format(totals.utilidad)}%`}
+                        <td className="px-3 py-3">
+                          {eur.format(Number(getValue(row, "precioVenta", 0)))}
                         </td>
-                        <td className="px-3 py-3 text-center">
-                          {isEditing ? (
-                            <div className="flex justify-center gap-2">
-                              <button
-                                type="button"
-                                disabled={savingEdit}
-                                onClick={saveEdit}
-                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-                              >
-                                <Save size={14} />
-                                Guardar
-                              </button>
-                              <button
-                                type="button"
-                                disabled={savingEdit}
-                                onClick={cancelEdit}
-                                className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
-                              >
-                                <X size={14} />
-                                Cancelar
-                              </button>
-                            </div>
-                          ) : (
+                        <td className="px-3 py-3">
+                          {getValue(row, "ubicacion", "-") || "-"}
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap justify-center gap-2">
                             <button
                               type="button"
-                              onClick={() => startEdit(row)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                              onClick={() => startPartEdit(row)}
+                              className="rounded-lg bg-sky-600 p-2 text-white hover:bg-sky-700"
+                              title="Editar"
                             >
-                              <Pencil size={14} />
-                              Editar
+                              <Edit3 size={15} />
                             </button>
-                          )}
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(row, "set")}
+                              className="rounded-lg bg-slate-700 px-2.5 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                            >
+                              Stock
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(row, "add")}
+                              className="rounded-lg bg-white px-2.5 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                            >
+                              +/-
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deletePart(row)}
+                              className="rounded-lg bg-rose-600 p-2 text-white hover:bg-rose-700"
+                              title="Eliminar"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
                   })}
-                </React.Fragment>
-              ))}
 
-              {!loading && parts.length === 0 && (
-                <tr>
-                  <td colSpan={12} className="py-8 text-center text-slate-500">
-                    No hay lineas facturadas para mostrar.
-                  </td>
-                </tr>
-              )}
+                  {!inventoryLoading && inventoryParts.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        className="py-8 text-center text-slate-500"
+                      >
+                        No hay repuestos para mostrar.
+                      </td>
+                    </tr>
+                  )}
 
-              {loading && (
-                <tr>
-                  <td colSpan={12} className="py-8 text-center text-slate-500">
-                    Cargando rentabilidad...
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                  {inventoryLoading && (
+                    <tr>
+                      <td
+                        colSpan={10}
+                        className="py-8 text-center text-slate-500"
+                      >
+                        Cargando inventario...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Anterior
-          </button>
-          <span className="text-sm text-slate-500">
-            Pagina {page} de {totalPages}
-          </span>
-          <button
-            type="button"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Siguiente
-          </button>
-        </div>
-      </section>
+            {!showLowOnly && (
+              <Pagination
+                page={inventoryPage}
+                totalPages={inventoryTotalPages}
+                onPage={setInventoryPage}
+              />
+            )}
+          </section>
+        </>
+      ) : (
+        <>
+          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <MetricCard
+              label="Total venta"
+              value={eur.format(billedSummary.venta)}
+            />
+            <MetricCard
+              label="Total compra"
+              value={eur.format(billedSummary.compra)}
+            />
+            <MetricCard
+              label="Ganancia"
+              value={eur.format(billedSummary.ganancia)}
+              danger={billedSummary.ganancia < 0}
+            />
+          </section>
+
+          <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
+            <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <h3 className="text-lg font-semibold text-slate-800">
+                Lineas facturadas
+              </h3>
+
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-[160px_160px_minmax(260px,1fr)_auto]">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => {
+                    setBilledPage(1);
+                    setDateFrom(e.target.value);
+                  }}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  aria-label="Fecha inicio"
+                />
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => {
+                    setBilledPage(1);
+                    setDateTo(e.target.value);
+                  }}
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  aria-label="Fecha fin"
+                />
+                <div className="relative">
+                  <Search
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    type="search"
+                    placeholder="Buscar factura, cliente, matricula o concepto..."
+                    value={billedSearch}
+                    onChange={(e) => {
+                      setBilledPage(1);
+                      setBilledSearch(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-slate-300 py-2 pl-9 pr-3 text-sm"
+                  />
+                </div>
+                {(dateFrom || dateTo || billedSearch) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBilledPage(1);
+                      setDateFrom("");
+                      setDateTo("");
+                      setBilledSearch("");
+                    }}
+                    className="rounded-xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+                  >
+                    Limpiar
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-sm text-center">
+                <thead className="bg-slate-50 text-slate-600">
+                  <tr>
+                    <th className="px-3 py-3">Fecha</th>
+                    <th className="px-3 py-3">Factura</th>
+                    <th className="px-3 py-3">Cliente</th>
+                    <th className="px-3 py-3">Matricula</th>
+                    <th className="px-3 py-3">Referencia</th>
+                    <th className="px-3 py-3">Concepto</th>
+                    <th className="px-3 py-3">Proveedor</th>
+                    <th className="px-3 py-3">Cant.</th>
+                    <th className="px-3 py-3">Compra</th>
+                    <th className="px-3 py-3">Venta</th>
+                    <th className="px-3 py-3">Ganancia</th>
+                    <th className="px-3 py-3">% utilidad</th>
+                    <th className="px-3 py-3">Acciones</th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-100">
+                  {invoiceGroups.map((group) => (
+                    <React.Fragment key={group.numeroFactura}>
+                      <tr className="border-t border-slate-200 bg-slate-100/80">
+                        <td colSpan={13} className="px-4 py-3">
+                          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <span className="font-bold text-slate-900">
+                                {group.fechaFactura
+                                  ? formatDate(group.fechaFactura)
+                                  : "Sin fecha"}
+                              </span>
+                              <span className="text-slate-600">
+                                <strong>{group.numeroFactura}</strong>
+                              </span>
+                              <span className="text-slate-700">
+                                {group.cliente}
+                              </span>
+                              <span className="text-slate-500">
+                                {group.matricula}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                              <span>
+                                Venta:{" "}
+                                <strong>{eur.format(group.venta)}</strong>
+                              </span>
+                              <span>
+                                Compra:{" "}
+                                <strong>{eur.format(group.compra)}</strong>
+                              </span>
+                              <span
+                                className={
+                                  group.ganancia >= 0
+                                    ? "text-emerald-700"
+                                    : "text-rose-700"
+                                }
+                              >
+                                Ganancia:{" "}
+                                <strong>{eur.format(group.ganancia)}</strong>
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {group.rows.map((row) => {
+                        const id = getValue(row, "id");
+                        const totals = getLineTotals(row);
+                        const isEditing =
+                          String(editingBilledId) === String(id);
+
+                        return (
+                          <tr key={id} className="hover:bg-slate-50">
+                            <td className="px-3 py-3 text-slate-400">-</td>
+                            <td className="px-3 py-3 text-slate-400">-</td>
+                            <td className="px-3 py-3 text-slate-400">-</td>
+                            <td className="px-3 py-3 text-slate-400">-</td>
+                            <td className="px-3 py-3 font-semibold">
+                              {getValue(row, "codigoReferencia", "-") || "-"}
+                            </td>
+                            <td className="px-3 py-3 font-semibold">
+                              {getValue(row, "nombre", "-")}
+                            </td>
+                            <td className="px-3 py-3">
+                              {isEditing ? (
+                                <select
+                                  value={billedEditForm.idProveedor}
+                                  onChange={(e) =>
+                                    setBilledEditForm((current) => ({
+                                      ...current,
+                                      idProveedor: e.target.value,
+                                    }))
+                                  }
+                                  className="w-48 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                                  aria-label="Proveedor"
+                                >
+                                  <option value="">Sin proveedor</option>
+                                  {providers.map((provider) => {
+                                    const providerId = getProviderId(provider);
+                                    return (
+                                      <option
+                                        key={providerId}
+                                        value={providerId}
+                                      >
+                                        {getProviderName(provider)}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                              ) : (
+                                getValue(row, "nombreProveedor", "-") || "-"
+                              )}
+                            </td>
+                            <td className="px-3 py-3 font-semibold">
+                              {qty.format(totals.cantidad)}
+                            </td>
+                            <td className="px-3 py-3">
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={billedEditForm.precioCompra}
+                                  onChange={(e) =>
+                                    setBilledEditForm((current) => ({
+                                      ...current,
+                                      precioCompra: e.target.value,
+                                    }))
+                                  }
+                                  className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
+                                  aria-label="Precio compra"
+                                />
+                              ) : (
+                                eur.format(totals.compra)
+                              )}
+                            </td>
+                            <td className="px-3 py-3">
+                              {eur.format(totals.venta)}
+                            </td>
+                            <td
+                              className={`px-3 py-3 font-semibold ${totals.ganancia >= 0 ? "text-emerald-700" : "text-rose-700"}`}
+                            >
+                              {eur.format(totals.ganancia)}
+                            </td>
+                            <td className="px-3 py-3 font-semibold">
+                              {totals.utilidad == null
+                                ? "-"
+                                : `${pct.format(totals.utilidad)}%`}
+                            </td>
+                            <td className="px-3 py-3">
+                              {isEditing ? (
+                                <div className="flex justify-center gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={savingBilled}
+                                    onClick={saveBilledEdit}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                  >
+                                    <Save size={14} />
+                                    Guardar
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={savingBilled}
+                                    onClick={cancelBilledEdit}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+                                  >
+                                    <X size={14} />
+                                    Cancelar
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => startBilledEdit(row)}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                                >
+                                  <Edit3 size={14} />
+                                  Editar
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
+
+                  {!billedLoading && billedParts.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={13}
+                        className="py-8 text-center text-slate-500"
+                      >
+                        No hay lineas facturadas para mostrar.
+                      </td>
+                    </tr>
+                  )}
+
+                  {billedLoading && (
+                    <tr>
+                      <td
+                        colSpan={13}
+                        className="py-8 text-center text-slate-500"
+                      >
+                        Cargando rentabilidad...
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              page={billedPage}
+              totalPages={billedTotalPages}
+              onPage={setBilledPage}
+            />
+          </section>
+        </>
+      )}
     </>
+  );
+}
+
+function MetricCard({ label, value, danger = false }) {
+  return (
+    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p
+        className={`mt-2 text-xl font-bold ${danger ? "text-rose-700" : "text-slate-900"}`}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = "text", step }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+      {label}
+      <input
+        type={type}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+      />
+    </label>
+  );
+}
+
+function Pagination({ page, totalPages, onPage }) {
+  return (
+    <div className="mt-4 flex items-center justify-end gap-2">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPage((p) => Math.max(1, p - 1))}
+        className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+      >
+        Anterior
+      </button>
+      <span className="text-sm text-slate-500">
+        Pagina {page} de {totalPages}
+      </span>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onPage((p) => Math.min(totalPages, p + 1))}
+        className="rounded-lg bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+      >
+        Siguiente
+      </button>
+    </div>
   );
 }

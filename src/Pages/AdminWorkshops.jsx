@@ -24,6 +24,7 @@ const emptyWorkshop = {
   email: "",
   iban: "",
   serieFactura: "A",
+  serieFacturaRecambio: "RC",
   logoPath: "",
   maxUsers: 3,
   activo: true,
@@ -36,7 +37,11 @@ const emptyWorkshop = {
   enableInvoiceExport: true,
   enableProfitAndLoss: true,
   enableDashboardRepairVehicles: true,
+  enablePreOrders: true,
+  enableSpecialInvoices: true,
   enableAccountsReceivable: true,
+  enableLedger: true,
+  allowInvoiceClientEdit: false,
   ownerEmail: "",
   ownerPassword: "",
   ownerFullName: "",
@@ -67,6 +72,7 @@ export default function AdminWorkshops() {
     email: "",
     iban: "",
     serieFactura: "A",
+    serieFacturaRecambio: "RC",
     logoPath: "",
     activo: true,
     footerText: "",
@@ -79,10 +85,17 @@ export default function AdminWorkshops() {
     enableInvoiceExport: true,
     enableProfitAndLoss: true,
     enableDashboardRepairVehicles: true,
+    enablePreOrders: true,
+    enableSpecialInvoices: true,
     enableAccountsReceivable: true,
+    enableLedger: true,
+    allowInvoiceClientEdit: false,
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [banks, setBanks] = useState([]);
+  const [bankDrafts, setBankDrafts] = useState({});
+  const [bankForm, setBankForm] = useState({ nombre: "", iban: "", esPrincipal: false });
 
   const load = async () => {
     const res = await api.get("/AdminWorkshops");
@@ -96,6 +109,34 @@ export default function AdminWorkshops() {
     }
     const res = await api.get(`/AdminWorkshops/${workshopId}/users`);
     setUsers(res.data || []);
+  };
+
+  const loadBanks = async (workshopId = selectedId) => {
+    if (!workshopId) {
+      setBanks([]);
+      setBankDrafts({});
+      return;
+    }
+    const res = await api.get(`/WorkshopBankAccounts/admin/${workshopId}`);
+    setBankList(Array.isArray(res.data) ? res.data : []);
+  };
+
+  const setBankList = (list) => {
+    setBanks(list);
+    setBankDrafts(
+      Object.fromEntries(
+        list.map((bank) => {
+          const id = bank.id ?? bank.Id;
+          return [
+            id,
+            {
+              nombre: bank.nombre ?? bank.Nombre ?? "",
+              iban: bank.iban ?? bank.Iban ?? "",
+            },
+          ];
+        }),
+      ),
+    );
   };
 
   useEffect(() => {
@@ -115,6 +156,7 @@ export default function AdminWorkshops() {
         email: "",
         iban: "",
         serieFactura: "A",
+        serieFacturaRecambio: "RC",
         logoPath: "",
         activo: true,
         footerText: "",
@@ -127,9 +169,15 @@ export default function AdminWorkshops() {
         enableInvoiceExport: true,
         enableProfitAndLoss: true,
         enableDashboardRepairVehicles: true,
+        enablePreOrders: true,
+        enableSpecialInvoices: true,
         enableAccountsReceivable: true,
+        enableLedger: true,
+        allowInvoiceClientEdit: false,
       });
       setUsers([]);
+      setBanks([]);
+      setBankDrafts({});
       return;
     }
 
@@ -142,6 +190,10 @@ export default function AdminWorkshops() {
       email: selectedWorkshop.email ?? selectedWorkshop.Email ?? "",
       iban: selectedWorkshop.iban ?? selectedWorkshop.Iban ?? "",
       serieFactura: selectedWorkshop.serieFactura ?? selectedWorkshop.SerieFactura ?? "A",
+      serieFacturaRecambio:
+        selectedWorkshop.serieFacturaRecambio ??
+        selectedWorkshop.SerieFacturaRecambio ??
+        "RC",
       logoPath: selectedWorkshop.logoPath ?? selectedWorkshop.LogoPath ?? "",
       activo: selectedWorkshop.activo ?? selectedWorkshop.Activo ?? true,
       footerText: selectedWorkshop.footerText ?? selectedWorkshop.FooterText ?? "",
@@ -157,10 +209,26 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableDashboardRepairVehicles ??
         selectedWorkshop.EnableDashboardRepairVehicles ??
         true,
+      enablePreOrders:
+        selectedWorkshop.enablePreOrders ??
+        selectedWorkshop.EnablePreOrders ??
+        true,
+      enableSpecialInvoices:
+        selectedWorkshop.enableSpecialInvoices ??
+        selectedWorkshop.EnableSpecialInvoices ??
+        true,
       enableAccountsReceivable:
         selectedWorkshop.enableAccountsReceivable ??
         selectedWorkshop.EnableAccountsReceivable ??
         true,
+      enableLedger:
+        selectedWorkshop.enableLedger ??
+        selectedWorkshop.EnableLedger ??
+        true,
+      allowInvoiceClientEdit:
+        selectedWorkshop.allowInvoiceClientEdit ??
+        selectedWorkshop.AllowInvoiceClientEdit ??
+        false,
     });
     setForm({
       nombre: selectedWorkshop.nombre ?? selectedWorkshop.Nombre ?? "",
@@ -171,6 +239,10 @@ export default function AdminWorkshops() {
       email: selectedWorkshop.email ?? selectedWorkshop.Email ?? "",
       iban: selectedWorkshop.iban ?? selectedWorkshop.Iban ?? "",
       serieFactura: selectedWorkshop.serieFactura ?? selectedWorkshop.SerieFactura ?? "A",
+      serieFacturaRecambio:
+        selectedWorkshop.serieFacturaRecambio ??
+        selectedWorkshop.SerieFacturaRecambio ??
+        "RC",
       logoPath: selectedWorkshop.logoPath ?? selectedWorkshop.LogoPath ?? "",
       maxUsers: selectedWorkshop.maxUsers ?? selectedWorkshop.MaxUsers ?? 3,
       activo: selectedWorkshop.activo ?? selectedWorkshop.Activo ?? true,
@@ -186,16 +258,33 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableDashboardRepairVehicles ??
         selectedWorkshop.EnableDashboardRepairVehicles ??
         true,
+      enablePreOrders:
+        selectedWorkshop.enablePreOrders ??
+        selectedWorkshop.EnablePreOrders ??
+        true,
+      enableSpecialInvoices:
+        selectedWorkshop.enableSpecialInvoices ??
+        selectedWorkshop.EnableSpecialInvoices ??
+        true,
       enableAccountsReceivable:
         selectedWorkshop.enableAccountsReceivable ??
         selectedWorkshop.EnableAccountsReceivable ??
         true,
+      enableLedger:
+        selectedWorkshop.enableLedger ??
+        selectedWorkshop.EnableLedger ??
+        true,
+      allowInvoiceClientEdit:
+        selectedWorkshop.allowInvoiceClientEdit ??
+        selectedWorkshop.AllowInvoiceClientEdit ??
+        false,
       ownerEmail: "",
       ownerPassword: "",
       ownerFullName: "",
     });
     setEditingUserId("");
     loadUsers(selectedId).catch((err) => setError(err?.response?.data?.message || "No se pudieron cargar los usuarios."));
+    loadBanks(selectedId).catch((err) => setError(err?.response?.data?.message || "No se pudieron cargar los bancos."));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, workshops]);
 
@@ -231,9 +320,67 @@ export default function AdminWorkshops() {
     setSelectedId("");
     setForm(emptyWorkshop);
     setUsers([]);
+    setBanks([]);
+    setBankDrafts({});
     setEditingUserId("");
     setMessage("");
     setError("");
+  };
+
+  const addBank = async (ev) => {
+    ev.preventDefault();
+    if (!selectedId) return;
+    setMessage("");
+    setError("");
+
+    try {
+      const res = await api.post(`/WorkshopBankAccounts/admin/${selectedId}`, bankForm);
+      setBankList(Array.isArray(res.data) ? res.data : []);
+      setBankForm({ nombre: "", iban: "", esPrincipal: false });
+      setMessage("Banco agregado correctamente.");
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || "No se pudo agregar el banco.");
+    }
+  };
+
+  const updateBank = async (bank, patch) => {
+    if (!selectedId) return;
+    setMessage("");
+    setError("");
+    const id = bank.id ?? bank.Id;
+    const payload = {
+      nombre: bank.nombre ?? bank.Nombre,
+      iban: bank.iban ?? bank.Iban,
+      esPrincipal: bank.esPrincipal ?? bank.EsPrincipal,
+      activo: bank.activo ?? bank.Activo,
+      ...patch,
+    };
+
+    try {
+      const res = await api.put(`/WorkshopBankAccounts/admin/${selectedId}/${id}`, payload);
+      setBankList(Array.isArray(res.data) ? res.data : []);
+      setMessage("Banco actualizado correctamente.");
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || "No se pudo actualizar el banco.");
+    }
+  };
+
+  const deactivateBank = async (bank) => {
+    if (!selectedId) return;
+    const id = bank.id ?? bank.Id;
+    setMessage("");
+    setError("");
+
+    try {
+      const res = await api.delete(`/WorkshopBankAccounts/admin/${selectedId}/${id}`);
+      setBankList(Array.isArray(res.data) ? res.data : []);
+      setMessage("Banco desactivado correctamente.");
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || "No se pudo desactivar el banco.");
+    }
   };
 
   const addUser = async (ev) => {
@@ -376,6 +523,7 @@ export default function AdminWorkshops() {
             <Input label="Razon social" value={form.razonSocial} onChange={(v) => setField("razonSocial", v)} required />
             <Input label="NIF/CIF" value={form.nif} onChange={(v) => setField("nif", v)} required />
             <Input label="Serie factura" value={form.serieFactura} onChange={(v) => setField("serieFactura", v)} />
+            <Input label="Serie factura recambio" value={form.serieFacturaRecambio} onChange={(v) => setField("serieFacturaRecambio", v)} />
             <Select label="Tipo de negocio" value={form.businessType} onChange={(v) => setField("businessType", v)} options={BUSINESS_TYPES} />
             <Select label="Perfil de textos" value={form.terminologyProfile} onChange={(v) => setField("terminologyProfile", v)} options={TERMINOLOGY_PROFILES} />
             <Input label="Telefono" value={form.telefono} onChange={(v) => setField("telefono", v)} />
@@ -448,6 +596,138 @@ export default function AdminWorkshops() {
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
+            <h3 className="mb-4 text-lg font-bold text-slate-900">Bancos del negocio</h3>
+
+            {!selectedId && (
+              <p className="text-sm text-slate-500">Selecciona un negocio para gestionar sus bancos.</p>
+            )}
+
+            {selectedId && (
+              <>
+                <form onSubmit={addBank} className="grid grid-cols-1 gap-3">
+                  <Input
+                    label="Nombre del banco"
+                    value={bankForm.nombre}
+                    onChange={(v) => setBankForm((p) => ({ ...p, nombre: v }))}
+                    placeholder="Cuenta principal"
+                  />
+                  <Input
+                    label="IBAN"
+                    value={bankForm.iban}
+                    onChange={(v) => setBankForm((p) => ({ ...p, iban: v }))}
+                    required
+                  />
+                  <label className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={bankForm.esPrincipal}
+                      onChange={(e) => setBankForm((p) => ({ ...p, esPrincipal: e.target.checked }))}
+                    />
+                    Principal
+                  </label>
+                  <button className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700">
+                    <Plus size={17} />
+                    Agregar banco
+                  </button>
+                </form>
+
+                <div className="mt-4 space-y-2">
+                  {banks.length === 0 && (
+                    <p className="text-sm text-slate-500">No hay bancos registrados.</p>
+                  )}
+                  {banks.map((bank) => {
+                    const id = bank.id ?? bank.Id;
+                    const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                    const iban = bank.iban ?? bank.Iban ?? "";
+                    const active = bank.activo ?? bank.Activo ?? true;
+                    const main = bank.esPrincipal ?? bank.EsPrincipal ?? false;
+                    const draft = bankDrafts[id] || { nombre: name, iban };
+                    return (
+                      <div key={id} className="rounded-2xl border border-slate-200 bg-white p-3 text-sm">
+                        <div className="grid grid-cols-1 gap-2">
+                          <Input
+                            label="Nombre"
+                            value={draft.nombre}
+                            onChange={(v) =>
+                              setBankDrafts((prev) => ({
+                                ...prev,
+                                [id]: { ...(prev[id] || draft), nombre: v },
+                              }))
+                            }
+                          />
+                          <Input
+                            label="IBAN"
+                            value={draft.iban}
+                            onChange={(v) =>
+                              setBankDrafts((prev) => ({
+                                ...prev,
+                                [id]: { ...(prev[id] || draft), iban: v },
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${active ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>
+                            {active ? "Activo" : "Inactivo"}
+                          </span>
+                          {main && (
+                            <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-bold text-sky-700">
+                              Principal
+                            </span>
+                          )}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateBank(bank, {
+                                nombre: draft.nombre,
+                                iban: draft.iban,
+                                esPrincipal: main,
+                                activo: active,
+                              })
+                            }
+                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-bold text-white hover:bg-slate-800"
+                          >
+                            Guardar
+                          </button>
+                          {active && !main && (
+                            <button
+                              type="button"
+                              onClick={() => updateBank(bank, { esPrincipal: true, activo: true })}
+                              className="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-700"
+                            >
+                              Hacer principal
+                            </button>
+                          )}
+                          {active && (
+                            <button
+                              type="button"
+                              onClick={() => deactivateBank(bank)}
+                              className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-rose-700"
+                            >
+                              Desactivar
+                            </button>
+                          )}
+                          {!active && (
+                            <button
+                              type="button"
+                              onClick={() => updateBank(bank, { activo: true })}
+                              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                            >
+                              Reactivar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </section>
 
           <form onSubmit={addUser} className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
@@ -780,10 +1060,34 @@ function FeatureSwitches({ values, onChange }) {
           }
         />
         <Switch
+          label="Pre-ordenes"
+          description="Habilita la recepcion previa y conversion a orden."
+          checked={values.enablePreOrders}
+          onChange={(checked) => onChange("enablePreOrders", checked)}
+        />
+        <Switch
+          label="Facturas especiales"
+          description="Habilita facturas de recambio y futuras ventas especiales."
+          checked={values.enableSpecialInvoices}
+          onChange={(checked) => onChange("enableSpecialInvoices", checked)}
+        />
+        <Switch
           label="Cuentas por cobrar"
           description="Muestra el modulo de importes pendientes de cobro."
           checked={values.enableAccountsReceivable}
           onChange={(checked) => onChange("enableAccountsReceivable", checked)}
+        />
+        <Switch
+          label="Mayor"
+          description="Permite registrar movimientos de Cliente, Proveedor y Banco."
+          checked={values.enableLedger}
+          onChange={(checked) => onChange("enableLedger", checked)}
+        />
+        <Switch
+          label="Editar cliente en factura"
+          description="Permite modificar datos del cliente antes de imprimir una factura."
+          checked={values.allowInvoiceClientEdit}
+          onChange={(checked) => onChange("allowInvoiceClientEdit", checked)}
         />
       </div>
       </div>

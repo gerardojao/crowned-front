@@ -27,7 +27,10 @@ import Support from "./Pages/Support";
 import RegisterSupplier from "./Pages/RegisterSupplier.jsx";
 import RegisterWorkOrder from "./Pages/RegisterWorkOrder.jsx";
 import PrintWorkOrder from "./Pages/PrintWorkOrder.jsx";
+import RegisterPreOrder from "./Pages/RegisterPreOrder.jsx";
+import PrintPreOrder from "./Pages/PrintPreOrder.jsx";
 import WorkshopInvoice from "./Pages/WorkShopInvoice.jsx";
+import SpecialPartsInvoice from "./Pages/SpecialPartsInvoice.jsx";
 import StockParts from "./Pages/StockParts.jsx";
 import ReprintInvoice from "./Pages/ReprintInvoice.jsx";
 import RegisterExpenseType from "./Pages/RegisterExpenseType.jsx";
@@ -36,6 +39,7 @@ import RegisterBudget from "./Pages/RegisterBudget.jsx";
 import PrintBudget from "./Pages/PrintBudget.jsx";
 import AdminWorkshops from "./Pages/AdminWorkshops.jsx";
 import AccountsReceivable from "./Pages/AccountsReceivable.jsx";
+import Ledger from "./Pages/Ledger.jsx";
 
 function App() {
   const protectedElement = (element) => (
@@ -77,9 +81,11 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
             <Route path="/print-order/:id" element={protectedElement(<PrintWorkOrder />)} />
+            <Route path="/print-pre-order/:id" element={protectedElement(<PrintPreOrder />)} />
             <Route path="/workshop-invoice/:id" element={protectedElement(<WorkshopInvoice />)} />
 
             <Route path="/workshop-invoice" element={protectedElement(<WorkshopInvoice />)} />
+            <Route path="/special-invoices/parts" element={protectedElement(<SpecialPartsInvoice />)} />
 
             <Route path="/stock-parts" element={protectedElement(<StockParts />)} />
             <Route
@@ -94,6 +100,7 @@ function App() {
             <Route path="/register-income-type" element={protectedElement(<RegisterIncomeType />)} />
             <Route path="/presupuestos" element={protectedElement(<RegisterBudget />)} />
             <Route path="/accounts-receivable" element={protectedElement(<AccountsReceivable />)} />
+            <Route path="/ledger" element={protectedElement(<Ledger />)} />
             <Route path="/print-budget/:id" element={protectedElement(<PrintBudget />)} />
             <Route
               path="/admin/workshops"
@@ -111,6 +118,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <RegisterWorkOrder />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/pre-ordenes"
+              element={
+                <ProtectedRoute>
+                  <RegisterPreOrder />
                 </ProtectedRoute>
               }
             />

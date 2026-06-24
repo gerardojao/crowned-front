@@ -16,10 +16,16 @@ import {
 } from "lucide-react";
 import { currency } from "../utils/currency";
 import { loadStatementSummary } from "../utils/statementStore";
+import {
+  appendAccountsReceivableSummary,
+  fetchAccountsReceivableIncome,
+  incomeTotalAmount,
+} from "../utils/accountsReceivableIncome";
 import api from "../Components/api";
 import KPIs from "../Components/Kpi";
 import { useAuth } from "../Components/AuthContext";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 
 function soloFecha(value) {
   if (!value) return "";
@@ -47,6 +53,18 @@ const moduleIcon =
 
 const actionLink =
   "inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-slate-50 text-slate-700 hover:bg-slate-100 ring-1 ring-slate-200 transition";
+
+const IVA_RATE = 0.21;
+const sumRows = (rows) =>
+  (Array.isArray(rows) ? rows : []).reduce(
+    (sum, item) => sum + Number(item.total ?? item.Total ?? 0),
+    0,
+  );
+const sumIncomeRowsWithIva = (rows) =>
+  (Array.isArray(rows) ? rows : []).reduce((sum, item) => {
+    const amount = Number(item.total ?? item.Total ?? 0);
+    return sum + incomeTotalAmount(item, amount, IVA_RATE);
+  }, 0);
 
 const getEstadoBadge = (estado) => {
   switch (estado) {
@@ -77,9 +95,16 @@ export default function Home() {
   const [saldoCuentasPorCobrar, setSaldoCuentasPorCobrar] = useState(0);
   const [dashboardFeatures, setDashboardFeatures] = useState({
     enableDashboardRepairVehicles: false,
+    enablePreOrders: false,
     enableAccountsReceivable: false,
+    enableLedger: false,
+  });
+  const [dashboardTotals, setDashboardTotals] = useState({
+    ingresos: 0,
+    gastos: 0,
   });
   const [lastStatement, setLastStatement] = useState(null);
+  const [useZagaDocuments, setUseZagaDocuments] = useState(false);
 
   const ts = (d) => (d ? new Date(d).getTime() : 0);
 
@@ -99,9 +124,13 @@ export default function Home() {
       setVehiculosReparacionLoading(false);
       setDashboardFeatures({
         enableDashboardRepairVehicles: false,
+        enablePreOrders: false,
         enableAccountsReceivable: false,
+        enableLedger: false,
       });
+      setDashboardTotals({ ingresos: 0, gastos: 0 });
       setLastStatement(null);
+      setUseZagaDocuments(false);
       return;
     }
 
@@ -109,15 +138,18 @@ export default function Home() {
       setVehiculosReparacionLoading(true);
 
       try {
-        const [movRes, reparacionRes, settingsRes] = await Promise.all([
+        const [movRes, reparacionRes, settingsRes, ingresosRes, gastosRes] = await Promise.all([
           api.get("/OrdenTrabajo/ultimas", { params: { take: 10 } }),
           api.get("/OrdenTrabajo", {
             params: { estado: "Reparando", page: 1, pageSize: 1 },
           }),
           api.get("/WorkshopSettings"),
+          api.get("/Ingreso/totales"),
+          api.get("/Egreso/totales"),
         ]);
 
         const settings = settingsRes?.data || {};
+        setUseZagaDocuments(usesZagaInvoiceTemplate(settings));
         const enableAccountsReceivable =
           settings.enableAccountsReceivable ??
           settings.EnableAccountsReceivable ??
@@ -125,6 +157,17 @@ export default function Home() {
 
         setOrdenes(pickDataList(movRes));
         setVehiculosReparacion(pickPagingTotal(reparacionRes));
+        const cxcIncome = await fetchAccountsReceivableIncome();
+        const incomeRows = appendAccountsReceivableSummary(
+          ingresosRes?.data?.data?.[0] || [],
+          cxcIncome,
+        );
+        const totalIngresos = sumIncomeRowsWithIva(incomeRows);
+        const totalGastos = sumRows(gastosRes?.data?.data?.[0] || []);
+        setDashboardTotals({
+          ingresos: totalIngresos,
+          gastos: totalGastos,
+        });
         if (enableAccountsReceivable) {
           const cxcRes = await api.get("/FacturaEmitida/cxc");
           setSaldoCuentasPorCobrar(
@@ -142,7 +185,15 @@ export default function Home() {
             settings.enableDashboardRepairVehicles ??
             settings.EnableDashboardRepairVehicles ??
             false,
+          enablePreOrders:
+            settings.enablePreOrders ??
+            settings.EnablePreOrders ??
+            true,
           enableAccountsReceivable,
+          enableLedger:
+            settings.enableLedger ??
+            settings.EnableLedger ??
+            false,
         });
       } catch (err) {
         console.error(err);
@@ -150,6 +201,7 @@ export default function Home() {
         setOrdenes([]);
         setVehiculosReparacion(0);
         setSaldoCuentasPorCobrar(0);
+        setDashboardTotals({ ingresos: 0, gastos: 0 });
       } finally {
         setVehiculosReparacionLoading(false);
         setLastStatement(loadStatementSummary());
@@ -164,10 +216,11 @@ export default function Home() {
   const showDashboardModules =
     dashboardFeatures.enableDashboardRepairVehicles ||
     dashboardFeatures.enableAccountsReceivable;
+  const preOrdersEnabled = useZagaDocuments && dashboardFeatures.enablePreOrders;
 
   return (
     <>
-      <KPIs />
+      <KPIs totalsOverride={dashboardTotals} />
 
       {showDashboardModules && (
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -224,6 +277,7 @@ export default function Home() {
               </div>
             </Link>
           )}
+
         </section>
       )}
 
@@ -264,6 +318,11 @@ export default function Home() {
                   </p>
 
                   <div className="mt-4 grid grid-cols-1 gap-2">
+                    {preOrdersEnabled && (
+                      <Link to="/pre-ordenes" className={actionLink}>
+                        Nueva pre-orden <ArrowRight size={15} />
+                      </Link>
+                    )}
                     <Link to="/register-work-order" className={actionLink}>
                       Nueva orden <ArrowRight size={15} />
                     </Link>
@@ -365,6 +424,11 @@ export default function Home() {
                     {dashboardFeatures.enableAccountsReceivable && (
                       <Link to="/accounts-receivable" className={actionLink}>
                         Cuentas por cobrar <ArrowRight size={15} />
+                      </Link>
+                    )}
+                    {dashboardFeatures.enableLedger && (
+                      <Link to="/ledger" className={actionLink}>
+                        Estado de cuentas <ArrowRight size={15} />
                       </Link>
                     )}
                   </div>

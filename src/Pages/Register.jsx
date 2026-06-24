@@ -8,7 +8,28 @@ import { useRef } from "react";
 const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 const EMPTY_EXPENSE = {
-  Id:"", Foto:"", Fecha:"", Mes:"", Importe:"", NombreEgreso:"", Descripcion:"",
+  Id:"", Foto:"", Fecha:"", Mes:"", Importe:"", NombreEgreso:"", Referencia:"", Descripcion:"", BankAccountId:"",
+};
+
+const splitExpenseReference = (value = "") => {
+  const text = String(value || "");
+  const separator = " - ";
+  const index = text.indexOf(separator);
+  if (index <= 0) {
+    return { referencia: "", descripcion: text };
+  }
+  return {
+    referencia: text.slice(0, index),
+    descripcion: text.slice(index + separator.length),
+  };
+};
+
+const buildExpenseDescription = (expense) => {
+  const referencia = String(expense.Referencia || "").trim();
+  const descripcion = String(expense.Descripcion || "").trim();
+  return referencia && descripcion
+    ? `${referencia} - ${descripcion}`
+    : referencia || descripcion || null;
 };
 
 // Mini componente para mostrar errores de campo
@@ -55,6 +76,7 @@ export default function Register({ expense, setExpense }) {
   const isEdit = Boolean(state.edit === true && (state.id || record?.id));
 
   const [outTypes, setOutTypes] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   // errores por campo
@@ -106,6 +128,24 @@ useEffect(() => {
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get("/WorkshopBankAccounts");
+        const banks = Array.isArray(res?.data) ? res.data : [];
+        setBankAccounts(banks);
+        const main = banks.find((x) => x.esPrincipal ?? x.EsPrincipal) || banks[0];
+        const mainId = main?.id ?? main?.Id ?? "";
+        if (mainId && !expense?.BankAccountId) {
+          setField("BankAccountId", String(mainId));
+        }
+      } catch {
+        setBankAccounts([]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ✅ Reset en crear; prefill en editar
   useEffect(() => {
     if (!isEdit) {
@@ -113,6 +153,7 @@ useEffect(() => {
       return;
     }
     const r = record || {};
+    const parsedDescription = splitExpenseReference(r.descripcion ?? "");
     setExpense({
       Id: state.id || r.id || "",
       Foto: r.foto ?? "",
@@ -120,7 +161,9 @@ useEffect(() => {
       Mes: r.mes ?? "",
       Importe: r.importe ?? "",
       NombreEgreso: r.tipoId ?? "",
-      Descripcion: r.descripcion ?? "",
+      Referencia: parsedDescription.referencia,
+      Descripcion: parsedDescription.descripcion,
+      BankAccountId: r.bankAccountId ?? r.BankAccountId ?? "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
@@ -133,7 +176,12 @@ useEffect(() => {
     switch (name) {
       case "NombreEgreso":
       case "Fecha":
+      case "Referencia":
+      case "Descripcion":
         if (!value) msg = REQUIRED;
+        break;
+      case "BankAccountId":
+        if (bankAccounts.length > 1 && !value) msg = REQUIRED;
         break;
       case "Importe":
         if (value === "" || value === null || value === undefined) msg = REQUIRED;
@@ -141,7 +189,7 @@ useEffect(() => {
         else if (Number(value) <= 0) msg = "Debe ser mayor que 0.";
         break;
       default:
-        // campos opcionales: Descripcion, Foto
+        // campos opcionales: Foto
         break;
     }
     setErrors(prev => ({ ...prev, [name]: msg || undefined }));
@@ -149,7 +197,8 @@ useEffect(() => {
   };
 
   const validateAll = () => {
-    const fields = ["NombreEgreso", "Fecha", "Importe"];
+    const fields = ["NombreEgreso", "Fecha", "Referencia", "Descripcion", "Importe"];
+    if (bankAccounts.length > 1) fields.push("BankAccountId");
     const next = {};
     for (const f of fields) {
       const ok = validateField(f, expense[f]);
@@ -165,7 +214,7 @@ useEffect(() => {
     }
     setErrors(prev => ({ ...prev, ...next }));
     // enfocar el primero con error
-    const firstError = ["NombreEgreso", "Fecha", "Importe"].find(f => next[f]);
+    const firstError = ["NombreEgreso", "Fecha", "Referencia", "Descripcion", "Importe", "BankAccountId"].find(f => next[f]);
     if (firstError) {
       const el = document.getElementById(firstError);
       el?.focus();
@@ -192,9 +241,10 @@ useEffect(() => {
           fecha: expense.Fecha || null,
           mes: expense.Mes || null,
           nombreEgreso: expense.NombreEgreso ? Number(expense.NombreEgreso) : null,
-          descripcion: expense.Descripcion ?? null,
+          descripcion: buildExpenseDescription(expense),
           importe: Number(expense.Importe ?? 0),
           foto: expense.Foto ?? null,
+          ...(expense.BankAccountId ? { bankAccountId: Number(expense.BankAccountId) } : {}),
         });
         setNotice({
             type: "success",
@@ -217,7 +267,8 @@ useEffect(() => {
         Mes: expense.Mes || null,
         Importe: Number(expense.Importe), // requerido > 0
         NombreEgreso: Number(expense.NombreEgreso), // requerido
-        Descripcion: expense.Descripcion || null,
+        Descripcion: buildExpenseDescription(expense),
+        BankAccountId: expense.BankAccountId ? Number(expense.BankAccountId) : null,
       });
 
       setNotice({
@@ -321,6 +372,31 @@ useEffect(() => {
         </div> */}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {bankAccounts.length > 1 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="BankAccountId">Banco</label>
+              <select
+                id="BankAccountId"
+                name="BankAccountId"
+                className={cls("BankAccountId")}
+                value={expense.BankAccountId ?? ""}
+                onChange={handleChange}
+                onBlur={onBlurValidate}
+                aria-invalid={!!errors.BankAccountId}
+                aria-describedby={errors.BankAccountId ? "BankAccountId-error" : undefined}
+              >
+                <option value="">Selecciona...</option>
+                {bankAccounts.map((bank) => {
+                  const id = bank.id ?? bank.Id;
+                  const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                  const iban = bank.iban ?? bank.Iban ?? "";
+                  return <option key={id} value={id}>{name} - {iban}</option>;
+                })}
+              </select>
+              {errors.BankAccountId && <FieldError id="BankAccountId-error">{errors.BankAccountId}</FieldError>}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Fecha">Fecha</label>
             <input
@@ -356,7 +432,25 @@ useEffect(() => {
           </div> */}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Descripcion">Descripción</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Referencia">Fact/Ref</label>
+            <input
+              id="Referencia"
+              type="text"
+              className={cls("Referencia")}
+              name="Referencia"
+              value={expense.Referencia ?? ""}
+              onChange={handleChange}
+              placeholder="fact-215"
+              onBlur={onBlurValidate}
+              required
+              aria-invalid={!!errors.Referencia}
+              aria-describedby={errors.Referencia ? "Referencia-error" : undefined}
+            />
+            {errors.Referencia && <FieldError id="Referencia-error">{errors.Referencia}</FieldError>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Descripcion">Descripcion</label>
             <input
               id="Descripcion"
               type="text"
@@ -364,10 +458,13 @@ useEffect(() => {
               name="Descripcion"
               value={expense.Descripcion ?? ""}
               onChange={handleChange}
-              placeholder="(opcional)"
+              placeholder="Recambio amortiguador Fiat"
               onBlur={onBlurValidate}
+              required
+              aria-invalid={!!errors.Descripcion}
+              aria-describedby={errors.Descripcion ? "Descripcion-error" : undefined}
             />
-            {/* sin error: opcional */}
+            {errors.Descripcion && <FieldError id="Descripcion-error">{errors.Descripcion}</FieldError>}
           </div>
 
           <div>

@@ -23,6 +23,19 @@ const isoDate = (value) => {
   return date.toISOString().slice(0, 10);
 };
 
+const normalizeText = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const includesText = (value, term) => {
+  const cleanTerm = normalizeText(term);
+  if (!cleanTerm) return true;
+  return normalizeText(value).includes(cleanTerm);
+};
+
 const todayStart = () => {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -59,6 +72,9 @@ export default function AccountsReceivable() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [clienteFilter, setClienteFilter] = useState("");
+  const [matriculaFilter, setMatriculaFilter] = useState("");
+  const [facturaFilter, setFacturaFilter] = useState("");
 
   const load = async () => {
     try {
@@ -107,9 +123,12 @@ export default function AccountsReceivable() {
       const fecha = isoDate(item.fecha ?? item.Fecha);
       if (from && (!fecha || fecha < from)) return false;
       if (to && (!fecha || fecha > to)) return false;
+      if (!includesText(item.cliente ?? item.Cliente, clienteFilter)) return false;
+      if (!includesText(item.matricula ?? item.Matricula, matriculaFilter)) return false;
+      if (!includesText(item.numeroFactura ?? item.NumeroFactura, facturaFilter)) return false;
       return true;
     });
-  }, [items, from, to]);
+  }, [items, from, to, clienteFilter, matriculaFilter, facturaFilter]);
 
   const summary = useMemo(() => {
     return filteredItems.reduce(
@@ -137,6 +156,12 @@ export default function AccountsReceivable() {
   const clearDateFilter = () => {
     setFrom("");
     setTo("");
+  };
+
+  const clearSearchFilters = () => {
+    setClienteFilter("");
+    setMatriculaFilter("");
+    setFacturaFilter("");
   };
 
   const setAbono = (id, value) => {
@@ -266,6 +291,46 @@ export default function AccountsReceivable() {
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(150px,0.8fr)_minmax(150px,0.8fr)_auto] md:items-end">
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Cliente
+              <input
+                type="search"
+                value={clienteFilter}
+                onChange={(event) => setClienteFilter(event.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                placeholder="Nombre del cliente"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Matricula
+              <input
+                type="search"
+                value={matriculaFilter}
+                onChange={(event) => setMatriculaFilter(event.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm uppercase"
+                placeholder="Ej. 1234ABC"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Nº factura
+              <input
+                type="search"
+                value={facturaFilter}
+                onChange={(event) => setFacturaFilter(event.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                placeholder="Numero"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={clearSearchFilters}
+              className="h-9 rounded-lg bg-white px-3 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              Limpiar busqueda
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 md:ml-auto md:w-fit md:grid-cols-[170px_170px_auto] md:items-end">
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
               Desde
@@ -313,6 +378,7 @@ export default function AccountsReceivable() {
               <tr>
                 <th className="px-3 py-3 font-bold">Factura</th>
                 <th className="px-3 py-3 font-bold">Cliente</th>
+                <th className="px-3 py-3 font-bold">Matricula</th>
                 <th className="px-3 py-3 font-bold">Fecha</th>
                 <th className="px-3 py-3 font-bold">Vencimiento</th>
                 <th className="px-3 py-3 text-right font-bold">Dias atraso</th>
@@ -371,6 +437,7 @@ export default function AccountsReceivable() {
                     label="Vence"
                     value={dateOnly(factura.fechaVencimiento ?? factura.FechaVencimiento)}
                   />
+                  <Info label="Matricula" value={factura.matricula ?? factura.Matricula ?? "-"} />
                   {atraso > 0 && (
                     <Info label="Dias atraso" value={`${atraso} dia${atraso === 1 ? "" : "s"}`} />
                   )}
@@ -446,6 +513,9 @@ function FacturaRow({ factura, abonos, setAbono, registrarAbono }) {
       </td>
       <td className="px-3 py-3 text-slate-700">
         {factura.cliente ?? factura.Cliente}
+      </td>
+      <td className="px-3 py-3 font-semibold text-slate-600">
+        {factura.matricula ?? factura.Matricula ?? "-"}
       </td>
       <td className="px-3 py-3 text-slate-600">
         {dateOnly(factura.fecha ?? factura.Fecha)}

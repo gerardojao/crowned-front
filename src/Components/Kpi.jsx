@@ -7,7 +7,7 @@ import {
   fetchAccountsReceivableIncome,
 } from "../utils/accountsReceivableIncome";
 
-export default function KPIs({ from, to, className, refreshKey = 0 }) {
+export default function KPIs({ from, to, className, refreshKey = 0, totalsOverride = null }) {
   const { token } = useAuth();
 
   const [totIn, setTotIn] = useState(0);
@@ -20,6 +20,14 @@ export default function KPIs({ from, to, className, refreshKey = 0 }) {
   const isoTo = toISODate(to);
 
   useEffect(() => {
+    if (totalsOverride) {
+      setTotIn(Number(totalsOverride.ingresos || 0));
+      setTotEg(Number(totalsOverride.gastos || 0));
+      setErr("");
+      setLoading(false);
+      return;
+    }
+
     if (!token) return;
 
     let alive = true;
@@ -29,6 +37,32 @@ export default function KPIs({ from, to, className, refreshKey = 0 }) {
       setErr("");
 
       try {
+        const settingsRes = await api.get("/WorkshopSettings");
+        const settings = settingsRes?.data || {};
+        const ledgerEnabled =
+          settings.enableLedger ??
+          settings.EnableLedger ??
+          false;
+
+        if (ledgerEnabled) {
+          const ledgerRes = await api.get("/Mayor", {
+            params: hasRange
+              ? { fechaInicio: isoFrom, fechaFin: isoTo }
+              : {},
+          });
+          const items =
+            ledgerRes?.data?.data?.[0]?.items ??
+            ledgerRes?.data?.Data?.[0]?.Items ??
+            ledgerRes?.data?.Data?.[0]?.items ??
+            [];
+
+          if (!alive) return;
+
+          setTotIn(sumLedgerItems(items, "Cliente", "Ingreso"));
+          setTotEg(sumLedgerItems(items, "Proveedor", "Egreso"));
+          return;
+        }
+
         const [rIng, rEgr] = hasRange
           ? await Promise.all([
               api.get("/Ingreso/totalesPorMes", {
@@ -70,7 +104,7 @@ export default function KPIs({ from, to, className, refreshKey = 0 }) {
     return () => {
       alive = false;
     };
-  }, [token, hasRange, isoFrom, isoTo, refreshKey]);
+  }, [token, hasRange, isoFrom, isoTo, refreshKey, totalsOverride]);
 
   const balance = useMemo(() => totIn - totEg, [totIn, totEg]);
   const balColor = balance >= 0 ? "text-emerald-700" : "text-rose-700";
@@ -174,6 +208,17 @@ const formatCurrency = (n) => eur.format(Number(n || 0));
 
 const sumTotals = (arr) =>
   arr.reduce((s, x) => s + Number(x.Total ?? x.total ?? 0), 0);
+
+const sumLedgerItems = (arr, account, movementType) =>
+  (Array.isArray(arr) ? arr : []).reduce(
+    (s, x) => {
+      const cuenta = x.Cuenta ?? x.cuenta;
+      const tipo = x.TipoMovimiento ?? x.tipoMovimiento;
+      if (cuenta !== account || tipo !== movementType) return s;
+      return s + Number(x.Importe ?? x.importe ?? 0);
+    },
+    0,
+  );
 
 const toISODate = (d) =>
   typeof d === "string" ? d : d?.toISOString?.().slice(0, 10);

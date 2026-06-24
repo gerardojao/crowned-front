@@ -1,8 +1,11 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer } from "lucide-react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, FileMinus2, Printer, X } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
+import ZagaInvoiceDocument, {
+  usesZagaInvoiceTemplate,
+} from "../Components/ZagaInvoiceDocument";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -13,6 +16,7 @@ const DEFAULT_TALLER = {
   email: "multiservicioscrower@gmail.com",
   iban: "ES69 2100 4014 9122 0012 3843",
   logoUrl: "",
+  documentTemplateKey: "",
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -22,13 +26,25 @@ const eur = new Intl.NumberFormat("es-ES", {
 
 export default function ReprintInvoice() {
   const { idOrden, numeroFactura } = useParams();
+  const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [rectError, setRectError] = useState("");
+  const [rectSaving, setRectSaving] = useState(false);
+  const [showRectModal, setShowRectModal] = useState(false);
+  const [rectForm, setRectForm] = useState({
+    tipo: "Total",
+    fecha: new Date().toISOString().slice(0, 10),
+    motivo: "",
+    importe: "",
+    descripcion: "",
+  });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
 
   const [invoice, setInvoice] = useState({
+    id: null,
     numero: "",
     fecha: "",
     cliente: "",
@@ -39,6 +55,12 @@ export default function ReprintInvoice() {
     km: "",
     observaciones: "",
     ivaPct: 21,
+    tipoFactura: "Normal",
+    numeroFacturaRectificada: "",
+    motivoRectificacion: "",
+    rectificativas: [],
+    bankAccountName: "",
+    bankAccountIban: "",
   });
 
   const [items, setItems] = useState([]);
@@ -69,6 +91,10 @@ export default function ReprintInvoice() {
         email: data.email ?? data.Email ?? DEFAULT_TALLER.email,
         iban: data.iban ?? data.Iban ?? DEFAULT_TALLER.iban,
         logoUrl: data.logoUrl ?? data.LogoUrl ?? DEFAULT_TALLER.logoUrl,
+        documentTemplateKey:
+          data.documentTemplateKey ??
+          data.DocumentTemplateKey ??
+          DEFAULT_TALLER.documentTemplateKey,
       });
     } catch {
       setTaller(DEFAULT_TALLER);
@@ -103,8 +129,11 @@ export default function ReprintInvoice() {
       const total = Number(f.total ?? f.Total ?? 0);
 
       const ivaPct = subtotal > 0 ? Math.round((iva / subtotal) * 100) : 21;
+      const tipoFactura = f.tipoFactura ?? f.TipoFactura ?? "Normal";
+      const rectificativas = f.rectificativas ?? f.Rectificativas ?? [];
 
       setInvoice({
+        id: f.id ?? f.Id ?? null,
         numero: f.numeroFactura ?? f.NumeroFactura ?? "",
         fecha: String(f.fecha ?? f.Fecha ?? "").slice(0, 10),
         cliente: f.cliente ?? f.Cliente ?? "",
@@ -115,6 +144,12 @@ export default function ReprintInvoice() {
         km: f.km ?? f.Km ?? "",
         observaciones: f.observaciones ?? f.Observaciones ?? "",
         ivaPct,
+        tipoFactura,
+        numeroFacturaRectificada: f.numeroFacturaRectificada ?? f.NumeroFacturaRectificada ?? "",
+        motivoRectificacion: f.motivoRectificacion ?? f.MotivoRectificacion ?? "",
+        rectificativas,
+        bankAccountName: f.bankAccountName ?? f.BankAccountName ?? "",
+        bankAccountIban: f.bankAccountIban ?? f.BankAccountIban ?? "",
       });
 
       setItems(parsedItems);
@@ -141,6 +176,99 @@ export default function ReprintInvoice() {
     window.print();
   };
 
+  const isRectificativa = invoice.tipoFactura === "Rectificativa";
+  const useZagaTemplate = usesZagaInvoiceTemplate(taller);
+  const documentTaller = {
+    ...taller,
+    iban: invoice.bankAccountIban || taller.iban,
+  };
+  const reprintDocumentTitle = isRectificativa
+    ? "Factura rectificativa"
+    : "Factura duplicada";
+  const linkedRectificativas = Array.isArray(invoice.rectificativas)
+    ? invoice.rectificativas
+    : [];
+
+  const handleRectFormChange = (field, value) => {
+    setRectForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const openRectModal = () => {
+    setRectError("");
+    setRectForm({
+      tipo: "Total",
+      fecha: new Date().toISOString().slice(0, 10),
+      motivo: "",
+      importe: "",
+      descripcion: "",
+    });
+    setShowRectModal(true);
+  };
+
+  const createRectificativa = async (event) => {
+    event.preventDefault();
+    setRectError("");
+
+    if (!invoice.id) {
+      setRectError("No se pudo identificar la factura original.");
+      return;
+    }
+
+    if (!rectForm.motivo.trim()) {
+      setRectError("El motivo es requerido.");
+      return;
+    }
+
+    if (rectForm.tipo === "Parcial" && Number(rectForm.importe || 0) <= 0) {
+      setRectError("El importe parcial debe ser mayor que 0.");
+      return;
+    }
+
+    try {
+      setRectSaving(true);
+      const payload = {
+        tipo: rectForm.tipo,
+        fecha: rectForm.fecha || null,
+        motivo: rectForm.motivo.trim(),
+        descripcion: rectForm.descripcion.trim() || null,
+        importe: rectForm.tipo === "Parcial" ? Number(rectForm.importe) : null,
+      };
+
+      const res = await api.post(`/FacturaEmitida/${invoice.id}/rectificativa`, payload);
+      if ((res?.data?.ok ?? res?.data?.Ok) === 0) {
+        throw new Error(
+          res?.data?.message ||
+            res?.data?.Message ||
+            "No se pudo crear la rectificativa.",
+        );
+      }
+
+      const created = res?.data?.data?.[0] ?? res?.data?.Data?.[0];
+      const nextNumero = created?.numeroFactura ?? created?.NumeroFactura;
+
+      if (!nextNumero) {
+        throw new Error(
+          res?.data?.message ||
+            res?.data?.Message ||
+            "No se pudo obtener la rectificativa creada.",
+        );
+      }
+
+      setShowRectModal(false);
+      navigate(`/reprint-invoice/number/${encodeURIComponent(nextNumero)}`);
+    } catch (err) {
+      console.error(err);
+      setRectError(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo crear la factura rectificativa.",
+      );
+    } finally {
+      setRectSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <section className="rounded-2xl bg-white/80 p-6 ring-1 ring-slate-200">
@@ -154,14 +282,56 @@ export default function ReprintInvoice() {
       <div className="no-print flex items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Reimprimir factura
+            {isRectificativa ? "Reimprimir factura rectificativa" : "Reimprimir factura"}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Factura {invoice.numero}
+            {isRectificativa && invoice.numeroFacturaRectificada
+              ? ` - rectifica ${invoice.numeroFacturaRectificada}`
+              : ""}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
+          {isRectificativa && invoice.numeroFacturaRectificada && (
+            <Link
+              to={`/reprint-invoice/number/${encodeURIComponent(invoice.numeroFacturaRectificada)}`}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition"
+            >
+              <ArrowLeft size={18} />
+              Ver factura original
+            </Link>
+          )}
+
+          {!isRectificativa &&
+            linkedRectificativas.map((rect) => {
+              const numero =
+                rect.numeroFactura ?? rect.NumeroFactura ?? rect.numero ?? rect.Numero;
+              if (!numero) return null;
+
+              return (
+                <Link
+                  key={numero}
+                  to={`/reprint-invoice/number/${encodeURIComponent(numero)}`}
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-white text-rose-700 ring-1 ring-rose-200 hover:bg-rose-50 transition"
+                >
+                  <FileMinus2 size={18} />
+                  Ver rectificativa {numero}
+                </Link>
+              );
+            })}
+
+          {!isRectificativa && (
+            <button
+              type="button"
+              onClick={openRectModal}
+              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-rose-600 text-white hover:bg-rose-700 transition"
+            >
+              <FileMinus2 size={18} />
+              Crear rectificativa
+            </button>
+          )}
+
           <button
             type="button"
             onClick={printInvoice}
@@ -187,13 +357,28 @@ export default function ReprintInvoice() {
         </div>
       )}
 
-      {!error && (
+      {!error && useZagaTemplate && (
+          <ZagaInvoiceDocument
+            taller={documentTaller}
+          invoice={invoice}
+          items={items}
+          totals={totals}
+          isRectificativa={isRectificativa}
+          isDuplicate
+        />
+      )}
+
+      {!error && !useZagaTemplate && (
         <section className="invoice-print bg-white text-black">
           <div className="invoice-sheet mx-auto max-w-5xl">
+            <div className="mb-3 border-2 border-black px-4 py-2 text-center text-xl font-extrabold uppercase tracking-wide">
+              {reprintDocumentTitle}
+            </div>
+
             <div className="grid grid-cols-[150px_1fr_310px] items-start gap-6 border-b-2 border-black pb-4">
               <div className="flex h-32 items-center justify-center">
                 <img
-                  src={resolveApiAssetUrl(taller.logoUrl) || logoTaller}
+                src={resolveApiAssetUrl(documentTaller.logoUrl) || logoTaller}
                   alt="Logo taller"
                   className="max-h-28 max-w-36 object-contain"
                 />
@@ -201,15 +386,15 @@ export default function ReprintInvoice() {
 
               <div className="min-w-0 text-center">
                 <h1 className="mt-3 text-3xl font-extrabold tracking-wide uppercase leading-tight">
-                  {taller.nombre}
+                {documentTaller.nombre}
                 </h1>
 
                 <div className="mt-3 text-sm leading-5">
-                  <p className="font-semibold">{taller.razonSocial}</p>
-                  <p>{taller.nif && `NIF/CIF: ${taller.nif}`}</p>
-                  <p>{taller.direccion}</p>
-                  <p>{taller.telefono}</p>
-                  <p>{taller.email}</p>
+                <p className="font-semibold">{documentTaller.razonSocial}</p>
+                <p>{documentTaller.nif && `NIF/CIF: ${documentTaller.nif}`}</p>
+                <p>{documentTaller.direccion}</p>
+                <p>{documentTaller.telefono}</p>
+                <p>{documentTaller.email}</p>
                 </div>
               </div>
 
@@ -220,6 +405,13 @@ export default function ReprintInvoice() {
 
                   <p className="font-bold">N. FACTURA:</p>
                   <p className="text-xl font-extrabold">{invoice.numero}</p>
+
+                  {isRectificativa && (
+                    <>
+                      <p className="font-bold">RECTIFICA:</p>
+                      <p className="font-bold">{invoice.numeroFacturaRectificada}</p>
+                    </>
+                  )}
 
                   <p className="font-bold">FACTURAR A:</p>
                   <p className="font-bold">{invoice.cliente}</p>
@@ -242,12 +434,12 @@ export default function ReprintInvoice() {
               </div>
             </div>
 
-            {taller.iban && (
-              <div className="text-center text-sm font-bold italic border-b border-black py-2">
-                Transferencias a la cuenta {taller.iban} a nombre de{" "}
-                {taller.razonSocial}
-              </div>
-            )}
+          {documentTaller.iban && (
+            <div className="text-center text-sm font-bold italic border-b border-black py-2">
+              Transferencias a la cuenta {documentTaller.iban} a nombre de{" "}
+              {documentTaller.razonSocial}
+            </div>
+          )}
 
             <table className="w-full border-collapse text-sm mt-2">
               <thead>
@@ -315,6 +507,12 @@ export default function ReprintInvoice() {
                   </p>
 
                   <p className="mt-2">{invoice.observaciones}</p>
+                  {isRectificativa && invoice.motivoRectificacion && (
+                    <p className="mt-2">
+                      <span className="font-bold">Motivo de rectificacion: </span>
+                      {invoice.motivoRectificacion}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -329,15 +527,131 @@ export default function ReprintInvoice() {
 
             <div className="mt-8 border-t border-black pt-2 text-xs">
               <p>
-                RAZON SOCIAL: {taller.razonSocial}
-                {taller.nif ? ` / NIF: ${taller.nif}` : ""}
-                {taller.direccion
-                  ? ` / DOMICILIO FISCAL: ${taller.direccion}`
+                RAZON SOCIAL: {documentTaller.razonSocial}
+                {documentTaller.nif ? ` / NIF: ${documentTaller.nif}` : ""}
+                {documentTaller.direccion
+                  ? ` / DOMICILIO FISCAL: ${documentTaller.direccion}`
                   : ""}
               </p>
             </div>
           </div>
         </section>
+      )}
+
+      {showRectModal && (
+        <div className="no-print fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <form
+            onSubmit={createRectificativa}
+            className="w-full max-w-2xl rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-slate-200"
+          >
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-900">
+                  Crear factura rectificativa
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Factura original {invoice.numero}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowRectModal(false)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                aria-label="Cerrar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {rectError && (
+              <div className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-200">
+                {rectError}
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <label className="block text-sm font-medium text-slate-700">
+                Tipo
+                <select
+                  value={rectForm.tipo}
+                  onChange={(e) => handleRectFormChange("tipo", e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                >
+                  <option value="Total">Total</option>
+                  <option value="Parcial">Parcial</option>
+                </select>
+              </label>
+
+              <label className="block text-sm font-medium text-slate-700">
+                Fecha
+                <input
+                  type="date"
+                  value={rectForm.fecha}
+                  onChange={(e) => handleRectFormChange("fecha", e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                />
+              </label>
+
+              {rectForm.tipo === "Parcial" && (
+                <label className="block text-sm font-medium text-slate-700">
+                  Base imponible a rectificar
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={rectForm.importe}
+                    onChange={(e) => handleRectFormChange("importe", e.target.value)}
+                    placeholder="0,00"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                  />
+                </label>
+              )}
+
+              {rectForm.tipo === "Parcial" && (
+                <label className="block text-sm font-medium text-slate-700">
+                  Concepto
+                  <input
+                    type="text"
+                    value={rectForm.descripcion}
+                    onChange={(e) => handleRectFormChange("descripcion", e.target.value)}
+                    placeholder="Ajuste parcial de factura"
+                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                  />
+                </label>
+              )}
+            </div>
+
+            <label className="mt-4 block text-sm font-medium text-slate-700">
+              Motivo
+              <textarea
+                value={rectForm.motivo}
+                onChange={(e) => handleRectFormChange("motivo", e.target.value)}
+                rows={3}
+                placeholder="Error en factura, devolucion, ajuste acordado..."
+                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                required
+              />
+            </label>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRectModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-slate-700 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={rectSaving}
+                className="rounded-xl bg-rose-600 px-4 py-2.5 font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {rectSaving ? "Creando..." : "Crear rectificativa"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </>
   );

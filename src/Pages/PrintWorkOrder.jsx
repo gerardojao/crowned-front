@@ -1,60 +1,638 @@
-﻿import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import api from "../Components/api";
+import React, { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import api, { resolveApiAssetUrl } from "../Components/api";
+import logoTaller from "../assets/LogoTallerCrowned.png";
+import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+
+const DEFAULT_TALLER = {
+  nombre: "Multiservicios Crower",
+  razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
+  nif: "61407055E",
+  direccion: "CALLE ALCACER 63 D, Albal, 46470",
+  telefono: "960057935/655042253",
+  email: "multiservicioscrower@gmail.com",
+  logoUrl: "",
+  documentTemplateKey: "",
+};
+
+function valueOf(row, field, fallback = "") {
+  const pascal = field.charAt(0).toUpperCase() + field.slice(1);
+  return row?.[field] ?? row?.[pascal] ?? fallback;
+}
+
+function formatDate(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString("es-ES");
+}
+
+function formatDateTime(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function normalizeText(value) {
+  return String(value || "").trim();
+}
+
+function parseItems(itemsJson) {
+  if (!itemsJson) return [];
+
+  try {
+    const parsed = JSON.parse(itemsJson);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item, index) => ({
+        id: item.id || item.Id || `item-${index}`,
+        descripcion:
+          item.descripcion ||
+          item.Descripcion ||
+          item.nombre ||
+          item.Nombre ||
+          "",
+        cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
+        kind: String(item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "").toLowerCase(),
+      }))
+      .filter((item) => normalizeText(item.descripcion));
+  } catch {
+    return [];
+  }
+}
+
+function splitOperationLines(text) {
+  return normalizeText(text)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function buildFallbackItems(order) {
+  const trabajo = splitOperationLines(order.trabajo);
+  return trabajo.map((descripcion, index) => ({
+    id: `fallback-${index}`,
+    descripcion,
+    cantidad: 1,
+    kind: index === 0 ? "labor" : "",
+  }));
+}
+
+function isMaterial(item) {
+  const kind = item.kind.toLowerCase();
+  return kind.includes("repuesto") || kind.includes("material") || kind.includes("part");
+}
+
+function isLabor(item) {
+  const kind = item.kind.toLowerCase();
+  return kind.includes("labor") || kind.includes("mano");
+}
 
 export default function PrintWorkOrder() {
   const { id } = useParams();
+  const [params] = useSearchParams();
+  const documentType = String(params.get("type") || params.get("tipo") || "orden").toLowerCase();
+  const isCustody = documentType === "resguardo" || documentType === "deposito";
+  const isPreOrder = documentType === "preorden" || documentType === "pre-orden";
 
   const [order, setOrder] = useState(null);
-  const [workshopName, setWorkshopName] = useState("Multiservicios Crower");
+  const [taller, setTaller] = useState(DEFAULT_TALLER);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [printed, setPrinted] = useState(false);
 
   useEffect(() => {
-    loadWorkshopSettings();
-    loadOrder();
-  }, []);
+    loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  const loadWorkshopSettings = async () => {
+  useEffect(() => {
+    if (loading || error || !order || printed) return;
+    setPrinted(true);
+    const timer = setTimeout(() => window.print(), 500);
+    return () => clearTimeout(timer);
+  }, [loading, error, order, printed]);
+
+  const loadData = async () => {
     try {
-      const res = await api.get("/WorkshopSettings");
-      setWorkshopName(res?.data?.nombre ?? res?.data?.Nombre ?? "Multiservicios Crower");
-    } catch {
-      setWorkshopName("Multiservicios Crower");
-    }
-  };
+      setLoading(true);
+      setError("");
 
-  const loadOrder = async () => {
-    try {
-      const res = await api.get(`/OrdenTrabajo/${id}`);
+      const [settingsRes, orderRes] = await Promise.all([
+        api.get("/WorkshopSettings").catch(() => null),
+        api.get(`/OrdenTrabajo/${id}`),
+      ]);
 
-      const data = res?.data?.data?.[0];
+      const settings = settingsRes?.data || {};
+      setTaller({
+        nombre: settings.nombre ?? settings.Nombre ?? DEFAULT_TALLER.nombre,
+        razonSocial:
+          settings.razonSocial ?? settings.RazonSocial ?? DEFAULT_TALLER.razonSocial,
+        nif: settings.nif ?? settings.Nif ?? DEFAULT_TALLER.nif,
+        direccion: settings.direccion ?? settings.Direccion ?? DEFAULT_TALLER.direccion,
+        telefono: settings.telefono ?? settings.Telefono ?? DEFAULT_TALLER.telefono,
+        email: settings.email ?? settings.Email ?? DEFAULT_TALLER.email,
+        logoUrl: settings.logoUrl ?? settings.LogoUrl ?? DEFAULT_TALLER.logoUrl,
+        documentTemplateKey:
+          settings.documentTemplateKey ??
+          settings.DocumentTemplateKey ??
+          DEFAULT_TALLER.documentTemplateKey,
+      });
 
-      setOrder(data);
+      const data = orderRes?.data?.data?.[0];
+      if (!data) {
+        setError("No se encontro la orden.");
+        return;
+      }
 
-      setTimeout(() => {
-        window.print();
-      }, 500);
+      setOrder({
+        id: valueOf(data, "id"),
+        cliente: valueOf(data, "cliente"),
+        dni: valueOf(data, "dni"),
+        telefono: valueOf(data, "telefono"),
+        direccion: valueOf(data, "direccion"),
+        matricula: valueOf(data, "matricula"),
+        marca: valueOf(data, "marca"),
+        modelo: valueOf(data, "modelo"),
+        kilometraje: valueOf(data, "kilometraje"),
+        fecha: valueOf(data, "fecha"),
+        fechaPrevistaEntrega: valueOf(data, "fechaPrevistaEntrega"),
+        tiempoEstimadoHoras: valueOf(data, "tiempoEstimadoHoras"),
+        trabajo: valueOf(data, "trabajo"),
+        itemsJson: valueOf(data, "itemsJson"),
+        estado: valueOf(data, "estado"),
+        observaciones: valueOf(data, "observaciones"),
+      });
     } catch (err) {
       console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo cargar la orden de trabajo.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!order) {
-    return (
-      <div className="p-10 text-center text-slate-500">Cargando orden...</div>
-    );
+  const items = useMemo(() => {
+    if (!order) return [];
+    const parsed = parseItems(order.itemsJson);
+    return parsed.length ? parsed : buildFallbackItems(order);
+  }, [order]);
+
+  const laborItems = useMemo(() => {
+    const explicit = items.filter(isLabor);
+    if (explicit.length) return explicit;
+    return items.filter((item) => !isMaterial(item));
+  }, [items]);
+
+  const materialItems = useMemo(() => items.filter(isMaterial), [items]);
+  const operationLines = useMemo(() => splitOperationLines(order?.trabajo), [order?.trabajo]);
+
+  if (loading) {
+    return <div className="p-10 text-center text-slate-500">Cargando orden...</div>;
+  }
+
+  if (error || !order) {
+    return <div className="p-10 text-center text-rose-600">{error || "No se encontro la orden."}</div>;
+  }
+
+  const useZagaTemplate = usesZagaInvoiceTemplate(taller);
+  const title = isPreOrder
+    ? "PRE-ORDEN"
+    : isCustody
+      ? "RESGUARDO DE DEPOSITO"
+      : "ORDEN DE TRABAJO";
+  const documentNumber = String(order.id || "").padStart(9, "0");
+  const pageLabel = "Pag. 1";
+  const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
+
+  if (!useZagaTemplate) {
+    return <CrowerWorkOrderDocument order={order} workshopName={taller.nombre || "Multiservicios Crower"} />;
   }
 
   return (
+    <main className="print-page bg-white text-black">
+      <PrintActions />
+      <style>{`
+        .workorder-sheet {
+          width: 190mm;
+          min-height: 255mm;
+          margin: 0 auto;
+          padding: 4mm 5mm;
+          font-family: Arial, Helvetica, sans-serif;
+          font-size: 8.2px;
+          line-height: 1.18;
+          color: #111;
+        }
+        .wo-header {
+          display: grid;
+          grid-template-columns: 48% 52%;
+          align-items: start;
+          gap: 8mm;
+          margin-bottom: 9mm;
+        }
+        .wo-logo {
+          width: 72mm;
+          max-height: 24mm;
+          object-fit: contain;
+          object-position: left center;
+        }
+        .wo-company {
+          font-size: 9px;
+          line-height: 1.22;
+          text-transform: uppercase;
+        }
+        .wo-title-row {
+          display: grid;
+          grid-template-columns: 47mm 1fr;
+          gap: 6mm;
+          align-items: start;
+          margin-bottom: 2mm;
+          
+        }
+        .wo-title {
+          font-size: 15px;
+          font-weight: 800;
+          letter-spacing: .2px;
+          margin: 0 0 5mm;
+          text-align: left;
+        }
+        .wo-meta {
+          width: 36mm;
+          border-collapse: collapse;
+          font-size: 8px;
+        }
+        .wo-meta th {
+          width: 21mm;
+          background: #b7b7b7;
+          border: 1px solid #b7b7b7;
+          padding: 2.1mm 1.4mm;
+          text-align: left;
+          font-weight: 800;
+        }
+        .wo-meta td {
+          border: 1px solid transparent;
+          padding: 2.1mm 1.4mm;
+          font-weight: 700;
+        }
+        .wo-client-box {
+          position: relative;
+          min-height: 24mm;
+          padding: 5mm 10mm 4mm;
+          font-size: 10px;
+          line-height: 1.25;
+          text-transform: uppercase;
+          margin-top:25mm;
+          margin-left: 55mm;
+        }
+        .wo-client-box:before,
+        .wo-client-box:after,
+        .wo-client-corners:before,
+        .wo-client-corners:after {
+          content: "";
+          position: absolute;
+          width: 13mm;
+          height: 9mm;
+          border-color: #111;
+        }
+        .wo-client-box:before { top: 0; left: 0; border-top: 1px solid; border-left: 1px solid; }
+        .wo-client-box:after { top: 0; right: 0; border-top: 1px solid; border-right: 1px solid; }
+        .wo-client-corners:before { bottom: 0; left: 0; border-bottom: 1px solid; border-left: 1px solid; }
+        .wo-client-corners:after { bottom: 0; right: 0; border-bottom: 1px solid; border-right: 1px solid; }
+        .wo-page-label {
+          text-align: right;
+          font-size: 8px;
+          margin-top: 1mm;
+        }
+        .wo-grid {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          margin-top: 1mm;
+          font-size: 8px;
+        }
+        .wo-grid th {
+          background: #b7b7b7;
+          border: 1px solid #fff;
+          padding: 1.3mm 1mm;
+          text-align: center;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .wo-grid td {
+          padding: 1.4mm 1mm;
+          text-align: center;
+          border: 1px solid #fff;
+        }
+        .wo-body {
+          margin-top: 2mm;
+          min-height: 94mm;
+          border: 1px solid #111;
+        }
+        .wo-section-head {
+          display: grid;
+          grid-template-columns: 32mm 1fr 18mm;
+          background: #b7b7b7;
+          font-weight: 800;
+          text-transform: uppercase;
+          border-bottom: 1px solid #fff;
+        }
+        .wo-section-head span {
+          padding: 1.5mm 1.5mm;
+        }
+        .wo-block {
+          padding: 1.7mm 1.5mm 1mm;
+        }
+        .wo-op-line {
+          margin: 0 0 1mm;
+          text-transform: uppercase;
+        }
+        .wo-lines {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+          font-size: 8px;
+        }
+        .wo-lines td {
+          padding: .9mm 1.2mm;
+          vertical-align: top;
+        }
+        .wo-code {
+          width: 26mm;
+          text-transform: uppercase;
+        }
+        .wo-qty {
+          width: 18mm;
+          text-align: right;
+        }
+        .wo-footer {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1.08fr;
+          border: 1px solid #111;
+          border-top: 0;
+          min-height: 46mm;
+        }
+        .wo-footer-cell {
+          border-right: 1px solid #111;
+          padding: 1.5mm;
+          font-size: 7.2px;
+        }
+        .wo-footer-cell:last-child {
+          border-right: 0;
+        }
+        .wo-footer-head {
+          margin: -1.5mm -1.5mm 1.5mm;
+          padding: 1.4mm 1.5mm;
+          background: #b7b7b7;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .wo-sign {
+          margin-top: 6mm;
+          font-size: 7px;
+          text-transform: uppercase;
+        }
+        .wo-car-box {
+          height: 38mm;
+          position: relative;
+          overflow: hidden;
+        }
+        .wo-car {
+          position: absolute;
+          left: 12mm;
+          top: 6mm;
+          width: 44mm;
+          height: 23mm;
+          border: 1px solid #999;
+          border-radius: 42% 42% 34% 34%;
+        }
+        .wo-car:before {
+          content: "";
+          position: absolute;
+          left: 11mm;
+          top: 4mm;
+          width: 22mm;
+          height: 14mm;
+          border: 1px solid #bbb;
+          border-radius: 38%;
+        }
+        .wo-car-note {
+          position: absolute;
+          right: 2mm;
+          bottom: 1mm;
+          font-size: 7px;
+          color: #333;
+        }
+        @media print {
+          @page { size: letter portrait; margin: 8mm; }
+          .workorder-sheet {
+            width: 100%;
+            min-height: auto;
+            margin: 0;
+            padding: 0;
+          }
+        }
+      `}</style>
+
+      <section className="workorder-sheet">
+        <header className="wo-header">
+          <div>
+            <img src={logoSrc} alt="Logo taller" className="wo-logo" />
+          </div>
+          <div className="wo-company text-left">
+            <strong>{taller.razonSocial || taller.nombre}</strong><br />
+            {taller.nif && <>{taller.nif}<br /></>}
+            {taller.direccion && <>{taller.direccion}<br /></>}
+            {taller.telefono && <>Tel: {taller.telefono}<br /></>}
+            {taller.email && <>E-mail: {taller.email}</>}
+          </div>
+        </header>
+
+        <section className="wo-title-row">
+          <div>
+            <h1 className="wo-title">{title}</h1>
+            <table className="wo-meta">
+              <tbody>
+                <tr><th>Nº Documento</th><td>{documentNumber}</td></tr>
+                <tr><th>Fecha</th><td>{formatDate(order.fecha)}</td></tr>
+                <tr><th>N. Cliente</th><td>{order.id || "-"}</td></tr>
+                <tr><th>NIF</th><td>{order.dni || "-"}</td></tr>
+                <tr><th>Forma de Pago</th><td>{isCustody ? "PENDIENTE" : "-"}</td></tr>
+                <tr><th>Tipo de Operacion</th><td>MECANICA</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <div className="wo-client-box">
+              <div className="wo-client-corners" />
+              <strong>{order.cliente || "-"}</strong><br />
+              {order.direccion && <>{order.direccion}<br /></>}
+              {order.telefono && <>{order.telefono}<br /></>}
+              {order.dni && <>{order.dni}</>}
+            </div>
+            <div className="wo-page-label">{pageLabel}</div>
+          </div>
+        </section>
+
+        <table className="wo-grid">
+          <thead>
+            <tr>
+              <th>Bloque</th>
+              <th>F. recepcion</th>
+              <th>F. prevista entrega</th>
+              <th>Kms</th>
+              <th>Cod color</th>
+              <th>Marca y modelo</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>-</td>
+              <td>{formatDateTime(order.fecha)}</td>
+              <td>{formatDate(order.fechaPrevistaEntrega || order.fecha)}</td>
+              <td>{order.kilometraje || "-"}</td>
+              <td>-</td>
+              <td>{[order.marca, order.modelo].filter(Boolean).join(" ") || "-"}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <table className="wo-grid">
+          <thead>
+            <tr>
+              <th>Matricula</th>
+              <th>Nº peritacion</th>
+              <th>F. matriculacion</th>
+              <th>Nº de chasis</th>
+              <th>Nº motor</th>
+              <th>Recepcion</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{order.matricula || "-"}</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>{order.estado || "-"}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <section className="wo-body">
+          <div className="wo-section-head">
+            <span>Codigo operacion</span>
+            <span>Descripcion</span>
+            <span />
+          </div>
+
+          <div className="wo-block">
+            {operationLines.length ? (
+              operationLines.map((line, index) => (
+                <p key={`${line}-${index}`} className="wo-op-line">* {line}</p>
+              ))
+            ) : (
+              <p className="wo-op-line">* Sin descripcion de trabajo.</p>
+            )}
+          </div>
+
+          <div className="wo-section-head">
+            <span>Mano obra</span>
+            <span />
+            <span>Tiempo</span>
+          </div>
+          <div className="wo-block">
+            <table className="wo-lines">
+              <tbody>
+                {(laborItems.length ? laborItems : [{ id: "labor-empty", descripcion: "Mano de obra", cantidad: 1 }]).map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td className="wo-code">MO</td>
+                    <td>{item.descripcion}</td>
+                    <td className="wo-qty">
+                      {order.tiempoEstimadoHoras && index === 0
+                        ? `${order.tiempoEstimadoHoras} h`
+                        : Number(item.cantidad || 1).toLocaleString("es-ES")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="wo-section-head">
+            <span>Materiales</span>
+            <span />
+            <span>Cantidad</span>
+          </div>
+          <div className="wo-block">
+            <table className="wo-lines">
+              <tbody>
+                {(materialItems.length ? materialItems : [{ id: "mat-empty", descripcion: "Pendiente de asignar", cantidad: "" }]).map((item, index) => (
+                  <tr key={item.id || index}>
+                    <td className="wo-code">MAT</td>
+                    <td>{item.descripcion}</td>
+                    <td className="wo-qty">
+                      {item.cantidad === "" ? "-" : Number(item.cantidad || 1).toLocaleString("es-ES")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {order.observaciones && (
+            <div className="wo-block">
+              <p className="wo-op-line">* OBSERVACIONES: {order.observaciones}</p>
+            </div>
+          )}
+        </section>
+
+        <footer className="wo-footer">
+          <div className="wo-footer-cell">
+            <div>PENDIENTE CONFIGURAR</div>
+            <div className="wo-sign">Firma cliente</div>
+          </div>
+          <div className="wo-footer-cell">
+            <div>AUTORIZO REPARACION DESCRITA. DESEO RECOGER PIEZAS SUSTITUIDAS: SI NO</div>
+            <div className="wo-sign">Firma cliente</div>
+            <div className="wo-footer-head" style={{ marginTop: "9mm" }}>
+              {isCustody ? "Resguardo de deposito" : "Acepto renuncia presupuesto"}
+            </div>
+            <div className="wo-sign">Firma taller</div>
+          </div>
+          <div className="wo-footer-cell">
+            <div>DANOS OBSERVADOS EN LA CARROCERIA</div>
+            <div className="wo-car-box">
+              <div className="wo-car" />
+              <div className="wo-car-note">Marcar danos visibles</div>
+            </div>
+          </div>
+        </footer>
+      </section>
+    </main>
+  );
+}
+
+function CrowerWorkOrderDocument({ order, workshopName }) {
+  return (
     <div className="bg-white text-black print-page">
+      <PrintActions />
       <div className="max-w-2xl mx-auto border border-black p-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold">{workshopName}</h1>
-
           <p className="text-lg mt-2">Orden #{order.id || order.Id}</p>
         </div>
 
         <div className="space-y-5">
-
           <div>
             <p className="font-bold">Vehiculo</p>
             <p>
@@ -99,3 +677,23 @@ export default function PrintWorkOrder() {
   );
 }
 
+function PrintActions() {
+  return (
+    <div className="no-print fixed right-4 top-4 z-50 flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => window.print()}
+        className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-orange-700"
+      >
+        Imprimir
+      </button>
+      <Link
+        to="/register-work-order#ordenes-recientes"
+        className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800"
+      >
+        <ArrowLeft size={16} />
+        Volver
+      </Link>
+    </div>
+  );
+}

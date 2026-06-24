@@ -6,13 +6,19 @@ import { soloFecha } from "../utils/date";
 import {
   Search, RotateCcw, ArrowLeft, CalendarDays, XCircle,
 } from "lucide-react";
-import { fetchAccountsReceivableIncome } from "../utils/accountsReceivableIncome";
+import {
+  fetchAccountsReceivableIncome,
+  incomeIvaAmount,
+  incomeTotalAmount,
+} from "../utils/accountsReceivableIncome";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const IVA_RATE = 0.21;
 const amountOf = (value) => Number(value ?? 0);
-const ivaOf = (value) => amountOf(value) * IVA_RATE;
-const totalWithIva = (value) => amountOf(value) + ivaOf(value);
+const incomeIvaOf = (item, value) =>
+  incomeIvaAmount(item, amountOf(value), IVA_RATE);
+const incomeTotalWithIva = (item, value) =>
+  incomeTotalAmount(item, amountOf(value), IVA_RATE);
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -109,8 +115,14 @@ export default function IncomeDetails() {
   });
 
   const total = useMemo(() => rows.reduce((acc, x) => acc + amountOf(x.importe), 0), [rows]);
-  const ivaTotal = total * IVA_RATE;
-  const totalConIva = total + ivaTotal;
+  const ivaTotal = useMemo(
+    () => rows.reduce((acc, x) => acc + incomeIvaOf(x, x.importe), 0),
+    [rows],
+  );
+  const totalConIva = useMemo(
+    () => rows.reduce((acc, x) => acc + incomeTotalWithIva(x, x.importe), 0),
+    [rows],
+  );
 
   const loadTipos = useCallback(async () => {
     try {
@@ -429,9 +441,9 @@ export default function IncomeDetails() {
                   <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
                 </div>
                 <div className="shrink-0 text-right">
-                  <div className="font-semibold text-emerald-700">{eur.format(totalWithIva(r.importe))}</div>
+                  <div className="font-semibold text-emerald-700">{eur.format(incomeTotalWithIva(r, r.importe))}</div>
                   <div className="text-xs text-slate-500">
-                    Base {eur.format(amountOf(r.importe))} · IVA {eur.format(ivaOf(r.importe))}
+                    Base {eur.format(amountOf(r.importe))} · IVA {eur.format(incomeIvaOf(r, r.importe))}
                   </div>
                 </div>
               </div>
@@ -489,10 +501,10 @@ export default function IncomeDetails() {
                             {eur.format(amountOf(r.importe))}
                           </td>
                           <td className="py-2.5 px-3 text-right font-semibold text-slate-700 whitespace-nowrap">
-                            {eur.format(ivaOf(r.importe))}
+                            {eur.format(incomeIvaOf(r, r.importe))}
                           </td>
                           <td className="py-2.5 px-3 text-right font-bold text-emerald-700 whitespace-nowrap">
-                            {eur.format(totalWithIva(r.importe))}
+                            {eur.format(incomeTotalWithIva(r, r.importe))}
                           </td>
                         </tr>
                       ))

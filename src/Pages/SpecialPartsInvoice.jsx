@@ -1,0 +1,684 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Plus, Printer, Search, Trash2 } from "lucide-react";
+import api, { resolveApiAssetUrl } from "../Components/api";
+import logoTaller from "../assets/LogoTallerCrowned.png";
+import PartPicker, {
+  getPartDisplayName,
+  getPartId,
+  getPartProviderId,
+  getPartProviderName,
+  getPartPurchasePrice,
+  getPartSalePrice,
+} from "../Components/PartPicker";
+import ZagaInvoiceDocument, { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+
+const DEFAULT_TALLER = {
+  nombre: "Multiservicios Crower",
+  razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
+  nif: "61407055E",
+  direccion: "CALLE ALCACER 63 D, Albal, 46470",
+  telefono: "960057935/655042253",
+  email: "multiservicioscrower@gmail.com",
+  iban: "ES69 2100 4014 9122 0012 3843",
+  serieFacturaRecambio: "RC",
+  logoUrl: "",
+  enableSpecialInvoices: true,
+};
+
+const EMPTY_ITEM = {
+  descripcion: "",
+  cantidad: 1,
+  importe: "",
+  tipo: "Recambio",
+  kind: "Recambio",
+};
+
+const PAYMENT_OPTIONS = [
+  { value: "Contado", label: "Contado" },
+  { value: "Efectivo", label: "Efectivo" },
+  { value: "Transferencia", label: "Transferencia" },
+  { value: "TPV", label: "TPV" },
+  { value: "Credito", label: "Credito" },
+];
+
+const eur = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+});
+
+const inputCls = "rounded-xl border border-slate-300 px-3 py-2 text-sm";
+
+const round2 = (value) =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+export default function SpecialPartsInvoice() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [taller, setTaller] = useState(DEFAULT_TALLER);
+  const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedBankId, setSelectedBankId] = useState("");
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientResults, setClientResults] = useState([]);
+  const [invoice, setInvoice] = useState({
+    numero: "",
+    fecha: new Date().toISOString().slice(0, 10),
+    cliente: "",
+    dni: "",
+    direccionCliente: "",
+    telefonoCliente: "",
+    matricula: "",
+    km: "",
+    observaciones: "",
+    ivaPct: 21,
+    tipoPago: "Contado",
+    plazoCreditoDias: 30,
+    fechaVencimiento: "",
+  });
+  const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
+
+  const isCredit = invoice.tipoPago === "Credito";
+  const specialInvoicesEnabled =
+    taller.enableSpecialInvoices ?? taller.EnableSpecialInvoices ?? true;
+
+  const subtotal = useMemo(
+    () =>
+      round2(
+        items.reduce(
+          (sum, item) =>
+            sum + Number(item.cantidad || 0) * Number(item.importe || 0),
+          0,
+        ),
+      ),
+    [items],
+  );
+  const iva = round2(subtotal * (Number(invoice.ivaPct || 21) / 100));
+  const total = round2(subtotal + iva);
+  const totals = { subtotal, iva, otros: 0, total };
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+        const settingsRes = await api.get("/WorkshopSettings");
+        const settings = settingsRes?.data || {};
+        const nextTaller = {
+          ...DEFAULT_TALLER,
+          nombre: settings.nombre ?? settings.Nombre ?? DEFAULT_TALLER.nombre,
+          razonSocial:
+            settings.razonSocial ?? settings.RazonSocial ?? DEFAULT_TALLER.razonSocial,
+          nif: settings.nif ?? settings.Nif ?? DEFAULT_TALLER.nif,
+          direccion: settings.direccion ?? settings.Direccion ?? DEFAULT_TALLER.direccion,
+          telefono: settings.telefono ?? settings.Telefono ?? DEFAULT_TALLER.telefono,
+          email: settings.email ?? settings.Email ?? DEFAULT_TALLER.email,
+          iban: settings.iban ?? settings.Iban ?? DEFAULT_TALLER.iban,
+          serieFacturaRecambio:
+            settings.serieFacturaRecambio ??
+            settings.SerieFacturaRecambio ??
+            DEFAULT_TALLER.serieFacturaRecambio,
+          logoUrl: settings.logoUrl ?? settings.LogoUrl ?? "",
+          documentTemplateKey:
+            settings.documentTemplateKey ?? settings.DocumentTemplateKey ?? "",
+          enableSpecialInvoices:
+            settings.enableSpecialInvoices ?? settings.EnableSpecialInvoices ?? true,
+        };
+
+        const banksRes = await api.get("/WorkshopBankAccounts");
+        const banks = Array.isArray(banksRes?.data) ? banksRes.data : [];
+        const main = banks.find((x) => x.esPrincipal ?? x.EsPrincipal) || banks[0];
+
+        const previewRes = await api.get("/NumeradorFactura/preview", {
+          params: { serie: nextTaller.serieFacturaRecambio || "RC" },
+        });
+        const numeroFactura =
+          previewRes?.data?.data?.[0]?.numeroFactura ||
+          previewRes?.data?.Data?.[0]?.NumeroFactura ||
+          "";
+
+        if (!alive) return;
+        setTaller({
+          ...nextTaller,
+          iban: main?.iban ?? main?.Iban ?? nextTaller.iban,
+        });
+        setBankAccounts(banks);
+        setSelectedBankId(String(main?.id ?? main?.Id ?? ""));
+        setInvoice((prev) => ({ ...prev, numero: numeroFactura }));
+      } catch (err) {
+        console.error(err);
+        if (alive) setError("No se pudo cargar la factura de recambio.");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const search = clientSearch.trim();
+    if (search.length < 2) {
+      setClientResults([]);
+      return undefined;
+    }
+
+    let alive = true;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.get("/Cliente", {
+          params: { search, page: 1, pageSize: 8 },
+        });
+        if (!alive) return;
+        setClientResults(res?.data?.data?.[0]?.items || []);
+      } catch (err) {
+        console.error(err);
+        if (alive) setClientResults([]);
+      }
+    }, 250);
+
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [clientSearch]);
+
+  const setInvoiceField = (field, value) => {
+    setInvoice((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const selectClient = (client) => {
+    setInvoice((prev) => ({
+      ...prev,
+      cliente: client.nombre ?? client.Nombre ?? "",
+      dni: client.dni ?? client.Dni ?? "",
+      direccionCliente: client.direccion ?? client.Direccion ?? "",
+      telefonoCliente: client.telefono ?? client.Telefono ?? "",
+      matricula: client.matricula ?? client.Matricula ?? "",
+      km: client.kilometraje ?? client.Kilometraje ?? "",
+    }));
+    setClientSearch("");
+    setClientResults([]);
+  };
+
+  const setItem = (index, field, value) => {
+    setItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)),
+    );
+  };
+
+  const addItem = () => setItems((prev) => [...prev, { ...EMPTY_ITEM }]);
+
+  const removeItem = (index) => {
+    setItems((prev) =>
+      prev.length === 1 ? [{ ...EMPTY_ITEM }] : prev.filter((_, i) => i !== index),
+    );
+  };
+
+  const addPart = (part) => {
+    const next = {
+      ...EMPTY_ITEM,
+      descripcion: getPartDisplayName(part),
+      cantidad: 1,
+      importe: getPartSalePrice(part),
+      precioCompra: getPartPurchasePrice(part),
+      idProveedor: getPartProviderId(part),
+      proveedor: getPartProviderName(part),
+      repuestoStockId: getPartId(part),
+    };
+
+    setItems((prev) => {
+      const emptyIndex = prev.findIndex(
+        (item) => !String(item.descripcion || "").trim() && !Number(item.importe || 0),
+      );
+      if (emptyIndex < 0) return [...prev, next];
+      return prev.map((item, index) => (index === emptyIndex ? next : item));
+    });
+  };
+
+  const emitInvoice = async () => {
+    const billableItems = items
+      .filter(
+        (item) =>
+          String(item.descripcion || "").trim() &&
+          Number(item.cantidad || 0) > 0 &&
+          Number(item.importe || 0) > 0,
+      )
+      .map((item) => ({
+        ...item,
+        cantidad: Number(item.cantidad || 0),
+        importe: Number(item.importe || 0),
+        tipo: "Recambio",
+        kind: "Recambio",
+      }));
+
+    if (!invoice.cliente.trim()) throw new Error("El cliente es requerido.");
+    if (!billableItems.length) {
+      throw new Error("Agrega al menos un recambio con importe mayor que 0.");
+    }
+    if (!isCredit && bankAccounts.length > 1 && !selectedBankId) {
+      throw new Error("Selecciona el banco para esta factura.");
+    }
+
+    const res = await api.post("/FacturaEmitida/emitir", {
+      tipoFactura: "Recambio",
+      serie: taller.serieFacturaRecambio || "RC",
+      fecha: invoice.fecha,
+      cliente: invoice.cliente,
+      dni: invoice.dni || null,
+      direccionCliente: invoice.direccionCliente || null,
+      telefonoCliente: invoice.telefonoCliente || null,
+      matricula: invoice.matricula || null,
+      km: invoice.km ? String(invoice.km) : null,
+      marca: invoice.marca || null,
+      modelo: invoice.modelo || null,
+      observaciones: invoice.observaciones || null,
+      ivaPct: Number(invoice.ivaPct || 21),
+      tipoPago: invoice.tipoPago,
+      totalAbonado: isCredit ? 0 : total,
+      plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
+      fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
+      bankAccountId: !isCredit && selectedBankId ? Number(selectedBankId) : null,
+      items: billableItems,
+    });
+
+    if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+      throw new Error(res?.data?.message || res?.data?.Message || "No se pudo emitir la factura.");
+    }
+
+    const created =
+      res?.data?.data?.[0] ||
+      res?.data?.Data?.[0] ||
+      {};
+    return created.numeroFactura ?? created.NumeroFactura ?? "";
+  };
+
+  const printInvoice = async () => {
+    try {
+      setSaving(true);
+      setError("");
+      setNotice("");
+      const numeroFactura = await emitInvoice();
+      if (!numeroFactura) throw new Error("No se recibio el numero de factura emitida.");
+      setInvoice((prev) => ({ ...prev, numero: numeroFactura }));
+      setNotice("Factura de recambio emitida correctamente.");
+      setTimeout(() => window.print(), 150);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo emitir la factura.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <section className="rounded-2xl bg-white/80 p-6 ring-1 ring-slate-200">Cargando factura...</section>;
+  }
+
+  if (!specialInvoicesEnabled) {
+    return (
+      <section className="rounded-2xl bg-white p-6 ring-1 ring-slate-200">
+        <h2 className="text-xl font-bold text-slate-900">Facturas especiales desactivadas</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          El modulo de facturas especiales no esta habilitado para este taller.
+        </p>
+        <Link
+          to="/"
+          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-white hover:bg-slate-800"
+        >
+          <ArrowLeft size={18} />
+          Volver
+        </Link>
+      </section>
+    );
+  }
+
+  const printableItems = items.filter((item) => String(item.descripcion || "").trim());
+
+  return (
+    <>
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-900">Factura especial de recambio</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Venta directa de piezas con numeracion independiente.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={printInvoice}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-white transition hover:bg-orange-700 disabled:opacity-60"
+          >
+            <Printer size={18} />
+            {saving ? "Emitiendo..." : "Emitir e imprimir"}
+          </button>
+          <Link
+            to="/stock-parts"
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-white transition hover:bg-slate-800"
+          >
+            <ArrowLeft size={18} />
+            Volver
+          </Link>
+        </div>
+      </div>
+
+      {error && (
+        <div className="no-print mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-200">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div className="no-print mb-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
+          {notice}
+        </div>
+      )}
+
+      <section className="no-print mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
+        <div className="space-y-4 rounded-2xl bg-white/90 p-5 ring-1 ring-slate-200">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Cliente</h3>
+            <div className="relative mt-3">
+              <div className="flex items-center gap-2">
+                <Search size={18} className="text-slate-500" />
+                <input
+                  value={clientSearch}
+                  onChange={(event) => setClientSearch(event.target.value)}
+                  placeholder="Buscar cliente registrado"
+                  className={`${inputCls} w-full`}
+                />
+              </div>
+              {clientResults.length > 0 && (
+                <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+                  {clientResults.map((client) => {
+                    const id = client.id ?? client.Id;
+                    const name = client.nombre ?? client.Nombre;
+                    const phone = client.telefono ?? client.Telefono;
+                    const nif = client.dni ?? client.Dni;                    
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => selectClient(client)}
+                        className="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-orange-50"
+                      >
+                        <span className="block font-bold text-slate-900">{name}</span>
+                        <span className="text-xs text-slate-500">
+                          {[nif, phone].filter(Boolean).join(" · ")}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Input label="Cliente" value={invoice.cliente} onChange={(v) => setInvoiceField("cliente", v)} />
+            <Input label="NIF/DNI" value={invoice.dni} onChange={(v) => setInvoiceField("dni", v)} />
+            <Input label="Telefono" value={invoice.telefonoCliente} onChange={(v) => setInvoiceField("telefonoCliente", v)} />
+            <Input label="Direccion" value={invoice.direccionCliente} onChange={(v) => setInvoiceField("direccionCliente", v)} />
+            <Input label="Matricula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
+            <Input label="Km" value={invoice.km} onChange={(v) => setInvoiceField("km", v)} />
+            <Input label="Marca" value={invoice.marca} onChange={(v) => setInvoiceField("marca", v)} />
+            <Input label="Modelo" value={invoice.modelo} onChange={(v) => setInvoiceField("modelo", v)} />  
+          </div>
+
+          <div>
+            <h3 className="mb-3 text-lg font-bold text-slate-900">Recambios</h3>
+            <PartPicker
+              onSelect={addPart}
+              placeholder="Buscar recambio en stock"
+              buttonLabel="Agregar"
+              allowCreate
+            />
+            <div className="mt-4 space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 md:grid-cols-[1fr_90px_120px_44px]">
+                  <input
+                    value={item.descripcion}
+                    onChange={(event) => setItem(index, "descripcion", event.target.value)}
+                    placeholder="Descripcion del recambio"
+                    className={inputCls}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.cantidad}
+                    onChange={(event) => setItem(index, "cantidad", event.target.value)}
+                    className={inputCls}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.importe}
+                    onChange={(event) => setItem(index, "importe", event.target.value)}
+                    className={inputCls}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    className="inline-flex h-10 items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
+                    title="Quitar linea"
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addItem}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
+            >
+              <Plus size={17} />
+              Agregar linea manual
+            </button>
+          </div>
+        </div>
+
+        <aside className="space-y-4 rounded-2xl bg-white/90 p-5 ring-1 ring-slate-200">
+          <h3 className="text-lg font-bold text-slate-900">Datos de factura</h3>
+          <Input label="Numero" value={invoice.numero} readOnly />
+          <Input label="Fecha" type="date" value={invoice.fecha} onChange={(v) => setInvoiceField("fecha", v)} />
+          <label className="block text-sm font-medium text-slate-700">
+            Metodo de pago
+            <select
+              value={invoice.tipoPago}
+              onChange={(event) => setInvoiceField("tipoPago", event.target.value)}
+              className={`${inputCls} mt-1 w-full`}
+            >
+              {PAYMENT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {isCredit && (
+            <div className="grid grid-cols-1 gap-3">
+              <Input
+                label="Plazo credito dias"
+                type="number"
+                value={invoice.plazoCreditoDias}
+                onChange={(v) => setInvoiceField("plazoCreditoDias", v)}
+              />
+              <Input
+                label="Fecha vencimiento"
+                type="date"
+                value={invoice.fechaVencimiento}
+                onChange={(v) => setInvoiceField("fechaVencimiento", v)}
+              />
+            </div>
+          )}
+          {!isCredit && bankAccounts.length > 0 && (
+            <label className="block text-sm font-medium text-slate-700">
+              Banco
+              <select
+                value={selectedBankId}
+                onChange={(event) => setSelectedBankId(event.target.value)}
+                className={`${inputCls} mt-1 w-full`}
+              >
+                {bankAccounts.map((bank) => {
+                  const id = bank.id ?? bank.Id;
+                  return (
+                    <option key={id} value={id}>
+                      {bank.nombre ?? bank.Nombre}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          )}
+          <label className="block text-sm font-medium text-slate-700">
+            Observaciones
+            <textarea
+              value={invoice.observaciones}
+              onChange={(event) => setInvoiceField("observaciones", event.target.value)}
+              rows={4}
+              className={`${inputCls} mt-1 w-full`}
+            />
+          </label>
+          <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200">
+            <div className="flex justify-between">
+              <span>Base imponible</span>
+              <strong>{eur.format(subtotal)}</strong>
+            </div>
+            <div className="mt-2 flex justify-between">
+              <span>IVA {invoice.ivaPct}%</span>
+              <strong>{eur.format(iva)}</strong>
+            </div>
+            <div className="mt-3 flex justify-between border-t border-slate-200 pt-3 text-base text-slate-900">
+              <span>Total</span>
+              <strong>{eur.format(total)}</strong>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      {usesZagaInvoiceTemplate(taller) ? (
+        <ZagaInvoiceDocument
+          taller={taller}
+          invoice={invoice}
+          items={printableItems}
+          totals={totals}
+          selectedPaymentMethods={[{ label: invoice.tipoPago }]}
+        />
+      ) : (
+        <StandardInvoiceDocument
+          taller={taller}
+          invoice={invoice}
+          items={printableItems}
+          totals={totals}
+        />
+      )}
+    </>
+  );
+}
+
+function Input({ label, value, onChange, type = "text", readOnly = false }) {
+  return (
+    <label className="block text-sm font-medium text-slate-700">
+      {label}
+      <input
+        type={type}
+        value={value ?? ""}
+        readOnly={readOnly}
+        onChange={(event) => onChange?.(event.target.value)}
+        className={`${inputCls} mt-1 w-full ${readOnly ? "bg-slate-100 text-slate-600" : ""}`}
+      />
+    </label>
+  );
+}
+
+function StandardInvoiceDocument({ taller, invoice, items, totals }) {
+  const logo = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
+
+  return (
+    <section className="invoice-print rounded-2xl bg-white p-8 text-slate-950 shadow-sm ring-1 ring-slate-200">
+      <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-6">
+        <div>
+          <img src={logo} alt="Logo taller" className="h-16 max-w-56 object-contain" />
+          <h1 className="mt-5 text-2xl font-bold">Factura especial de recambio</h1>
+          <p className="mt-1 text-sm text-slate-500">{invoice.numero}</p>
+        </div>
+        <div className="text-right text-sm">
+          <p className="font-bold">{taller.razonSocial || taller.nombre}</p>
+          <p>{taller.nif}</p>
+          <p>{taller.direccion}</p>
+          <p>{taller.telefono}</p>
+          <p>{taller.email}</p>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
+        <div>
+          <p className="font-bold text-slate-700">Cliente</p>
+          <p>{invoice.cliente}</p>
+          <p>{invoice.dni}</p>
+          <p>{invoice.direccionCliente}</p>
+          <p>{invoice.telefonoCliente}</p>
+        </div>
+        <div className="md:text-right">
+          <p>Fecha: {invoice.fecha}</p>
+          <p>Pago: {invoice.tipoPago}</p>
+          {invoice.fechaVencimiento && <p>Vencimiento: {invoice.fechaVencimiento}</p>}
+        </div>
+      </div>
+
+      <table className="mt-8 w-full border-collapse text-sm">
+        <thead>
+          <tr className="border-b border-slate-300 text-left">
+            <th className="py-2">Descripcion</th>
+            <th className="py-2 text-right">Cant.</th>
+            <th className="py-2 text-right">Precio</th>
+            <th className="py-2 text-right">Importe</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, index) => {
+            const quantity = Number(item.cantidad || 0);
+            const price = Number(item.importe || 0);
+            return (
+              <tr key={index} className="border-b border-slate-100">
+                <td className="py-2">{item.descripcion}</td>
+                <td className="py-2 text-right">{quantity}</td>
+                <td className="py-2 text-right">{eur.format(price)}</td>
+                <td className="py-2 text-right">{eur.format(quantity * price)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div className="ml-auto mt-6 w-full max-w-xs space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span>Base imponible</span>
+          <strong>{eur.format(totals.subtotal)}</strong>
+        </div>
+        <div className="flex justify-between">
+          <span>IVA</span>
+          <strong>{eur.format(totals.iva)}</strong>
+        </div>
+        <div className="flex justify-between border-t border-slate-300 pt-2 text-base">
+          <span>Total</span>
+          <strong>{eur.format(totals.total)}</strong>
+        </div>
+      </div>
+    </section>
+  );
+}

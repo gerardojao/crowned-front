@@ -23,6 +23,7 @@ import TrialBanner from "./TrialBanner";
 import zagaProLogo from "../assets/logozagapro.png";
 import ClientAlertModal from "./ClienteAlertModal";
 import { getBusinessTerminology } from "../utils/businessTerminology";
+import { usesZagaInvoiceTemplate } from "./ZagaInvoiceDocument";
 import { sendSupportRequest } from "./supportRequest";
 
 const heroBtnBase =
@@ -54,7 +55,7 @@ export default function Layout({ children }) {
   const [helpStatus, setHelpStatus] = useState(null);
 
   const isAuthRoute = /^\/(login|register)(\/|$)?/.test(location.pathname);
-  const isPrintRoute = /^\/print-order\/.+/.test(location.pathname);
+  const isPrintRoute = /^\/print-(pre-)?order\/.+/.test(location.pathname);
 
   const onLogout = () => {
     logout();
@@ -128,11 +129,25 @@ export default function Layout({ children }) {
     ? `${activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "Negocio"}`
     : "ZagaPro - Gestion inteligente de negocios";
   const labels = getBusinessTerminology(activeWorkshop);
+  const useZagaDocuments = usesZagaInvoiceTemplate(activeWorkshop);
+  const preOrdersEnabled =
+    useZagaDocuments &&
+    (activeWorkshop?.enablePreOrders ??
+      activeWorkshop?.EnablePreOrders ??
+      true);
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
   const accountsReceivableEnabled =
     activeWorkshop?.enableAccountsReceivable ??
     activeWorkshop?.EnableAccountsReceivable ??
     false;
+  const ledgerEnabled =
+    activeWorkshop?.enableLedger ??
+    activeWorkshop?.EnableLedger ??
+    false;
+  const specialInvoicesEnabled =
+    activeWorkshop?.enableSpecialInvoices ??
+    activeWorkshop?.EnableSpecialInvoices ??
+    true;
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
   };
@@ -316,6 +331,15 @@ export default function Layout({ children }) {
                       >
                         Nueva orden
                       </NavLink>
+                      {preOrdersEnabled && (
+                        <NavLink
+                          to="/pre-ordenes"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          Pre-ordenes
+                        </NavLink>
+                      )}
                       <NavLink
                         to="/register-customer"
                         className={mobileLink}
@@ -360,6 +384,15 @@ export default function Layout({ children }) {
                           Finanzas / Cuentas por cobrar
                         </NavLink>
                       )}
+                      {ledgerEnabled && (
+                        <NavLink
+                          to="/ledger"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          Finanzas / Mayor
+                        </NavLink>
+                      )}
                       {/* <Link
                         to="/workshop-invoice"
                         className={mobileLink}
@@ -367,6 +400,15 @@ export default function Layout({ children }) {
                       >
                         Facturar
                       </Link> */}
+                      {specialInvoicesEnabled && (
+                        <Link
+                          to="/special-invoices/parts"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          Facturas especiales / Recambio
+                        </Link>
+                      )}
                       {isSuperAdmin && (
                         <NavLink
                           to="/admin/workshops"
@@ -541,6 +583,29 @@ export default function Layout({ children }) {
                       <span className="text-xl opacity-80">›</span>
                     </Link>
 
+                          {/* {preOrdersEnabled && (
+                      <Link
+                        to="/pre-ordenes"
+                        className={`${heroBtnBase} bg-slate-700 hover:bg-slate-800`}
+                      >
+                        <span className={heroBtnIcon}>
+                          <FileText size={26} />
+                        </span>
+
+                        <span className="flex-1">
+                          <span className="block text-base font-bold">
+                            Pre-orden
+                          </span>
+
+                          <span className="block text-xs text-white/90">
+                            Recepcion inicial
+                          </span>
+                        </span>
+
+                        <span className="text-xl opacity-80">›</span>
+                      </Link>
+                    )} */}
+
                     <Link
                       to="/register-customer"
                       className={`${heroBtnBase} bg-emerald-600 hover:bg-emerald-700`}
@@ -603,6 +668,28 @@ export default function Layout({ children }) {
 
                       <span className="text-xl opacity-80">›</span>
                     </Link>
+                    {false && ledgerEnabled && (
+                      <Link
+                        to="/ledger"
+                        className={`${heroBtnBase} bg-indigo-700 hover:bg-indigo-800`}
+                      >
+                        <span className={heroBtnIcon}>
+                          <Landmark size={26} />
+                        </span>
+
+                        <span className="flex-1">
+                          <span className="block text-base font-bold">
+                            Estado de cuentas
+                          </span>
+
+                          <span className="block text-xs text-white/90">
+                            Cliente, proveedor y banco
+                          </span>
+                        </span>
+
+                        <span className="text-xl opacity-80">€</span>
+                      </Link>
+                    )}
 
                   </>
                 ) : (

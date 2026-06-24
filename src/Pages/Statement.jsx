@@ -9,12 +9,34 @@ import KPIs from "../Components/Kpi";
 import {
   appendAccountsReceivableSummary,
   fetchAccountsReceivableIncome,
+  incomeIvaAmount,
+  incomeTotalAmount,
 } from "../utils/accountsReceivableIncome";
 
 const IVA_RATE = 0.21;
 const amountOf = (value) => Number(value ?? 0);
 const ivaOf = (value) => amountOf(value) * IVA_RATE;
 const totalWithIva = (value) => amountOf(value) + ivaOf(value);
+const incomeIvaOf = (item, value) =>
+  incomeIvaAmount(item, amountOf(value), IVA_RATE);
+const incomeTotalWithIva = (item, value) =>
+  incomeTotalAmount(item, amountOf(value), IVA_RATE);
+const normalizeExpenseKind = (value) =>
+  String(value ?? "variable")
+    .trim()
+    .toLowerCase() === "fijo"
+    ? "fijo"
+    : "variable";
+const expenseKindOf = (item) =>
+  normalizeExpenseKind(item?.tipoGasto ?? item?.TipoGasto);
+const isFixedExpense = (item) => expenseKindOf(item) === "fijo";
+const expenseKindLabel = (item) => (isFixedExpense(item) ? "Fijo" : "Variable");
+const sumExpensesByKind = (rows, kind) =>
+  rows.reduce((sum, item) => {
+    return expenseKindOf(item) === kind
+      ? sum + Number(item.total ?? item.Total ?? 0)
+      : sum;
+  }, 0);
 
 export default function Statement() {
   const [incomes, setIncomes] = useState([]);
@@ -112,23 +134,22 @@ export default function Statement() {
     (s, x) => s + Number(x.total ?? x.Total ?? 0),
     0,
   );
-  const totalIncomesIva = totalIncomes * IVA_RATE;
-  const totalIncomesWithIva = totalIncomes + totalIncomesIva;
+  const totalIncomesIva = incomes.reduce(
+    (s, x) => s + incomeIvaOf(x, x.total ?? x.Total ?? 0),
+    0,
+  );
+  const totalIncomesWithIva = incomes.reduce(
+    (s, x) => s + incomeTotalWithIva(x, x.total ?? x.Total ?? 0),
+    0,
+  );
 
   const totalExpenses = expenses.reduce(
     (s, x) => s + Number(x.total ?? x.Total ?? 0),
     0,
   );
 
-  const variableExpenses = expenses.reduce((s, x) => {
-    const tipo = String(x.tipoGasto ?? x.TipoGasto ?? "variable").toLowerCase();
-    return tipo === "fijo" ? s : s + Number(x.total ?? x.Total ?? 0);
-  }, 0);
-
-  const fixedExpenses = expenses.reduce((s, x) => {
-    const tipo = String(x.tipoGasto ?? x.TipoGasto ?? "variable").toLowerCase();
-    return tipo === "fijo" ? s + Number(x.total ?? x.Total ?? 0) : s;
-  }, 0);
+  const variableExpenses = sumExpensesByKind(expenses, "variable");
+  const fixedExpenses = sumExpensesByKind(expenses, "fijo");
 
   const grossProfit = totalIncomes - variableExpenses;
   const operatingProfit = grossProfit - fixedExpenses;
@@ -204,22 +225,13 @@ export default function Statement() {
       const reportExpenses = expenseRes?.data?.data?.[0] || [];
 
       const reportTotalIncomes = sumRows(reportIncomes);
-      const reportVariableExpenses = reportExpenses.reduce((sum, item) => {
-        const kind = String(
-          item.tipoGasto ?? item.TipoGasto ?? "variable",
-        ).toLowerCase();
-        return kind === "fijo"
-          ? sum
-          : sum + Number(item.total ?? item.Total ?? 0);
-      }, 0);
-      const reportFixedExpenses = reportExpenses.reduce((sum, item) => {
-        const kind = String(
-          item.tipoGasto ?? item.TipoGasto ?? "variable",
-        ).toLowerCase();
-        return kind === "fijo"
-          ? sum + Number(item.total ?? item.Total ?? 0)
-          : sum;
-      }, 0);
+      const reportTotalIncomesIva = sumIncomeIva(reportIncomes);
+      const reportTotalIncomesWithIva = sumIncomeWithIva(reportIncomes);
+      const reportVariableExpenses = sumExpensesByKind(
+        reportExpenses,
+        "variable",
+      );
+      const reportFixedExpenses = sumExpensesByKind(reportExpenses, "fijo");
       const reportTotalExpenses = reportVariableExpenses + reportFixedExpenses;
       const reportGrossProfit = reportTotalIncomes - reportVariableExpenses;
       const reportNetResult = reportGrossProfit - reportFixedExpenses;
@@ -231,6 +243,8 @@ export default function Statement() {
           incomes: reportIncomes,
           expenses: reportExpenses,
           totalIncomes: reportTotalIncomes,
+          totalIncomesIva: reportTotalIncomesIva,
+          totalIncomesWithIva: reportTotalIncomesWithIva,
           variableExpenses: reportVariableExpenses,
           fixedExpenses: reportFixedExpenses,
           totalExpenses: reportTotalExpenses,
@@ -391,7 +405,15 @@ export default function Statement() {
         )}
       </section>
 
-      <KPIs from={appliedFrom} to={appliedTo} className="mb-6" />
+      <KPIs
+        from={appliedFrom}
+        to={appliedTo}
+        className="mb-6"
+        totalsOverride={{
+          ingresos: totalIncomesWithIva,
+          gastos: totalExpenses,
+        }}
+      />
       <section className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-3">
         <Link
           to="/register-income"
@@ -458,10 +480,10 @@ export default function Statement() {
                         {currency(amount)}
                       </td>
                       <td className="td text-right font-semibold text-slate-700">
-                        {currency(ivaOf(amount))}
+                        {currency(incomeIvaOf(i, amount))}
                       </td>
                       <td className="td text-right font-bold text-emerald-700">
-                        {currency(totalWithIva(amount))}
+                        {currency(incomeTotalWithIva(i, amount))}
                       </td>
                     </tr>
                   );
@@ -521,18 +543,12 @@ export default function Statement() {
                     <td className="td">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${
-                          String(
-                            e.tipoGasto ?? e.TipoGasto ?? "variable",
-                          ).toLowerCase() === "fijo"
+                          isFixedExpense(e)
                             ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
                             : "bg-amber-50 text-amber-700 ring-amber-200"
                         }`}
                       >
-                        {String(
-                          e.tipoGasto ?? e.TipoGasto ?? "variable",
-                        ).toLowerCase() === "fijo"
-                          ? "Fijo"
-                          : "Variable"}
+                        {expenseKindLabel(e)}
                       </span>
                     </td>
                     <td className="td text-right text-slate-600">
@@ -577,6 +593,21 @@ function sumRows(rows) {
   );
 }
 
+function sumIncomeIva(rows) {
+  return rows.reduce(
+    (sum, item) => sum + incomeIvaOf(item, item.total ?? item.Total ?? 0),
+    0,
+  );
+}
+
+function sumIncomeWithIva(rows) {
+  return rows.reduce(
+    (sum, item) =>
+      sum + incomeTotalWithIva(item, item.total ?? item.Total ?? 0),
+    0,
+  );
+}
+
 function downloadProfitAndLossExcel(report, filename) {
   const incomeRows = report.incomes
     .map((item) => {
@@ -589,8 +620,8 @@ function downloadProfitAndLossExcel(report, filename) {
           <td class="cell name" colspan="2">${escapeHtmlCell(name)}</td>
           <td class="cell percent">${escapeHtmlCell(formatPct(amount, report.totalIncomes))}</td>
           <td class="cell money positive">${formatMoneyCell(amount)}</td>
-          <td class="cell money">${formatMoneyCell(ivaOf(amount))}</td>
-          <td class="cell money positive">${formatMoneyCell(totalWithIva(amount))}</td>
+          <td class="cell money">${formatMoneyCell(incomeIvaOf(item, amount))}</td>
+          <td class="cell money positive">${formatMoneyCell(incomeTotalWithIva(item, amount))}</td>
         </tr>
       `;
     })
@@ -601,11 +632,7 @@ function downloadProfitAndLossExcel(report, filename) {
       const amount = Number(item.total ?? item.Total ?? 0);
       const name =
         item.cuenta_Egreso ?? item.Cuenta_Egreso ?? item.nombre ?? "Sin tipo";
-      const kind =
-        String(item.tipoGasto ?? item.TipoGasto ?? "variable").toLowerCase() ===
-        "fijo"
-          ? "Fijo"
-          : "Variable";
+      const kind = expenseKindLabel(item);
 
       return `
         <tr>
@@ -820,7 +847,13 @@ function downloadProfitAndLossExcel(report, filename) {
             <td class="summary-value negative">${formatMoneyCell(report.totalExpenses)}</td>
           </tr>
           <tr>
-            <td class="net-label" colspan="5">Resultado neto</td>
+            <td className="net-label" colSpan="5">
+                {report.netResult > 0
+                    ? "Beneficio neto"
+                    : report.netResult < 0
+                        ? "Pérdida neta"
+                        : "Resultado neto"}
+            </td>
             <td class="net-value ${resultClass}">${formatMoneyCell(report.netResult)}</td>
           </tr>
 
@@ -840,8 +873,8 @@ function downloadProfitAndLossExcel(report, filename) {
           <tr>
             <td class="summary-label" colspan="3">Total ingresos</td>
             <td class="summary-value positive">${formatMoneyCell(report.totalIncomes)}</td>
-            <td class="summary-value">${formatMoneyCell(ivaOf(report.totalIncomes))}</td>
-            <td class="summary-value positive">${formatMoneyCell(totalWithIva(report.totalIncomes))}</td>
+            <td class="summary-value">${formatMoneyCell(report.totalIncomesIva ?? ivaOf(report.totalIncomes))}</td>
+            <td class="summary-value positive">${formatMoneyCell(report.totalIncomesWithIva ?? totalWithIva(report.totalIncomes))}</td>
           </tr>
 
           <tr class="spacer"><td colspan="6"></td></tr>

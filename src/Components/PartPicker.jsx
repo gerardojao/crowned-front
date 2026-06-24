@@ -18,7 +18,7 @@ export function getPartDisplayName(part) {
   const brand = getPartValue(part, "marca");
   const ref = getPartValue(part, "codigoReferencia");
 
-  return [name, brand, ref ? `Ref. ${ref}` : ""].filter(Boolean).join(" - ");
+  return [ref, name, brand].filter(Boolean).join(" - ");
 }
 
 export function getPartSalePrice(part) {
@@ -399,6 +399,12 @@ export default function PartPicker({
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="Referencia opcional"
+                      value={newPart.codigoReferencia}
+                      onChange={(e) => setNewPartField("codigoReferencia", e.target.value)}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Nombre del repuesto"
                       value={newPart.nombre}
                       onChange={(e) => setNewPartField("nombre", e.target.value)}
@@ -424,12 +430,6 @@ export default function PartPicker({
                       placeholder="Marca opcional"
                       value={newPart.marca}
                       onChange={(e) => setNewPartField("marca", e.target.value)}
-                    />
-                    <input
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Referencia opcional"
-                      value={newPart.codigoReferencia}
-                      onChange={(e) => setNewPartField("codigoReferencia", e.target.value)}
                     />
                     <select
                       className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
