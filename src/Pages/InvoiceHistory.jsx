@@ -66,6 +66,7 @@ export default function InvoiceHistory() {
   const [invoiceType, setInvoiceType] = useState("");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(null);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
 
   const autoTimerRef = useRef(null);
 
@@ -264,28 +265,17 @@ const handleView = (row) => {
     }
   };
 
-const handleCreateRectification = (row) => {
-  if (row.isRectification) {
-    setNotice({
-      type: "error",
-      text: "No se puede rectificar una factura rectificativa.",
-    });
-    return;
-  }
+const filteredRows = useMemo(() => {
+  if (!invoiceNumber.trim()) return rows;
 
-  navigate(`/create-invoice-rectification/${row.id}`, {
-    state: {
-      facturaOriginalId: row.id,
-      invoiceNumber: row.invoiceNumber,
-      customerName: row.customerName,
-      totalAmount: row.totalAmount,
-      baseAmount: row.baseAmount,
-      tipoFactura: row.tipoFactura,
-      origin: row.origin,
-      idOrdenTrabajo: row.idOrdenTrabajo,
-    },
-  });
-};
+  const search = invoiceNumber.trim().toLowerCase();
+
+  return rows.filter((x) =>
+    (x.invoiceNumber || "")
+      .toLowerCase()
+      .includes(search)
+  );
+}, [rows, invoiceNumber]);
 
   return (
     <>
@@ -312,7 +302,7 @@ const handleCreateRectification = (row) => {
         className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 mb-6"
         onSubmit={onSubmit}
       >
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Desde
@@ -336,6 +326,20 @@ const handleCreateRectification = (row) => {
               onChange={(e) => setTo(e.target.value)}
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+                Nº Factura
+            </label>
+
+            <input
+                type="text"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                placeholder="MT-2026-T2-0001"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+            </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -413,12 +417,12 @@ const handleCreateRectification = (row) => {
           <div className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4">
             <Loader />
           </div>
-        ) : rows.length === 0 ? (
+        ) : filteredRows.length === 0 ? (
           <div className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 text-slate-500">
             Sin resultados
           </div>
         ) : (
-          rows.map((r) => (
+          filteredRows.map((r) => (
             <article
               key={`${r.origin}-${r.id}`}
               className="rounded-2xl border border-slate-200 bg-white/70 p-3"
@@ -514,7 +518,7 @@ const handleCreateRectification = (row) => {
               <div className="text-sm text-slate-500">
                 Resultados:{" "}
                 <span className="font-medium text-slate-700">
-                  {rows.length}
+                  {filteredRows.length}
                 </span>
               </div>
 
@@ -552,14 +556,14 @@ const handleCreateRectification = (row) => {
                   </thead>
 
                   <tbody className="divide-y divide-slate-100">
-                    {rows.length === 0 ? (
+                    {filteredRows.length === 0 ? (
                       <tr>
                         <td className="py-6 px-3 text-slate-500" colSpan={9}>
                           Sin resultados
                         </td>
                       </tr>
                     ) : (
-                      rows.map((r) => (
+                      filteredRows.map((r) => (
                         <tr
                           key={`${r.origin}-${r.id}`}
                           className="hover:bg-slate-50"
