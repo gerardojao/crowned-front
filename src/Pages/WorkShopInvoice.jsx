@@ -98,14 +98,19 @@ export default function WorkshopInvoice() {
 
   const [invoice, setInvoice] = useState({
     numero: "",
+    idCliente: "",
     fecha: new Date().toISOString().slice(0, 10),
     cliente: "",
     dni: "",
     direccionCliente: "",
+    codigoPostalCliente: "",
+    poblacionCliente: "",
+    provinciaCliente: "",
     telefonoCliente: "",
     matricula: "",
     km: "",
     observaciones: "",
+    tipoOperacion: "Mecanica",
     ivaPct: 21,
     otros: "",
     tipoPago: "Contado",
@@ -135,6 +140,7 @@ export default function WorkshopInvoice() {
     marca: o.marca ?? o.Marca ?? "",
     modelo: o.modelo ?? o.Modelo ?? "",
     kilometraje: o.kilometraje ?? o.Kilometraje ?? "",
+    tipoOperacion: o.tipoOperacion ?? o.TipoOperacion ?? "Mecanica",
     trabajo: o.trabajo ?? o.Trabajo ?? "",
     itemsJson: o.itemsJson ?? o.ItemsJson ?? null,
     repuestos: Number(o.repuestos ?? o.Repuestos ?? 0),
@@ -146,10 +152,14 @@ export default function WorkshopInvoice() {
   });
 
   const normalizeCustomer = (c) => ({
+    id: c.id ?? c.Id ?? "",
     nombre: c.nombre ?? c.Nombre ?? "",
     dni: c.dni ?? c.Dni ?? "",
     telefono: c.telefono ?? c.Telefono ?? "",
     direccion: c.direccion ?? c.Direccion ?? "",
+    codigoPostal: c.codigoPostal ?? c.CodigoPostal ?? "",
+    poblacion: c.poblacion ?? c.Poblacion ?? "",
+    provincia: c.provincia ?? c.Provincia ?? "",
     matricula: c.matricula ?? c.Matricula ?? "",
   });
 
@@ -181,10 +191,10 @@ export default function WorkshopInvoice() {
         ) ||
         customers[0];
 
-      return exactMatch?.direccion || "";
+      return exactMatch || null;
     } catch (err) {
       console.error(err);
-      return "";
+      return null;
     }
   };
 
@@ -299,19 +309,24 @@ export default function WorkshopInvoice() {
 
       const o = normalizeOrder(raw);
       setOrder(o);
-      const direccionCliente =
-        o.direccionCliente || (await findCustomerAddressForOrder(o));
+      const customerForOrder = await findCustomerAddressForOrder(o);
+      const direccionCliente = o.direccionCliente || customerForOrder?.direccion || "";
 
       setInvoice((prev) => ({
         ...prev,
         numero: numeroFacturaPrev,
+        idCliente: customerForOrder?.id || "",
         cliente: o.cliente,
         dni: o.dni,
         direccionCliente,
+        codigoPostalCliente: customerForOrder?.codigoPostal || "",
+        poblacionCliente: customerForOrder?.poblacion || "",
+        provinciaCliente: customerForOrder?.provincia || "",
         telefonoCliente: o.telefono,
         matricula: o.matricula,
         km: o.kilometraje || "",
         observaciones: o.observaciones || "",
+        tipoOperacion: o.tipoOperacion || "Mecanica",
         otros: o.otros || "",
       }));
 
@@ -585,9 +600,13 @@ const saveIssuedInvoice = async () => {
   const payload = {
     idOrdenTrabajo: id ? Number(id) : null,
     fecha: invoice.fecha,
+    idCliente: invoice.idCliente ? Number(invoice.idCliente) : null,
     cliente: invoice.cliente,
     dni: invoice.dni || null,
     direccionCliente: invoice.direccionCliente || null,
+    codigoPostalCliente: invoice.codigoPostalCliente || null,
+    poblacionCliente: invoice.poblacionCliente || null,
+    provinciaCliente: invoice.provinciaCliente || null,
     telefonoCliente: invoice.telefonoCliente || null,
     matricula: invoice.matricula || null,
     km: invoice.km ? String(invoice.km) : null,
@@ -595,6 +614,7 @@ const saveIssuedInvoice = async () => {
     ivaPct: Number(invoice.ivaPct || 21),
     serie: taller.serieFactura || "A",
     observaciones: invoice.observaciones || null,
+    tipoOperacion: invoice.tipoOperacion || "Mecanica",
     tipoPago: invoice.tipoPago,
     totalAbonado: isCredit ? paymentTotal : totalFinal,
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
@@ -642,6 +662,13 @@ const printInvoice = async () => {
       res?.data?.data?.[0]?.numeroFactura ||
       res?.data?.data?.[0]?.NumeroFactura ||
       "";
+    const emittedInvoice = res?.data?.data?.[0] || res?.data?.Data?.[0] || {};
+    const emittedClientId =
+      emittedInvoice.idCliente ??
+      emittedInvoice.IdCliente ??
+      emittedInvoice.numeroCliente ??
+      emittedInvoice.NumeroCliente ??
+      "";
 
     if (!numeroFactura) {
       throw new Error("No se recibio el numero de factura emitida.");
@@ -657,6 +684,8 @@ const printInvoice = async () => {
     setInvoice((prev) => ({
       ...prev,
       numero: numeroFactura,
+      idCliente: emittedClientId || prev.idCliente,
+      numeroCliente: emittedClientId || prev.numeroCliente,
     }));
 
     localStorage.setItem("tc:invoice-issued", JSON.stringify(issuedEvent));
@@ -864,6 +893,25 @@ const printInvoice = async () => {
               readOnly={clientFieldsLocked}
               onChange={(e) =>
                 setInvoiceField("direccionCliente", e.target.value)
+              }
+            />
+              <input
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
+              placeholder="Codigo postal"
+              value={invoice.codigoPostalCliente}
+              readOnly={clientFieldsLocked}
+              onChange={(e) =>
+                setInvoiceField("codigoPostalCliente", e.target.value)
+              }
+            />
+
+              <input
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
+              placeholder="Codigo postal"
+              value={invoice.poblacionCliente}
+              readOnly={clientFieldsLocked}
+              onChange={(e) =>
+                setInvoiceField("poblacionCliente", e.target.value)
               }
             />
 
@@ -1209,7 +1257,7 @@ const printInvoice = async () => {
                 <p className="font-bold">FECHA:</p>
                 <p>{formatDate(invoice.fecha)}</p>
 
-                <p className="font-bold">N. FACTURA:</p>
+                <p className="font-bold">Nº FACTURA:</p>
                 <p className="text-xl font-extrabold">{invoice.numero}</p>
 
                 <p className="font-bold">TIPO PAGO:</p>
@@ -1222,17 +1270,9 @@ const printInvoice = async () => {
                   </>
                 )}
 
-                <p className="font-bold">FACTURAR A:</p>
-                <p className="font-bold">{invoice.cliente}</p>
-
-                <p className="font-bold">DNI/NIE/NIF:</p>
-                <p>{invoice.dni}</p>
-
-                <p className="font-bold">DIRECCION:</p>
-                <p>{invoice.direccionCliente}</p>
-
-                <p className="font-bold">TELEFONO:</p>
-                <p>{invoice.telefonoCliente}</p>
+                <div className="col-span-2 pt-2">
+                  <InvoiceCustomerBox invoice={invoice} />
+                </div>
 
                 <p className="font-bold">{labels.referenceLabel.toUpperCase()}:</p>
                 <p className="font-bold">{invoice.matricula}</p>
@@ -1379,6 +1419,30 @@ function Row({ label, value, strong = false }) {
       </div>
     </div>
   );
+}
+
+function InvoiceCustomerBox({ invoice }) {
+  const cityLine = [invoice.codigoPostalCliente, invoice.poblacionCliente]
+    .filter(Boolean)
+    .join("-");
+
+  return (
+    <div className="relative min-h-[96px] px-9 py-5 text-left text-[12px] uppercase leading-[1.18]">
+      <InvoiceCustomerCorner className="left-0 top-0 border-l-2 border-t-2 border-black" />
+      <InvoiceCustomerCorner className="right-0 top-0 border-r-2 border-t-2 border-black" />
+      <InvoiceCustomerCorner className="bottom-0 left-0 border-b-2 border-l-2 border-black" />
+      <InvoiceCustomerCorner className="bottom-0 right-0 border-b-2 border-r-2 border-black" />
+      <div className="font-extrabold">{invoice.cliente || ""}</div>
+      {invoice.direccionCliente && <div>{invoice.direccionCliente}</div>}
+      {cityLine && <div>{cityLine}</div>}
+      {invoice.provinciaCliente && <div>{invoice.provinciaCliente}</div>}
+      {invoice.telefonoCliente && <div>{invoice.telefonoCliente}</div>}
+    </div>
+  );
+}
+
+function InvoiceCustomerCorner({ className }) {
+  return <span className={`absolute h-8 w-8 ${className}`} />;
 }
 
 function formatMoney(value) {

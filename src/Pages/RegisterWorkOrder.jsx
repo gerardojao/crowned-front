@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
+import { ArrowLeft, Images, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
 import api, { getCurrentWorkshopId } from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import PartPicker, {
@@ -12,6 +12,7 @@ import PartPicker, {
   getPartSalePrice,
 } from "../Components/PartPicker";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import { amountInput } from "../utils/currency";
 
 const EMPTY_ORDER = {
@@ -19,13 +20,24 @@ const EMPTY_ORDER = {
   Dni: "",
   Telefono: "",
   Direccion: "",
+  CodigoPostal: "",
+  Poblacion: "",
+  Provincia: "",
+  Clasificacion: "Particular",
   Matricula: "",
+  Bastidor: "",
   Marca: "",
   Modelo: "",
+  FechaMatriculacion: "",
+  Motor: "",
+  Kw: "",
+  Cv: "",
+  Combustible: "",
   Kilometraje: "",
   Fecha: new Date().toISOString().slice(0, 10),
   FechaPrevistaEntrega: "",
   TiempoEstimadoHoras: "",
+  TipoOperacion: "Mecanica",
   Trabajo: "",
   Items: [],
   Repuestos: "",
@@ -89,7 +101,7 @@ const ensureOk = (res) => {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
     throw new Error(
-      data?.message || data?.Message || "La operacion no se pudo completar.",
+      data?.message || data?.Message || "La operación no se pudo completar.",
     );
   }
   return data;
@@ -147,7 +159,9 @@ function openWhatsAppVehicleReady(order, businessName = "nuestro taller") {
 
 function readReadyOrderAlerts() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(getReadyOrderAlertsKey()) || "[]");
+    const parsed = JSON.parse(
+      localStorage.getItem(getReadyOrderAlertsKey()) || "[]",
+    );
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -179,7 +193,10 @@ function saveReadyOrderAlert(order, businessName = "nuestro taller") {
     whatsappText: buildReadyOrderAlertMessage(order, businessName),
     fechaAviso: new Date().toISOString(),
   };
-  const next = [alert, ...readReadyOrderAlerts().filter((item) => item.id !== id)];
+  const next = [
+    alert,
+    ...readReadyOrderAlerts().filter((item) => item.id !== id),
+  ];
   localStorage.setItem(getReadyOrderAlertsKey(), JSON.stringify(next));
   window.dispatchEvent(new Event("tc:client-alerts:refresh"));
 }
@@ -213,6 +230,9 @@ export default function RegisterWorkOrder() {
   const [whatsappEnabled, setWhatsappEnabled] = useState(false);
   const [useZagaDocuments, setUseZagaDocuments] = useState(false);
   const [preOrdersEnabled, setPreOrdersEnabled] = useState(false);
+  const [receptionPhotosEnabled, setReceptionPhotosEnabled] = useState(true);
+  const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
+  const [photoTarget, setPhotoTarget] = useState(null);
   const [preOrderSourceId, setPreOrderSourceId] = useState(null);
   const orderPageSize = 10;
   const detailItems = Array.isArray(order.Items) ? order.Items : [];
@@ -238,6 +258,12 @@ export default function RegisterWorkOrder() {
         data.enablePreOrders ?? data.EnablePreOrders ?? true;
       setUseZagaDocuments(zagaDocuments);
       setPreOrdersEnabled(zagaDocuments && preOrderModuleEnabled);
+      setReceptionPhotosEnabled(
+        data.enableReceptionPhotos ??
+          data.EnableReceptionPhotos ??
+          true,
+      );
+      setOperationTypes(normalizeOperationTypes(data.operationTypes ?? data.OperationTypes));
 
       const name =
         data.nombre ??
@@ -412,13 +438,25 @@ export default function RegisterWorkOrder() {
     Dni: o.dni ?? o.Dni ?? "",
     Telefono: o.telefono ?? o.Telefono,
     Direccion: o.direccion ?? o.Direccion ?? "",
+    CodigoPostal: o.codigoPostal ?? o.CodigoPostal ?? "",
+    Poblacion: o.poblacion ?? o.Poblacion ?? "",
+    Provincia: o.provincia ?? o.Provincia ?? "",
+    Clasificacion: o.clasificacion ?? o.Clasificacion ?? "Particular",
     Matricula: o.matricula ?? o.Matricula,
+    Bastidor: o.bastidor ?? o.Bastidor ?? "",
     Marca: o.marca ?? o.Marca,
     Modelo: o.modelo ?? o.Modelo,
+    FechaMatriculacion: String(o.fechaMatriculacion ?? o.FechaMatriculacion ?? "").slice(0, 10),
+    Motor: o.motor ?? o.Motor ?? "",
+    Kw: o.kw ?? o.Kw ?? "",
+    Cv: o.cv ?? o.Cv ?? "",
+    Combustible: o.combustible ?? o.Combustible ?? "",
     Kilometraje: o.kilometraje ?? o.Kilometraje,
     Fecha: o.fecha ?? o.Fecha,
-    FechaPrevistaEntrega: o.fechaPrevistaEntrega ?? o.FechaPrevistaEntrega ?? "",
+    FechaPrevistaEntrega:
+      o.fechaPrevistaEntrega ?? o.FechaPrevistaEntrega ?? "",
     TiempoEstimadoHoras: o.tiempoEstimadoHoras ?? o.TiempoEstimadoHoras ?? "",
+    TipoOperacion: o.tipoOperacion ?? o.TipoOperacion ?? "Mecanica",
     Trabajo: o.trabajo ?? o.Trabajo,
     Repuestos: o.repuestos ?? o.Repuestos ?? 0,
     Cantidad: o.cantidad ?? o.Cantidad ?? 1,
@@ -474,11 +512,23 @@ export default function RegisterWorkOrder() {
     Dni: c.dni ?? c.Dni ?? "",
     Telefono: c.telefono ?? c.Telefono ?? "",
     Matricula: c.matricula ?? c.Matricula ?? "",
+    Bastidor: c.bastidor ?? c.Bastidor ?? "",
     Marca: c.marca ?? c.Marca ?? "",
     Modelo: c.modelo ?? c.Modelo ?? "",
+    FechaMatriculacion: String(
+      c.fechaMatriculacion ?? c.FechaMatriculacion ?? "",
+    ).slice(0, 10),
+    Motor: c.motor ?? c.Motor ?? "",
+    Kw: c.kw ?? c.Kw ?? "",
+    Cv: c.cv ?? c.Cv ?? "",
+    Combustible: c.combustible ?? c.Combustible ?? "",
     Kilometraje: c.kilometraje ?? c.Kilometraje ?? "",
     Email: c.email ?? c.Email ?? "",
     Direccion: c.direccion ?? c.Direccion ?? "",
+    CodigoPostal: c.codigoPostal ?? c.CodigoPostal ?? "",
+    Poblacion: c.poblacion ?? c.Poblacion ?? "",
+    Provincia: c.provincia ?? c.Provincia ?? "",
+    Clasificacion: c.clasificacion ?? c.Clasificacion ?? "Particular",
     Observaciones: c.observaciones ?? c.Observaciones ?? "",
   });
 
@@ -489,9 +539,20 @@ export default function RegisterWorkOrder() {
       Dni: customer.Dni || prev.Dni,
       Telefono: customer.Telefono || prev.Telefono,
       Direccion: customer.Direccion || prev.Direccion,
+      CodigoPostal: customer.CodigoPostal || prev.CodigoPostal,
+      Poblacion: customer.Poblacion || prev.Poblacion,
+      Provincia: customer.Provincia || prev.Provincia,
+      Clasificacion: customer.Clasificacion || prev.Clasificacion,
       Matricula: customer.Matricula || prev.Matricula,
+      Bastidor: customer.Bastidor || prev.Bastidor,
       Marca: customer.Marca || prev.Marca,
       Modelo: customer.Modelo || prev.Modelo,
+      FechaMatriculacion:
+        customer.FechaMatriculacion || prev.FechaMatriculacion,
+      Motor: customer.Motor || prev.Motor,
+      Kw: customer.Kw || prev.Kw,
+      Cv: customer.Cv || prev.Cv,
+      Combustible: customer.Combustible || prev.Combustible,
       Kilometraje: customer.Kilometraje
         ? String(customer.Kilometraje)
         : prev.Kilometraje,
@@ -559,9 +620,19 @@ export default function RegisterWorkOrder() {
       telefono: order.Telefono,
       email: null,
       direccion: order.Direccion || null,
+      codigoPostal: order.CodigoPostal || null,
+      poblacion: order.Poblacion || null,
+      provincia: order.Provincia || null,
+      clasificacion: order.Clasificacion || "Particular",
       matricula: order.Matricula,
+      bastidor: order.Bastidor || null,
       marca: order.Marca || null,
       modelo: order.Modelo,
+      fechaMatriculacion: order.FechaMatriculacion || null,
+      motor: order.Motor || null,
+      kw: order.Kw ? Number(order.Kw) : null,
+      cv: order.Cv ? Number(order.Cv) : null,
+      combustible: order.Combustible || null,
       kilometraje: order.Kilometraje ? Number(order.Kilometraje) : null,
       observaciones: order.Observaciones || null,
     };
@@ -571,7 +642,7 @@ export default function RegisterWorkOrder() {
       return;
     }
     if (!payload.telefono?.trim()) {
-      setError("Indica el telefono del cliente para registrarlo.");
+      setError("Indica el teléfono del cliente para registrarlo.");
       return;
     }
     if (!payload.matricula?.trim()) {
@@ -590,7 +661,7 @@ export default function RegisterWorkOrder() {
       if (existing) {
         setNotice("");
         setError(
-          `La matricula ${payload.matricula.trim().toUpperCase()} ya esta registrada para ${existing.Nombre}. No se registro un cliente nuevo para evitar duplicar el vehiculo. Selecciona ese cliente en el buscador o usa otra matricula.`,
+          `La matrícula ${payload.matricula.trim().toUpperCase()} ya está registrada para ${existing.Nombre}. No se registró un cliente nuevo para evitar duplicar el vehículo. Selecciona ese cliente en el buscador o usa otra matrícula.`,
         );
         return;
       }
@@ -676,6 +747,7 @@ export default function RegisterWorkOrder() {
     }
     loadWorkshopName();
     loadFrequentServices();
+    loadOrders(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -722,16 +794,25 @@ export default function RegisterWorkOrder() {
           Modelo: data.modelo ?? data.Modelo ?? "",
           Kilometraje: data.kilometraje ?? data.Kilometraje ?? "",
           Fecha: new Date().toISOString().slice(0, 10),
-          FechaPrevistaEntrega: fechaPrevista ? String(fechaPrevista).slice(0, 10) : "",
+          FechaPrevistaEntrega: fechaPrevista
+            ? String(fechaPrevista).slice(0, 10)
+            : "",
           TiempoEstimadoHoras: tiempoEstimado ?? "",
+          TipoOperacion: data.tipoOperacion ?? data.TipoOperacion ?? "Mecanica",
           Trabajo: diagnostico || motivo,
-          Items: tiempoEstimadoNumero > 0
-            ? [
-                createDetailItem(diagnostico || motivo || "Trabajo mecanico", tiempoEstimadoNumero, 0, {
-                  kind: "labor",
-                }),
-              ]
-            : [],
+          Items:
+            tiempoEstimadoNumero > 0
+              ? [
+                  createDetailItem(
+                    diagnostico || motivo || "Trabajo mecánico",
+                    tiempoEstimadoNumero,
+                    0,
+                    {
+                      kind: "labor",
+                    },
+                  ),
+                ]
+              : [],
           Observaciones: observaciones,
         });
         setNotice("Pre-orden cargada. Completa la orden y guardala.");
@@ -838,9 +919,21 @@ export default function RegisterWorkOrder() {
       Dni: o.Dni || "",
       Telefono: o.Telefono || "",
       Direccion: o.Direccion || "",
+      CodigoPostal: o.CodigoPostal || "",
+      Poblacion: o.Poblacion || "",
+      Provincia: o.Provincia || "",
+      Clasificacion: o.Clasificacion || "Particular",
       Matricula: o.Matricula || "",
+      Bastidor: o.Bastidor || "",
       Marca: o.Marca || "",
       Modelo: o.Modelo || "",
+      FechaMatriculacion: o.FechaMatriculacion
+        ? String(o.FechaMatriculacion).slice(0, 10)
+        : "",
+      Motor: o.Motor || "",
+      Kw: o.Kw || "",
+      Cv: o.Cv || "",
+      Combustible: o.Combustible || "",
       Kilometraje: o.Kilometraje || "",
       Fecha: o.Fecha
         ? String(o.Fecha).slice(0, 10)
@@ -849,6 +942,7 @@ export default function RegisterWorkOrder() {
         ? String(o.FechaPrevistaEntrega).slice(0, 10)
         : "",
       TiempoEstimadoHoras: o.TiempoEstimadoHoras || "",
+      TipoOperacion: o.TipoOperacion || "Mecanica",
       Trabajo: o.Trabajo || "",
       Items: o.Items || [],
       Repuestos: o.Repuestos || "",
@@ -903,15 +997,26 @@ export default function RegisterWorkOrder() {
         dni: order.Dni || null,
         telefono: order.Telefono || null,
         direccion: order.Direccion || null,
+        codigoPostal: order.CodigoPostal || null,
+        poblacion: order.Poblacion || null,
+        provincia: order.Provincia || null,
+        clasificacion: order.Clasificacion || "Particular",
         matricula: order.Matricula,
+        bastidor: order.Bastidor || null,
         marca: order.Marca || null,
         modelo: order.Modelo,
+        fechaMatriculacion: order.FechaMatriculacion || null,
+        motor: order.Motor || null,
+        kw: order.Kw ? Number(order.Kw) : null,
+        cv: order.Cv ? Number(order.Cv) : null,
+        combustible: order.Combustible || null,
         kilometraje: order.Kilometraje ? Number(order.Kilometraje) : null,
         fecha: order.Fecha,
         fechaPrevistaEntrega: order.FechaPrevistaEntrega || null,
         tiempoEstimadoHoras: order.TiempoEstimadoHoras
           ? Number(order.TiempoEstimadoHoras)
           : null,
+        tipoOperacion: order.TipoOperacion || "Mecanica",
         trabajo: order.Trabajo,
         itemsJson: normalizedItems.length
           ? JSON.stringify(normalizedItems)
@@ -957,7 +1062,7 @@ export default function RegisterWorkOrder() {
       setCustomerMatches([]);
       setShowNewCustomer(false);
 
-      if (showOrders) await loadOrders();
+      await loadOrders(showOrders ? orderPage : 1);
     } catch (err) {
       console.error(err);
       setError(
@@ -975,6 +1080,9 @@ export default function RegisterWorkOrder() {
 
   const filteredOrders = orders;
   const orderTotalPages = Math.max(1, Math.ceil(orderTotal / orderPageSize));
+  const receivedOrdersCount = filteredOrders.filter(
+    (item) => String(item.Estado || "").toLowerCase() === "recibido",
+  ).length;
 
   useEffect(() => {
     if (window.location.hash) {
@@ -1021,7 +1129,8 @@ export default function RegisterWorkOrder() {
           <p className="font-bold">Orden lista para retirar</p>
 
           <p className="mt-1 text-sm">
-            Notificale a {readyWhatsappOrder.Cliente} que ya puede retirar su vehículo.
+            Notificale a {readyWhatsappOrder.Cliente} que ya puede retirar su
+            vehículo.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -1041,7 +1150,7 @@ export default function RegisterWorkOrder() {
               onClick={() => {
                 saveReadyOrderAlert(readyWhatsappOrder, workshopName);
                 setReadyWhatsappOrder(null);
-                setNotice("Notificacion guardada en la campanita.");
+                setNotice("Notificación guardada en la campanita.");
               }}
               className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-green-700 ring-1 ring-green-200 hover:bg-green-100"
             >
@@ -1057,57 +1166,57 @@ export default function RegisterWorkOrder() {
         </div>
       )}
 
+          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <Metric
+              label="Recibidas en pantalla"
+              value={loadingOrders ? "..." : receivedOrdersCount}
+            />
+            <Metric
+              label="Órdenes totales"
+              value={loadingOrders ? "..." : orderTotal}
+            />
+            <Metric label="Página" value={`${orderPage}/${orderTotalPages}`} />
+          </section>
+
       <form
         onSubmit={onSubmit}
         className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 space-y-5"
       >
         <div>
-          <h3 className="text-lg font-semibold text-slate-800 mb-4">
-            {labels.customerAndAssetTitle}
-          </h3>
 
+
+          
           <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-end">
-              <div className="flex-1">
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Buscar cliente registrado
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                    className={`${cls} pl-10`}
-                    placeholder="Nombre, telefono, matricula, modelo o email"
-                  />
-                  <Search
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  {customerSearch && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCustomerSearch("");
-                        setCustomerMatches([]);
-                      }}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                      aria-label="Limpiar busqueda"
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              </div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Buscar cliente registrado
+            </label>
 
-              <button
-                type="button"
-                onClick={() => setShowNewCustomer((v) => !v)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-              >
-                <UserPlus size={17} />
-                {showNewCustomer ? "Ocultar alta rapida" : "Registrar nuevo"}
-              </button>
+            <div className="relative">
+              <input
+                type="text"
+                value={customerSearch}
+                onChange={(e) => setCustomerSearch(e.target.value)}
+                className={`${cls} pl-10`}
+                placeholder="Nombre, teléfono, matrícula o modelo"
+              />
+
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+
+              {customerSearch && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomerSearch("");
+                    setCustomerMatches([]);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
 
             {loadingCustomers && (
@@ -1120,8 +1229,7 @@ export default function RegisterWorkOrder() {
               customerSearch.trim().length >= 2 &&
               customerMatches.length === 0 && (
                 <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
-                  No encontramos ese cliente. Puedes completar los campos y usar
-                  "Registrar nuevo".
+                  No encontramos ese cliente.
                 </div>
               )}
 
@@ -1137,39 +1245,46 @@ export default function RegisterWorkOrder() {
                     <span className="block font-semibold text-slate-900">
                       {customer.Nombre}
                     </span>
+
                     <span className="mt-1 block text-slate-600">
-                      {customer.Matricula ||
-                        `Sin ${labels.referenceLabel.toLowerCase()}`}{" "}
-                      · {customer.Marca} {customer.Modelo}
+                      {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
+                      {customer.Modelo}
                     </span>
+
                     <span className="mt-1 block text-xs text-slate-500">
-                      {customer.Telefono || "Sin telefono"}
+                      {customer.Telefono || "Sin teléfono"}
                     </span>
                   </button>
                 ))}
               </div>
             )}
 
-            {showNewCustomer && (
-              <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600 ring-1 ring-slate-200">
-                <p>
-                  Completa nombre, telefono, matricula y modelo en los campos de
-                  abajo. Luego pulsa este boton para guardar el cliente en la
-                  base de datos.
-                </p>
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => setShowNewCustomer((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                <UserPlus size={17} />
+
+                {showNewCustomer ? "Ocultar alta rápida" : "Registrar nuevo"}
+              </button>
+
+              {showNewCustomer && (
                 <button
                   type="button"
                   onClick={createCustomerFromOrder}
                   disabled={savingCustomer}
-                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  className="ml-2 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
                   <UserPlus size={17} />
+
                   {savingCustomer
                     ? "Guardando cliente..."
                     : "Guardar cliente nuevo"}
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1206,6 +1321,37 @@ export default function RegisterWorkOrder() {
               placeholder="Dirección del cliente"
             />
             <input
+              name="CodigoPostal"
+              value={order.CodigoPostal}
+              onChange={handleChange}
+              className={cls}
+              placeholder="Codigo postal"
+            />
+            <input
+              name="Poblacion"
+              value={order.Poblacion}
+              onChange={handleChange}
+              className={cls}
+              placeholder="Poblacion"
+            />
+            <input
+              name="Provincia"
+              value={order.Provincia}
+              onChange={handleChange}
+              className={cls}
+              placeholder="Provincia"
+            />
+            <select
+              name="Clasificacion"
+              value={order.Clasificacion}
+              onChange={handleChange}
+              className={cls}
+            >
+              <option value="Particular">Particular</option>
+              <option value="Empresa">Empresa</option>
+            </select>
+
+            <input
               name="Matricula"
               value={order.Matricula}
               onChange={handleChange}
@@ -1232,12 +1378,61 @@ export default function RegisterWorkOrder() {
             />
 
             <input
+              name="Bastidor"
+              value={order.Bastidor}
+              onChange={handleChange}
+              className={cls}
+              placeholder="Bastidor"
+            />
+
+            <input
               name="Modelo"
               value={order.Modelo}
               onChange={handleChange}
               className={cls}
               placeholder={`${labels.modelLabel} *`}
               required
+            />
+
+            <input
+              name="FechaMatriculacion"
+              type="date"
+              value={order.FechaMatriculacion}
+              onChange={handleChange}
+              className={cls}
+              title="Fecha matriculación"
+            />
+            <input
+              name="Motor"
+              value={order.Motor}
+              onChange={handleChange}
+              className={cls}
+              placeholder="Motor"
+            />
+            <input
+              name="Kw"
+              type="number"
+              step="0.01"
+              value={order.Kw}
+              onChange={handleChange}
+              className={cls}
+              placeholder="KW"
+            />
+            <input
+              name="Cv"
+              type="number"
+              step="0.01"
+              value={order.Cv}
+              onChange={handleChange}
+              className={cls}
+              placeholder="CV"
+            />
+            <input
+              name="Combustible"
+              value={order.Combustible}
+              onChange={handleChange}
+              className={cls}
+              placeholder="Combustible"
             />
 
             <input
@@ -1269,6 +1464,19 @@ export default function RegisterWorkOrder() {
               aria-label="Tiempo estimado en horas"
               placeholder="Tiempo estimado horas"
             />
+
+            <select
+              name="TipoOperacion"
+              value={order.TipoOperacion}
+              onChange={handleChange}
+              className={cls}
+            >
+              {operationTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
 
             <select
               name="Estado"
@@ -1381,7 +1589,7 @@ export default function RegisterWorkOrder() {
                 onChange={handleChange}
                 onBlur={(e) => upsertLaborItem(e.target.value)}
                 className={cls}
-                placeholder="Mano de obra €"
+                placeholder="Mano de obra ?"
               />
             </div>
 
@@ -1484,7 +1692,7 @@ export default function RegisterWorkOrder() {
                           type="button"
                           onClick={() => removeDetailItem(item.id)}
                           className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
-                          aria-label="Eliminar linea"
+                          aria-label="Eliminar línea"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -1541,7 +1749,7 @@ export default function RegisterWorkOrder() {
           }}
           className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
         >
-          {showOrders ? "Ocultar ordenes" : "Ver ordenes"}
+          {showOrders ? "Ocultar órdenes" : "Ver órdenes"}
         </button>
       </div>
 
@@ -1600,7 +1808,7 @@ export default function RegisterWorkOrder() {
           <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
             {loadingOrders && (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
-                Cargando ordenes...
+                Cargando órdenes...
               </div>
             )}
 
@@ -1761,6 +1969,17 @@ export default function RegisterWorkOrder() {
                       </>
                     )}
 
+                    {receptionPhotosEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => setPhotoTarget(o)}
+                        className="inline-flex justify-center gap-2 rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
+                      >
+                        <Images size={16} />
+                        Fotos
+                      </button>
+                    )}
+
                     {!isOrderEditLocked(o.Estado) && (
                       <button
                         type="button"
@@ -1802,8 +2021,8 @@ export default function RegisterWorkOrder() {
 
             {!loadingOrders && filteredOrders.length === 0 && (
               <div className="lg:col-span-2 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 text-2xl">
-                  🚗
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-100 text-sm font-bold uppercase text-orange-600">
+                  OT
                 </div>
 
                 <h4 className="mt-4 text-lg font-semibold text-slate-800">
@@ -1831,7 +2050,7 @@ export default function RegisterWorkOrder() {
               Anterior
             </button>
             <span className="text-center text-slate-600">
-              Pagina {orderPage} de {orderTotalPages} · {orderTotal} ordenes
+              Página {orderPage} de {orderTotalPages} · {orderTotal} órdenes
             </span>
             <button
               type="button"
@@ -1844,6 +2063,38 @@ export default function RegisterWorkOrder() {
           </div>
         </section>
       )}
+
+      {photoTarget && (
+        <ReceptionPhotosModal
+          open={!!photoTarget}
+          onClose={() => setPhotoTarget(null)}
+          orderId={photoTarget.Id}
+          title="Fotos de recepción"
+          subtitle={`${photoTarget.Matricula || ""} - ${photoTarget.Cliente || ""}`}
+          canUpload={false}
+          context={{
+            orderId: photoTarget.Id,
+            cliente: photoTarget.Cliente,
+            matricula: photoTarget.Matricula,
+          }}
+        />
+      )}
     </>
   );
 }
+
+function normalizeOperationTypes(types) {
+  const list = Array.isArray(types) ? types : ["Mecanica"];
+  const filtered = list.filter((type) => type && type !== "Recambio");
+  return filtered.length ? filtered : ["Mecanica"];
+}
+
+function Metric({ label, value }) {
+  return (
+    <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-2 text-xl font-bold text-slate-900">{value}</p>
+    </div>
+  );
+}
+

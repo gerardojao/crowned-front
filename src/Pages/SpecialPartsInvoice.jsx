@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Printer, Search, Trash2 } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
@@ -22,8 +22,12 @@ const DEFAULT_TALLER = {
   email: "multiservicioscrower@gmail.com",
   iban: "ES69 2100 4014 9122 0012 3843",
   serieFacturaRecambio: "RC",
+  serieFacturaRapel: "RP",
+  serieFacturaSinIva: "SI",
   logoUrl: "",
   enableSpecialInvoices: true,
+  enableRapelInvoices: false,
+  enableNoVatInvoices: false,
 };
 
 const EMPTY_ITEM = {
@@ -52,9 +56,76 @@ const inputCls = "rounded-xl border border-slate-300 px-3 py-2 text-sm";
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+function getInvoiceMode(type) {
+  const key = String(type || "parts").toLowerCase();
+  if (key === "rapel") {
+    return {
+      key: "rapel",
+      tipoFactura: "Rapel",
+      itemType: "Rapel",
+      operationType: "Rapel",
+      title: "Factura Rapel",
+      titleLower: "factura Rapel",
+      description: "Regularizacion comercial con base e importes siempre en negativo.",
+      linesTitle: "Conceptos Rapel",
+      linePlaceholder: "Descripcion del rapel",
+      ivaPct: 21,
+      isRapel: true,
+      isNoVat: false,
+      usesParts: false,
+    };
+  }
+  if (key === "no-vat" || key === "sin-iva" || key === "siniva") {
+    return {
+      key: "no-vat",
+      tipoFactura: "SinIva",
+      itemType: "SinIva",
+      operationType: "Sin IVA",
+      title: "Factura sin IVA",
+      titleLower: "factura sin IVA",
+      description: "Factura especial con numeracion propia y tasa de IVA 0%.",
+      linesTitle: "Conceptos",
+      linePlaceholder: "Descripcion del concepto",
+      ivaPct: 0,
+      isRapel: false,
+      isNoVat: true,
+      usesParts: false,
+    };
+  }
+  return {
+    key: "parts",
+    tipoFactura: "Recambio",
+    itemType: "Recambio",
+    operationType: "Recambio",
+    title: "Factura especial de recambio",
+    titleLower: "factura de recambio",
+    description: "Venta directa de piezas con numeracion independiente.",
+    linesTitle: "Recambios",
+    linePlaceholder: "Descripcion del recambio",
+    ivaPct: 21,
+    isRapel: false,
+    isNoVat: false,
+    usesParts: true,
+  };
+}
+
+function getSerieForMode(taller, mode) {
+  if (mode.isRapel) return taller.serieFacturaRapel || taller.SerieFacturaRapel || "RP";
+  if (mode.isNoVat) return taller.serieFacturaSinIva || taller.SerieFacturaSinIva || "SI";
+  return taller.serieFacturaRecambio || taller.SerieFacturaRecambio || "RC";
+}
+
+function getSignedQuantity(item, mode) {
+  const quantity = Math.abs(Number(item.cantidad || 0));
+  return mode.isRapel ? -quantity : quantity;
+}
+
 export default function SpecialPartsInvoice() {
+  const { type = "parts" } = useParams();
+  const invoiceMode = getInvoiceMode(type);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [taller, setTaller] = useState(DEFAULT_TALLER);
@@ -64,15 +135,29 @@ export default function SpecialPartsInvoice() {
   const [clientResults, setClientResults] = useState([]);
   const [invoice, setInvoice] = useState({
     numero: "",
+    idCliente: "",
     fecha: new Date().toISOString().slice(0, 10),
     cliente: "",
     dni: "",
     direccionCliente: "",
+    codigoPostalCliente: "",
+    poblacionCliente: "",
+    provinciaCliente: "",
     telefonoCliente: "",
     matricula: "",
+    bastidor: "",
+    marca: "",
+    modelo: "",
+    fechaMatriculacion: "",
+    motor: "",
+    kw: "",
+    cv: "",
+    combustible: "",
     km: "",
+    clasificacion: "Particular",
     observaciones: "",
-    ivaPct: 21,
+    tipoOperacion: invoiceMode.operationType,
+    ivaPct: invoiceMode.ivaPct,
     tipoPago: "Contado",
     plazoCreditoDias: 30,
     fechaVencimiento: "",
@@ -80,21 +165,24 @@ export default function SpecialPartsInvoice() {
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
 
   const isCredit = invoice.tipoPago === "Credito";
-  const specialInvoicesEnabled =
-    taller.enableSpecialInvoices ?? taller.EnableSpecialInvoices ?? true;
+  const moduleEnabled = invoiceMode.isRapel
+    ? (taller.enableRapelInvoices ?? taller.EnableRapelInvoices ?? false)
+    : invoiceMode.isNoVat
+      ? (taller.enableNoVatInvoices ?? taller.EnableNoVatInvoices ?? false)
+      : (taller.enableSpecialInvoices ?? taller.EnableSpecialInvoices ?? true);
 
   const subtotal = useMemo(
     () =>
       round2(
         items.reduce(
           (sum, item) =>
-            sum + Number(item.cantidad || 0) * Number(item.importe || 0),
+            sum + getSignedQuantity(item, invoiceMode) * Math.abs(Number(item.importe || 0)),
           0,
         ),
       ),
-    [items],
+    [items, invoiceMode.key],
   );
-  const iva = round2(subtotal * (Number(invoice.ivaPct || 21) / 100));
+  const iva = round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
   const total = round2(subtotal + iva);
   const totals = { subtotal, iva, otros: 0, total };
 
@@ -120,11 +208,23 @@ export default function SpecialPartsInvoice() {
             settings.serieFacturaRecambio ??
             settings.SerieFacturaRecambio ??
             DEFAULT_TALLER.serieFacturaRecambio,
+          serieFacturaRapel:
+            settings.serieFacturaRapel ??
+            settings.SerieFacturaRapel ??
+            DEFAULT_TALLER.serieFacturaRapel,
+          serieFacturaSinIva:
+            settings.serieFacturaSinIva ??
+            settings.SerieFacturaSinIva ??
+            DEFAULT_TALLER.serieFacturaSinIva,
           logoUrl: settings.logoUrl ?? settings.LogoUrl ?? "",
           documentTemplateKey:
             settings.documentTemplateKey ?? settings.DocumentTemplateKey ?? "",
           enableSpecialInvoices:
             settings.enableSpecialInvoices ?? settings.EnableSpecialInvoices ?? true,
+          enableRapelInvoices:
+            settings.enableRapelInvoices ?? settings.EnableRapelInvoices ?? false,
+          enableNoVatInvoices:
+            settings.enableNoVatInvoices ?? settings.EnableNoVatInvoices ?? false,
         };
 
         const banksRes = await api.get("/WorkshopBankAccounts");
@@ -132,7 +232,7 @@ export default function SpecialPartsInvoice() {
         const main = banks.find((x) => x.esPrincipal ?? x.EsPrincipal) || banks[0];
 
         const previewRes = await api.get("/NumeradorFactura/preview", {
-          params: { serie: nextTaller.serieFacturaRecambio || "RC" },
+          params: { serie: getSerieForMode(nextTaller, invoiceMode) },
         });
         const numeroFactura =
           previewRes?.data?.data?.[0]?.numeroFactura ||
@@ -146,10 +246,15 @@ export default function SpecialPartsInvoice() {
         });
         setBankAccounts(banks);
         setSelectedBankId(String(main?.id ?? main?.Id ?? ""));
-        setInvoice((prev) => ({ ...prev, numero: numeroFactura }));
+        setInvoice((prev) => ({
+          ...prev,
+          numero: numeroFactura,
+          tipoOperacion: invoiceMode.operationType,
+          ivaPct: invoiceMode.ivaPct,
+        }));
       } catch (err) {
         console.error(err);
-        if (alive) setError("No se pudo cargar la factura de recambio.");
+        if (alive) setError(`No se pudo cargar la ${invoiceMode.titleLower}.`);
       } finally {
         if (alive) setLoading(false);
       }
@@ -159,7 +264,7 @@ export default function SpecialPartsInvoice() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [invoiceMode.key]);
 
   useEffect(() => {
     const search = clientSearch.trim();
@@ -195,15 +300,75 @@ export default function SpecialPartsInvoice() {
   const selectClient = (client) => {
     setInvoice((prev) => ({
       ...prev,
+      idCliente: client.id ?? client.Id ?? "",
       cliente: client.nombre ?? client.Nombre ?? "",
       dni: client.dni ?? client.Dni ?? "",
       direccionCliente: client.direccion ?? client.Direccion ?? "",
+      codigoPostalCliente: client.codigoPostal ?? client.CodigoPostal ?? "",
+      poblacionCliente: client.poblacion ?? client.Poblacion ?? "",
+      provinciaCliente: client.provincia ?? client.Provincia ?? "",
       telefonoCliente: client.telefono ?? client.Telefono ?? "",
       matricula: client.matricula ?? client.Matricula ?? "",
+      bastidor: client.bastidor ?? client.Bastidor ?? "",
+      marca: client.marca ?? client.Marca ?? "",
+      modelo: client.modelo ?? client.Modelo ?? "",
+      fechaMatriculacion: String(client.fechaMatriculacion ?? client.FechaMatriculacion ?? "").slice(0, 10),
+      motor: client.motor ?? client.Motor ?? "",
+      kw: client.kw ?? client.Kw ?? "",
+      cv: client.cv ?? client.Cv ?? "",
+      combustible: client.combustible ?? client.Combustible ?? "",
       km: client.kilometraje ?? client.Kilometraje ?? "",
+      clasificacion: client.clasificacion ?? client.Clasificacion ?? "Particular",
     }));
     setClientSearch("");
     setClientResults([]);
+  };
+
+  const saveClientFromInvoice = async () => {
+    if (savingCustomer) return;
+
+    const payload = {
+      nombre: invoice.cliente,
+      dni: invoice.dni || null,
+      telefono: invoice.telefonoCliente,
+      email: null,
+      direccion: invoice.direccionCliente || null,
+      codigoPostal: invoice.codigoPostalCliente || null,
+      poblacion: invoice.poblacionCliente || null,
+      provincia: invoice.provinciaCliente || null,
+      clasificacion: invoice.clasificacion || "Particular",
+      matricula: invoice.matricula,
+      bastidor: invoice.bastidor || null,
+      marca: invoice.marca || null,
+      modelo: invoice.modelo,
+      fechaMatriculacion: invoice.fechaMatriculacion || null,
+      motor: invoice.motor || null,
+      kw: invoice.kw ? Number(invoice.kw) : null,
+      cv: invoice.cv ? Number(invoice.cv) : null,
+      combustible: invoice.combustible || null,
+      kilometraje: invoice.km ? Number(invoice.km) : null,
+      observaciones: invoice.observaciones || null,
+    };
+
+    if (!payload.nombre?.trim()) return setError("Indica el nombre del cliente para registrarlo.");
+    if (!payload.telefono?.trim()) return setError("Indica el telefono del cliente para registrarlo.");
+    if (!payload.matricula?.trim()) return setError("Indica la matricula para registrar el cliente.");
+    if (!payload.modelo?.trim()) return setError("Indica el modelo para registrar el cliente.");
+
+    try {
+      setSavingCustomer(true);
+      setError("");
+      const res = await api.post("/Cliente", payload);
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(res?.data?.message || res?.data?.Message || "No se pudo guardar el cliente.");
+      }
+      setNotice("Cliente guardado correctamente.");
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || "No se pudo guardar el cliente.");
+    } finally {
+      setSavingCustomer(false);
+    }
   };
 
   const setItem = (index, field, value) => {
@@ -226,6 +391,8 @@ export default function SpecialPartsInvoice() {
       descripcion: getPartDisplayName(part),
       cantidad: 1,
       importe: getPartSalePrice(part),
+      tipo: invoiceMode.itemType,
+      kind: invoiceMode.itemType,
       precioCompra: getPartPurchasePrice(part),
       idProveedor: getPartProviderId(part),
       proveedor: getPartProviderName(part),
@@ -251,36 +418,41 @@ export default function SpecialPartsInvoice() {
       )
       .map((item) => ({
         ...item,
-        cantidad: Number(item.cantidad || 0),
-        importe: Number(item.importe || 0),
-        tipo: "Recambio",
-        kind: "Recambio",
+        cantidad: getSignedQuantity(item, invoiceMode),
+        importe: Math.abs(Number(item.importe || 0)),
+        tipo: invoiceMode.itemType,
+        kind: invoiceMode.itemType,
       }));
 
     if (!invoice.cliente.trim()) throw new Error("El cliente es requerido.");
     if (!billableItems.length) {
-      throw new Error("Agrega al menos un recambio con importe mayor que 0.");
+      throw new Error(`Agrega al menos una linea de ${invoiceMode.titleLower} con importe mayor que 0.`);
     }
     if (!isCredit && bankAccounts.length > 1 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
 
     const res = await api.post("/FacturaEmitida/emitir", {
-      tipoFactura: "Recambio",
-      serie: taller.serieFacturaRecambio || "RC",
+      tipoFactura: invoiceMode.tipoFactura,
+      serie: getSerieForMode(taller, invoiceMode),
+      idCliente: invoice.idCliente ? Number(invoice.idCliente) : null,
       fecha: invoice.fecha,
       cliente: invoice.cliente,
       dni: invoice.dni || null,
       direccionCliente: invoice.direccionCliente || null,
+      codigoPostalCliente: invoice.codigoPostalCliente || null,
+      poblacionCliente: invoice.poblacionCliente || null,
+      provinciaCliente: invoice.provinciaCliente || null,
       telefonoCliente: invoice.telefonoCliente || null,
       matricula: invoice.matricula || null,
       km: invoice.km ? String(invoice.km) : null,
       marca: invoice.marca || null,
       modelo: invoice.modelo || null,
       observaciones: invoice.observaciones || null,
-      ivaPct: Number(invoice.ivaPct || 21),
+      tipoOperacion: invoiceMode.operationType,
+      ivaPct: Number(invoice.ivaPct || 0),
       tipoPago: invoice.tipoPago,
-      totalAbonado: isCredit ? 0 : total,
+      totalAbonado: isCredit || invoiceMode.isRapel ? 0 : total,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
       bankAccountId: !isCredit && selectedBankId ? Number(selectedBankId) : null,
@@ -295,7 +467,15 @@ export default function SpecialPartsInvoice() {
       res?.data?.data?.[0] ||
       res?.data?.Data?.[0] ||
       {};
-    return created.numeroFactura ?? created.NumeroFactura ?? "";
+    return {
+      numeroFactura: created.numeroFactura ?? created.NumeroFactura ?? "",
+      idCliente:
+        created.idCliente ??
+        created.IdCliente ??
+        created.numeroCliente ??
+        created.NumeroCliente ??
+        "",
+    };
   };
 
   const printInvoice = async () => {
@@ -303,10 +483,16 @@ export default function SpecialPartsInvoice() {
       setSaving(true);
       setError("");
       setNotice("");
-      const numeroFactura = await emitInvoice();
+      const emitted = await emitInvoice();
+      const numeroFactura = emitted.numeroFactura;
       if (!numeroFactura) throw new Error("No se recibio el numero de factura emitida.");
-      setInvoice((prev) => ({ ...prev, numero: numeroFactura }));
-      setNotice("Factura de recambio emitida correctamente.");
+      setInvoice((prev) => ({
+        ...prev,
+        numero: numeroFactura,
+        idCliente: emitted.idCliente || prev.idCliente,
+        numeroCliente: emitted.idCliente || prev.numeroCliente,
+      }));
+      setNotice(`${invoiceMode.title} emitida correctamente.`);
       setTimeout(() => window.print(), 150);
     } catch (err) {
       console.error(err);
@@ -314,7 +500,7 @@ export default function SpecialPartsInvoice() {
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
           err?.message ||
-          "No se pudo emitir la factura.",
+          `No se pudo emitir la ${invoiceMode.titleLower}.`,
       );
     } finally {
       setSaving(false);
@@ -325,12 +511,12 @@ export default function SpecialPartsInvoice() {
     return <section className="rounded-2xl bg-white/80 p-6 ring-1 ring-slate-200">Cargando factura...</section>;
   }
 
-  if (!specialInvoicesEnabled) {
+  if (!moduleEnabled) {
     return (
       <section className="rounded-2xl bg-white p-6 ring-1 ring-slate-200">
-        <h2 className="text-xl font-bold text-slate-900">Facturas especiales desactivadas</h2>
+        <h2 className="text-xl font-bold text-slate-900">{invoiceMode.title} desactivada</h2>
         <p className="mt-2 text-sm text-slate-600">
-          El modulo de facturas especiales no esta habilitado para este taller.
+          El modulo de {invoiceMode.titleLower} no esta habilitado para este taller.
         </p>
         <Link
           to="/"
@@ -343,15 +529,23 @@ export default function SpecialPartsInvoice() {
     );
   }
 
-  const printableItems = items.filter((item) => String(item.descripcion || "").trim());
+  const printableItems = items
+    .filter((item) => String(item.descripcion || "").trim())
+    .map((item) => ({
+      ...item,
+      cantidad: getSignedQuantity(item, invoiceMode),
+      importe: Math.abs(Number(item.importe || 0)),
+      tipo: invoiceMode.itemType,
+      kind: invoiceMode.itemType,
+    }));
 
   return (
     <>
       <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-semibold text-slate-900">Factura especial de recambio</h2>
+          <h2 className="text-2xl font-semibold text-slate-900">{invoiceMode.title}</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Venta directa de piezas con numeracion independiente.
+            {invoiceMode.description}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -365,7 +559,7 @@ export default function SpecialPartsInvoice() {
             {saving ? "Emitiendo..." : "Emitir e imprimir"}
           </button>
           <Link
-            to="/stock-parts"
+            to="/"
             className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-white transition hover:bg-slate-800"
           >
             <ArrowLeft size={18} />
@@ -384,7 +578,6 @@ export default function SpecialPartsInvoice() {
           {notice}
         </div>
       )}
-
       <section className="no-print mb-6 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_360px]">
         <div className="space-y-4 rounded-2xl bg-white/90 p-5 ring-1 ring-slate-200">
           <div>
@@ -430,27 +623,57 @@ export default function SpecialPartsInvoice() {
             <Input label="NIF/DNI" value={invoice.dni} onChange={(v) => setInvoiceField("dni", v)} />
             <Input label="Telefono" value={invoice.telefonoCliente} onChange={(v) => setInvoiceField("telefonoCliente", v)} />
             <Input label="Direccion" value={invoice.direccionCliente} onChange={(v) => setInvoiceField("direccionCliente", v)} />
+            <Input label="Codigo postal" value={invoice.codigoPostalCliente} onChange={(v) => setInvoiceField("codigoPostalCliente", v)} />
+            <Input label="Poblacion" value={invoice.poblacionCliente} onChange={(v) => setInvoiceField("poblacionCliente", v)} />
+            <Input label="Provincia" value={invoice.provinciaCliente} onChange={(v) => setInvoiceField("provinciaCliente", v)} />
+            <label className="flex flex-col gap-1 text-sm font-semibold text-slate-700">
+              Clasificacion
+              <select
+                value={invoice.clasificacion}
+                onChange={(event) => setInvoiceField("clasificacion", event.target.value)}
+                className={inputCls}
+              >
+                <option value="Particular">Particular</option>
+                <option value="Empresa">Empresa</option>
+              </select>
+            </label>
             <Input label="Matricula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
+            <Input label="Bastidor" value={invoice.bastidor} onChange={(v) => setInvoiceField("bastidor", v)} />
             <Input label="Km" value={invoice.km} onChange={(v) => setInvoiceField("km", v)} />
             <Input label="Marca" value={invoice.marca} onChange={(v) => setInvoiceField("marca", v)} />
             <Input label="Modelo" value={invoice.modelo} onChange={(v) => setInvoiceField("modelo", v)} />  
+            <Input label="Fecha matriculacion" type="date" value={invoice.fechaMatriculacion} onChange={(v) => setInvoiceField("fechaMatriculacion", v)} />
+            <Input label="Motor" value={invoice.motor} onChange={(v) => setInvoiceField("motor", v)} />
+            <Input label="KW" type="number" value={invoice.kw} onChange={(v) => setInvoiceField("kw", v)} />
+            <Input label="CV" type="number" value={invoice.cv} onChange={(v) => setInvoiceField("cv", v)} />
+            <Input label="Combustible" value={invoice.combustible} onChange={(v) => setInvoiceField("combustible", v)} />
           </div>
+          <button
+            type="button"
+            onClick={saveClientFromInvoice}
+            disabled={savingCustomer}
+            className="mt-3 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+          >
+            {savingCustomer ? "Guardando cliente..." : "Guardar cliente"}
+          </button>
 
           <div>
-            <h3 className="mb-3 text-lg font-bold text-slate-900">Recambios</h3>
-            <PartPicker
-              onSelect={addPart}
-              placeholder="Buscar recambio en stock"
-              buttonLabel="Agregar"
-              allowCreate
-            />
+            <h3 className="mb-3 text-lg font-bold text-slate-900">{invoiceMode.linesTitle}</h3>
+            {invoiceMode.usesParts && (
+              <PartPicker
+                onSelect={addPart}
+                placeholder="Buscar recambio en stock"
+                buttonLabel="Agregar"
+                allowCreate
+              />
+            )}
             <div className="mt-4 space-y-3">
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 md:grid-cols-[1fr_90px_120px_44px]">
                   <input
                     value={item.descripcion}
                     onChange={(event) => setItem(index, "descripcion", event.target.value)}
-                    placeholder="Descripcion del recambio"
+                    placeholder={invoiceMode.linePlaceholder}
                     className={inputCls}
                   />
                   <input
@@ -573,7 +796,11 @@ export default function SpecialPartsInvoice() {
       {usesZagaInvoiceTemplate(taller) ? (
         <ZagaInvoiceDocument
           taller={taller}
-          invoice={invoice}
+          invoice={{
+            ...invoice,
+            tipoFactura: invoiceMode.tipoFactura,
+            tipoOperacion: invoiceMode.operationType,
+          }}
           items={printableItems}
           totals={totals}
           selectedPaymentMethods={[{ label: invoice.tipoPago }]}
@@ -581,7 +808,11 @@ export default function SpecialPartsInvoice() {
       ) : (
         <StandardInvoiceDocument
           taller={taller}
-          invoice={invoice}
+          invoice={{
+            ...invoice,
+            tipoFactura: invoiceMode.tipoFactura,
+            tipoOperacion: invoiceMode.operationType,
+          }}
           items={printableItems}
           totals={totals}
         />
@@ -613,7 +844,13 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
       <div className="flex items-start justify-between gap-6 border-b border-slate-200 pb-6">
         <div>
           <img src={logo} alt="Logo taller" className="h-16 max-w-56 object-contain" />
-          <h1 className="mt-5 text-2xl font-bold">Factura especial de recambio</h1>
+          <h1 className="mt-5 text-2xl font-bold">
+            {invoice.tipoFactura === "Rapel"
+              ? "Factura Rapel"
+              : invoice.tipoFactura === "SinIva"
+                ? "Factura sin IVA"
+                : "Factura especial de recambio"}
+          </h1>
           <p className="mt-1 text-sm text-slate-500">{invoice.numero}</p>
         </div>
         <div className="text-right text-sm">
@@ -627,11 +864,7 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
 
       <div className="mt-6 grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
         <div>
-          <p className="font-bold text-slate-700">Cliente</p>
-          <p>{invoice.cliente}</p>
-          <p>{invoice.dni}</p>
-          <p>{invoice.direccionCliente}</p>
-          <p>{invoice.telefonoCliente}</p>
+          <InvoiceCustomerBox invoice={invoice} />
         </div>
         <div className="md:text-right">
           <p>Fecha: {invoice.fecha}</p>
@@ -681,4 +914,28 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
       </div>
     </section>
   );
+}
+
+function InvoiceCustomerBox({ invoice }) {
+  const cityLine = [invoice.codigoPostalCliente, invoice.poblacionCliente]
+    .filter(Boolean)
+    .join("-");
+
+  return (
+    <div className="relative min-h-[96px] max-w-sm px-9 py-5 text-left text-[12px] uppercase leading-[1.18] text-black">
+      <InvoiceCustomerCorner className="left-0 top-0 border-l-2 border-t-2 border-black" />
+      <InvoiceCustomerCorner className="right-0 top-0 border-r-2 border-t-2 border-black" />
+      <InvoiceCustomerCorner className="bottom-0 left-0 border-b-2 border-l-2 border-black" />
+      <InvoiceCustomerCorner className="bottom-0 right-0 border-b-2 border-r-2 border-black" />
+      <div className="font-extrabold">{invoice.cliente || ""}</div>
+      {invoice.direccionCliente && <div>{invoice.direccionCliente}</div>}
+      {cityLine && <div>{cityLine}</div>}
+      {invoice.provinciaCliente && <div>{invoice.provinciaCliente}</div>}
+      {invoice.telefonoCliente && <div>{invoice.telefonoCliente}</div>}
+    </div>
+  );
+}
+
+function InvoiceCustomerCorner({ className }) {
+  return <span className={`absolute h-8 w-8 ${className}`} />;
 }

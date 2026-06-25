@@ -45,15 +45,21 @@ export default function ReprintInvoice() {
 
   const [invoice, setInvoice] = useState({
     id: null,
+    idCliente: "",
+    numeroCliente: "",
     numero: "",
     fecha: "",
     cliente: "",
     dni: "",
     direccionCliente: "",
+    codigoPostalCliente: "",
+    poblacionCliente: "",
+    provinciaCliente: "",
     telefonoCliente: "",
     matricula: "",
     km: "",
     observaciones: "",
+    tipoOperacion: "Mecanica",
     ivaPct: 21,
     tipoFactura: "Normal",
     numeroFacturaRectificada: "",
@@ -134,15 +140,24 @@ export default function ReprintInvoice() {
 
       setInvoice({
         id: f.id ?? f.Id ?? null,
+        idCliente: f.idCliente ?? f.IdCliente ?? "",
+        numeroCliente: f.numeroCliente ?? f.NumeroCliente ?? f.idCliente ?? f.IdCliente ?? "",
         numero: f.numeroFactura ?? f.NumeroFactura ?? "",
         fecha: String(f.fecha ?? f.Fecha ?? "").slice(0, 10),
         cliente: f.cliente ?? f.Cliente ?? "",
         dni: f.dni ?? f.Dni ?? "",
         direccionCliente: f.direccionCliente ?? f.DireccionCliente ?? "",
+        codigoPostalCliente: f.codigoPostalCliente ?? f.CodigoPostalCliente ?? "",
+        poblacionCliente: f.poblacionCliente ?? f.PoblacionCliente ?? "",
+        provinciaCliente: f.provinciaCliente ?? f.ProvinciaCliente ?? "",
         telefonoCliente: f.telefonoCliente ?? f.TelefonoCliente ?? "",
         matricula: f.matricula ?? f.Matricula ?? "",
         km: f.km ?? f.Km ?? "",
         observaciones: f.observaciones ?? f.Observaciones ?? "",
+        tipoOperacion:
+          f.tipoOperacion ??
+          f.TipoOperacion ??
+          (tipoFactura === "Recambio" ? "Recambio" : "Mecanica"),
         ivaPct,
         tipoFactura,
         numeroFacturaRectificada: f.numeroFacturaRectificada ?? f.NumeroFacturaRectificada ?? "",
@@ -403,7 +418,7 @@ export default function ReprintInvoice() {
                   <p className="font-bold">FECHA:</p>
                   <p>{formatDate(invoice.fecha)}</p>
 
-                  <p className="font-bold">N. FACTURA:</p>
+                  <p className="font-bold">Nº FACTURA:</p>
                   <p className="text-xl font-extrabold">{invoice.numero}</p>
 
                   {isRectificativa && (
@@ -413,17 +428,9 @@ export default function ReprintInvoice() {
                     </>
                   )}
 
-                  <p className="font-bold">FACTURAR A:</p>
-                  <p className="font-bold">{invoice.cliente}</p>
-
-                  <p className="font-bold">DNI/NIE/NIF:</p>
-                  <p>{invoice.dni}</p>
-
-                  <p className="font-bold">DIRECCION:</p>
-                  <p>{invoice.direccionCliente}</p>
-
-                  <p className="font-bold">TELEFONO:</p>
-                  <p>{invoice.telefonoCliente}</p>
+                  <div className="col-span-2 pt-2">
+                    <InvoiceCustomerBox invoice={invoice} />
+                  </div>
 
                   <p className="font-bold">MATRICULA:</p>
                   <p className="font-bold">{invoice.matricula}</p>
@@ -668,6 +675,30 @@ function Row({ label, value, strong = false }) {
       </div>
     </div>
   );
+}
+
+function InvoiceCustomerBox({ invoice }) {
+  const cityLine = [invoice.codigoPostalCliente, invoice.poblacionCliente]
+    .filter(Boolean)
+    .join("-");
+
+  return (
+    <div className="relative min-h-[96px] px-9 py-5 text-left text-[12px] uppercase leading-[1.18]">
+      <InvoiceCustomerCorner className="left-0 top-0 border-l-2 border-t-2 border-black" />
+      <InvoiceCustomerCorner className="right-0 top-0 border-r-2 border-t-2 border-black" />
+      <InvoiceCustomerCorner className="bottom-0 left-0 border-b-2 border-l-2 border-black" />
+      <InvoiceCustomerCorner className="bottom-0 right-0 border-b-2 border-r-2 border-black" />
+      <div className="font-extrabold">{invoice.cliente || ""}</div>
+      {invoice.direccionCliente && <div>{invoice.direccionCliente}</div>}
+      {cityLine && <div>{cityLine}</div>}
+      {invoice.provinciaCliente && <div>{invoice.provinciaCliente}</div>}
+      {invoice.telefonoCliente && <div>{invoice.telefonoCliente}</div>}
+    </div>
+  );
+}
+
+function InvoiceCustomerCorner({ className }) {
+  return <span className={`absolute h-8 w-8 ${className}`} />;
 }
 
 function formatMoney(value) {

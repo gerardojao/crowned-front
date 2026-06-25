@@ -15,6 +15,8 @@ const TERMINOLOGY_PROFILES = [
   { value: "generic_service", label: "Servicios generales" },
 ];
 
+const OPERATION_TYPES = ["Mecanica", "Chapa y pintura", "Recambio"];
+
 const emptyWorkshop = {
   nombre: "",
   razonSocial: "",
@@ -25,6 +27,8 @@ const emptyWorkshop = {
   iban: "",
   serieFactura: "A",
   serieFacturaRecambio: "RC",
+  serieFacturaRapel: "RP",
+  serieFacturaSinIva: "SI",
   logoPath: "",
   maxUsers: 3,
   activo: true,
@@ -37,11 +41,16 @@ const emptyWorkshop = {
   enableInvoiceExport: true,
   enableProfitAndLoss: true,
   enableDashboardRepairVehicles: true,
+  enableDashboardBilling: true,
   enablePreOrders: true,
   enableSpecialInvoices: true,
+  enableRapelInvoices: false,
+  enableNoVatInvoices: false,
+  enableReceptionPhotos: true,
   enableAccountsReceivable: true,
   enableLedger: true,
   allowInvoiceClientEdit: false,
+  operationTypes: ["Mecanica"],
   ownerEmail: "",
   ownerPassword: "",
   ownerFullName: "",
@@ -73,6 +82,8 @@ export default function AdminWorkshops() {
     iban: "",
     serieFactura: "A",
     serieFacturaRecambio: "RC",
+    serieFacturaRapel: "RP",
+    serieFacturaSinIva: "SI",
     logoPath: "",
     activo: true,
     footerText: "",
@@ -85,11 +96,16 @@ export default function AdminWorkshops() {
     enableInvoiceExport: true,
     enableProfitAndLoss: true,
     enableDashboardRepairVehicles: true,
+    enableDashboardBilling: true,
     enablePreOrders: true,
     enableSpecialInvoices: true,
+    enableRapelInvoices: false,
+    enableNoVatInvoices: false,
+    enableReceptionPhotos: true,
     enableAccountsReceivable: true,
     enableLedger: true,
     allowInvoiceClientEdit: false,
+    operationTypes: ["Mecanica"],
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -157,6 +173,8 @@ export default function AdminWorkshops() {
         iban: "",
         serieFactura: "A",
         serieFacturaRecambio: "RC",
+        serieFacturaRapel: "RP",
+        serieFacturaSinIva: "SI",
         logoPath: "",
         activo: true,
         footerText: "",
@@ -169,8 +187,12 @@ export default function AdminWorkshops() {
         enableInvoiceExport: true,
         enableProfitAndLoss: true,
         enableDashboardRepairVehicles: true,
+        enableDashboardBilling: true,
         enablePreOrders: true,
         enableSpecialInvoices: true,
+        enableRapelInvoices: false,
+        enableNoVatInvoices: false,
+        enableReceptionPhotos: true,
         enableAccountsReceivable: true,
         enableLedger: true,
         allowInvoiceClientEdit: false,
@@ -194,6 +216,14 @@ export default function AdminWorkshops() {
         selectedWorkshop.serieFacturaRecambio ??
         selectedWorkshop.SerieFacturaRecambio ??
         "RC",
+      serieFacturaRapel:
+        selectedWorkshop.serieFacturaRapel ??
+        selectedWorkshop.SerieFacturaRapel ??
+        "RP",
+      serieFacturaSinIva:
+        selectedWorkshop.serieFacturaSinIva ??
+        selectedWorkshop.SerieFacturaSinIva ??
+        "SI",
       logoPath: selectedWorkshop.logoPath ?? selectedWorkshop.LogoPath ?? "",
       activo: selectedWorkshop.activo ?? selectedWorkshop.Activo ?? true,
       footerText: selectedWorkshop.footerText ?? selectedWorkshop.FooterText ?? "",
@@ -209,6 +239,10 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableDashboardRepairVehicles ??
         selectedWorkshop.EnableDashboardRepairVehicles ??
         true,
+      enableDashboardBilling:
+        selectedWorkshop.enableDashboardBilling ??
+        selectedWorkshop.EnableDashboardBilling ??
+        true,
       enablePreOrders:
         selectedWorkshop.enablePreOrders ??
         selectedWorkshop.EnablePreOrders ??
@@ -216,6 +250,18 @@ export default function AdminWorkshops() {
       enableSpecialInvoices:
         selectedWorkshop.enableSpecialInvoices ??
         selectedWorkshop.EnableSpecialInvoices ??
+        true,
+      enableRapelInvoices:
+        selectedWorkshop.enableRapelInvoices ??
+        selectedWorkshop.EnableRapelInvoices ??
+        false,
+      enableNoVatInvoices:
+        selectedWorkshop.enableNoVatInvoices ??
+        selectedWorkshop.EnableNoVatInvoices ??
+        false,
+      enableReceptionPhotos:
+        selectedWorkshop.enableReceptionPhotos ??
+        selectedWorkshop.EnableReceptionPhotos ??
         true,
       enableAccountsReceivable:
         selectedWorkshop.enableAccountsReceivable ??
@@ -229,6 +275,9 @@ export default function AdminWorkshops() {
         selectedWorkshop.allowInvoiceClientEdit ??
         selectedWorkshop.AllowInvoiceClientEdit ??
         false,
+      operationTypes: normalizeOperationTypes(
+        selectedWorkshop.operationTypes ?? selectedWorkshop.OperationTypes,
+      ),
     });
     setForm({
       nombre: selectedWorkshop.nombre ?? selectedWorkshop.Nombre ?? "",
@@ -243,6 +292,14 @@ export default function AdminWorkshops() {
         selectedWorkshop.serieFacturaRecambio ??
         selectedWorkshop.SerieFacturaRecambio ??
         "RC",
+      serieFacturaRapel:
+        selectedWorkshop.serieFacturaRapel ??
+        selectedWorkshop.SerieFacturaRapel ??
+        "RP",
+      serieFacturaSinIva:
+        selectedWorkshop.serieFacturaSinIva ??
+        selectedWorkshop.SerieFacturaSinIva ??
+        "SI",
       logoPath: selectedWorkshop.logoPath ?? selectedWorkshop.LogoPath ?? "",
       maxUsers: selectedWorkshop.maxUsers ?? selectedWorkshop.MaxUsers ?? 3,
       activo: selectedWorkshop.activo ?? selectedWorkshop.Activo ?? true,
@@ -258,6 +315,10 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableDashboardRepairVehicles ??
         selectedWorkshop.EnableDashboardRepairVehicles ??
         true,
+      enableDashboardBilling:
+        selectedWorkshop.enableDashboardBilling ??
+        selectedWorkshop.EnableDashboardBilling ??
+        true,
       enablePreOrders:
         selectedWorkshop.enablePreOrders ??
         selectedWorkshop.EnablePreOrders ??
@@ -265,6 +326,18 @@ export default function AdminWorkshops() {
       enableSpecialInvoices:
         selectedWorkshop.enableSpecialInvoices ??
         selectedWorkshop.EnableSpecialInvoices ??
+        true,
+      enableRapelInvoices:
+        selectedWorkshop.enableRapelInvoices ??
+        selectedWorkshop.EnableRapelInvoices ??
+        false,
+      enableNoVatInvoices:
+        selectedWorkshop.enableNoVatInvoices ??
+        selectedWorkshop.EnableNoVatInvoices ??
+        false,
+      enableReceptionPhotos:
+        selectedWorkshop.enableReceptionPhotos ??
+        selectedWorkshop.EnableReceptionPhotos ??
         true,
       enableAccountsReceivable:
         selectedWorkshop.enableAccountsReceivable ??
@@ -278,6 +351,9 @@ export default function AdminWorkshops() {
         selectedWorkshop.allowInvoiceClientEdit ??
         selectedWorkshop.AllowInvoiceClientEdit ??
         false,
+      operationTypes: normalizeOperationTypes(
+        selectedWorkshop.operationTypes ?? selectedWorkshop.OperationTypes,
+      ),
       ownerEmail: "",
       ownerPassword: "",
       ownerFullName: "",
@@ -524,6 +600,8 @@ export default function AdminWorkshops() {
             <Input label="NIF/CIF" value={form.nif} onChange={(v) => setField("nif", v)} required />
             <Input label="Serie factura" value={form.serieFactura} onChange={(v) => setField("serieFactura", v)} />
             <Input label="Serie factura recambio" value={form.serieFacturaRecambio} onChange={(v) => setField("serieFacturaRecambio", v)} />
+            <Input label="Serie factura Rapel" value={form.serieFacturaRapel} onChange={(v) => setField("serieFacturaRapel", v)} />
+            <Input label="Serie factura sin IVA" value={form.serieFacturaSinIva} onChange={(v) => setField("serieFacturaSinIva", v)} />
             <Select label="Tipo de negocio" value={form.businessType} onChange={(v) => setField("businessType", v)} options={BUSINESS_TYPES} />
             <Select label="Perfil de textos" value={form.terminologyProfile} onChange={(v) => setField("terminologyProfile", v)} options={TERMINOLOGY_PROFILES} />
             <Input label="Telefono" value={form.telefono} onChange={(v) => setField("telefono", v)} />
@@ -557,6 +635,12 @@ export default function AdminWorkshops() {
               <FeatureSwitches
                 values={form}
                 onChange={(name, value) => setField(name, value)}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <OperationTypeSwitches
+                values={form.operationTypes}
+                onChange={(values) => setField("operationTypes", values)}
               />
             </div>
             <Input label="Footer" value={form.footerText} onChange={(v) => setField("footerText", v)} />
@@ -1052,12 +1136,18 @@ function FeatureSwitches({ values, onChange }) {
         <p className="mb-2 text-sm font-bold text-slate-800">Modulos del dashboard</p>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         <Switch
-          label="Vehiculos en reparacion"
-          description="Muestra el contador de ordenes en estado Reparando."
+          label="Vehiculos por estado"
+          description="Muestra el contador de ordenes en estado Reparando o Entregado."
           checked={values.enableDashboardRepairVehicles}
           onChange={(checked) =>
             onChange("enableDashboardRepairVehicles", checked)
           }
+        />
+        <Switch
+          label="Facturacion"
+          description="Muestra lo facturado hoy y en el mes en el dashboard."
+          checked={values.enableDashboardBilling}
+          onChange={(checked) => onChange("enableDashboardBilling", checked)}
         />
         <Switch
           label="Pre-ordenes"
@@ -1070,6 +1160,24 @@ function FeatureSwitches({ values, onChange }) {
           description="Habilita facturas de recambio y futuras ventas especiales."
           checked={values.enableSpecialInvoices}
           onChange={(checked) => onChange("enableSpecialInvoices", checked)}
+        />
+        <Switch
+          label="Facturas Rapel"
+          description="Permite emitir facturas Rapel con importes negativos."
+          checked={values.enableRapelInvoices}
+          onChange={(checked) => onChange("enableRapelInvoices", checked)}
+        />
+        <Switch
+          label="Facturas sin IVA"
+          description="Permite emitir facturas especiales con tasa de IVA 0%."
+          checked={values.enableNoVatInvoices}
+          onChange={(checked) => onChange("enableNoVatInvoices", checked)}
+        />
+        <Switch
+          label="Fotos de recepcion"
+          description="Permite guardar hasta 5 fotos internas por pre-orden."
+          checked={values.enableReceptionPhotos}
+          onChange={(checked) => onChange("enableReceptionPhotos", checked)}
         />
         <Switch
           label="Cuentas por cobrar"
@@ -1090,6 +1198,38 @@ function FeatureSwitches({ values, onChange }) {
           onChange={(checked) => onChange("allowInvoiceClientEdit", checked)}
         />
       </div>
+      </div>
+    </div>
+  );
+}
+
+function OperationTypeSwitches({ values, onChange }) {
+  const selected = normalizeOperationTypes(values);
+  const toggle = (type, checked) => {
+    if (type === "Mecanica") return;
+    const next = checked
+      ? [...selected, type]
+      : selected.filter((item) => item !== type);
+    onChange(normalizeOperationTypes(next));
+  };
+
+  return (
+    <div>
+      <p className="mb-2 text-sm font-bold text-slate-800">Tipos de operacion</p>
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+        {OPERATION_TYPES.map((type) => (
+          <Switch
+            key={type}
+            label={type}
+            description={
+              type === "Recambio"
+                ? "Usado por las facturas de recambio."
+                : "Disponible en pre-ordenes, ordenes y presupuestos."
+            }
+            checked={selected.includes(type)}
+            onChange={(checked) => toggle(type, checked)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -1118,4 +1258,11 @@ function businessTypeLabel(value) {
 
 function terminologyProfileLabel(value) {
   return TERMINOLOGY_PROFILES.find((option) => option.value === value)?.label ?? "Automotriz";
+}
+
+function normalizeOperationTypes(values) {
+  const source = Array.isArray(values) ? values : ["Mecanica"];
+  const selected = OPERATION_TYPES.filter((type) => source.includes(type));
+  if (!selected.includes("Mecanica")) selected.unshift("Mecanica");
+  return selected;
 }

@@ -39,6 +39,12 @@ export default function ZagaInvoiceDocument({
     : isDuplicate
       ? "Factura duplicada"
       : "Factura";
+  const customerNumber =
+    invoice.numeroCliente ??
+    invoice.NumeroCliente ??
+    invoice.idCliente ??
+    invoice.IdCliente ??
+    "";
 
   return (
     <>
@@ -313,6 +319,11 @@ export default function ZagaInvoiceDocument({
 
               <div>{invoice.cliente}</div>
               <div>{invoice.direccionCliente}</div>
+              <div>
+                {[invoice.codigoPostalCliente, invoice.poblacionCliente, invoice.provinciaCliente]
+                  .filter(Boolean)
+                  .join(" ")}
+              </div>
               <div>{invoice.telefonoCliente}</div>
             </div>
 
@@ -346,7 +357,7 @@ export default function ZagaInvoiceDocument({
                 {documentTitle}
               </h1>
 
-              <div className="grid w-[360px] grid-cols-[135px_1fr] text-[11px]">
+              <div className="grid w-[330px] grid-cols-[128px_1fr] text-[11px]">
                 <InfoLabel>Nº Documento</InfoLabel>
                 <InfoValue strong>{invoice.numero}</InfoValue>
 
@@ -354,7 +365,7 @@ export default function ZagaInvoiceDocument({
                 <InfoValue>{formatDateShort(invoice.fecha)}</InfoValue>
 
                 <InfoLabel>Nº Cliente</InfoLabel>
-                <InfoValue>{invoice.Id}</InfoValue>
+                <InfoValue>{customerNumber}</InfoValue>
 
                 <InfoLabel>NIF</InfoLabel>
                 <InfoValue>{invoice.dni}</InfoValue>
@@ -377,15 +388,13 @@ export default function ZagaInvoiceDocument({
             </div>
 
             <div className="flex flex-col items-end">
-              <div className="relative mt-11 min-h-[116px] w-[360px] px-10 py-5 text-[13px] leading-[1.4] text-left uppercase">
+              <div className="relative mt-11 min-h-[116px] w-[360px] px-10 py-5 text-left uppercase">
                 <Corner className="left-0 top-0 border-l-2 border-t-2 border-black" />
                 <Corner className="right-0 top-0 border-r-2 border-t-2 border-black" />
                 <Corner className="bottom-0 left-0 border-b-2 border-l-2 border-black" />
                 <Corner className="bottom-0 right-0 border-b-2 border-r-2 border-black" />
 
-                <div>{invoice.cliente}</div>
-                <div>{invoice.direccionCliente}</div>
-                <div>{invoice.telefonoCliente}</div>
+                <InvoiceCustomerBlock invoice={invoice} />
               </div>
 
               <div className="mt-5 pr-1 text-right text-[12px]">Pág. 1</div>
@@ -469,6 +478,8 @@ export function usesZagaInvoiceTemplate(taller) {
 }
 
 function VehicleTable({ invoice, paymentText }) {
+  const operationType = String(invoice.tipoOperacion || "Mecanica").toUpperCase();
+
   return (
     <div className="mt-2 text-[10px] uppercase">
       <div className="grid grid-cols-6 bg-[#a7a7a7] text-center font-bold">
@@ -499,7 +510,7 @@ function VehicleTable({ invoice, paymentText }) {
         <div>{invoice.motor || ""}</div>
         <div>{formatDateShort(invoice.fecha)}</div>
         <div>{formatDateShort(invoice.fecha)}</div>
-        <div>MECÁNICA</div>
+        <div>{operationType}</div>
       </div>
     </div>
   );
@@ -562,13 +573,15 @@ function LineItems({ items, ivaPct }) {
 
 function InfoLabel({ children }) {
   return (
-    <div className="bg-[#a7a7a7] px-2 py-1 text-left font-bold">{children}</div>
+    <div className="border-b border-white bg-[#b7b7b7] px-2 py-1 text-left font-bold leading-tight">
+      {children}
+    </div>
   );
 }
 
 function InfoValue({ children, strong = false }) {
   return (
-    <div className={`px-2 py-1 text-left ${strong ? "font-bold" : ""}`}>
+    <div className={`px-2 py-1 text-left leading-tight ${strong ? "font-bold" : ""}`}>
       {children}
     </div>
   );
@@ -587,6 +600,22 @@ function SummaryCell({ label, value, strong = false }) {
 
 function Corner({ className }) {
   return <span className={`absolute h-8 w-8 ${className}`} />;
+}
+
+function InvoiceCustomerBlock({ invoice }) {
+  const cityLine = [invoice.codigoPostalCliente, invoice.poblacionCliente]
+    .filter(Boolean)
+    .join("-");
+
+  return (
+    <div className="text-[12px] leading-[1.18] uppercase">
+      <div className="font-extrabold">{invoice.cliente || ""}</div>
+      {invoice.direccionCliente && <div>{invoice.direccionCliente}</div>}
+      {cityLine && <div>{cityLine}</div>}
+      {invoice.provinciaCliente && <div>{invoice.provinciaCliente}</div>}
+      {invoice.telefonoCliente && <div>{invoice.telefonoCliente}</div>}
+    </div>
+  );
 }
 
 function isLaborItem(item) {

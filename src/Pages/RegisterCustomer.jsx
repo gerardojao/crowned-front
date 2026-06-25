@@ -12,12 +12,22 @@ const EMPTY_CUSTOMER = {
   Telefono: "",
   Email: "",
   Direccion: "",
+  CodigoPostal: "",
+  Poblacion: "",
+  Provincia: "",
+  Clasificacion: "Particular",
 
   // Vehículo
   Matricula: "",
+  Bastidor: "",
   Marca: "",
   Modelo: "",
   Anio: "",
+  FechaMatriculacion: "",
+  Motor: "",
+  Kw: "",
+  Cv: "",
+  Combustible: "",
   Kilometraje: "",
 
   // Extra
@@ -151,10 +161,20 @@ export default function RegisterCustomer() {
         telefono: customer.Telefono,
         email: customer.Email || null,
         direccion: customer.Direccion || null,
+        codigoPostal: customer.CodigoPostal || null,
+        poblacion: customer.Poblacion || null,
+        provincia: customer.Provincia || null,
+        clasificacion: customer.Clasificacion || "Particular",
         matricula: customer.Matricula,
+        bastidor: customer.Bastidor || null,
         marca: customer.Marca || null,
         modelo: customer.Modelo,
         anio: customer.Anio ? Number(customer.Anio) : null,
+        fechaMatriculacion: customer.FechaMatriculacion || null,
+        motor: customer.Motor || null,
+        kw: customer.Kw ? Number(customer.Kw) : null,
+        cv: customer.Cv ? Number(customer.Cv) : null,
+        combustible: customer.Combustible || null,
         kilometraje: customer.Kilometraje ? Number(customer.Kilometraje) : null,
         observaciones: customer.Observaciones || null,
       };
@@ -238,10 +258,20 @@ export default function RegisterCustomer() {
       Telefono: c.telefono ?? c.Telefono ?? "",
       Email: c.email ?? c.Email ?? "",
       Direccion: c.direccion ?? c.Direccion ?? "",
+      CodigoPostal: c.codigoPostal ?? c.CodigoPostal ?? "",
+      Poblacion: c.poblacion ?? c.Poblacion ?? "",
+      Provincia: c.provincia ?? c.Provincia ?? "",
+      Clasificacion: c.clasificacion ?? c.Clasificacion ?? "Particular",
       Matricula: c.matricula ?? c.Matricula ?? "",
+      Bastidor: c.bastidor ?? c.Bastidor ?? "",
       Marca: c.marca ?? c.Marca ?? "",
       Modelo: c.modelo ?? c.Modelo ?? "",
       Anio: c.anio ?? c.Anio ?? "",
+      FechaMatriculacion: String(c.fechaMatriculacion ?? c.FechaMatriculacion ?? "").slice(0, 10),
+      Motor: c.motor ?? c.Motor ?? "",
+      Kw: c.kw ?? c.Kw ?? "",
+      Cv: c.cv ?? c.Cv ?? "",
+      Combustible: c.combustible ?? c.Combustible ?? "",
       Kilometraje:
         (c.kilometraje ?? c.Kilometraje)
           ? String(c.kilometraje ?? c.Kilometraje)
@@ -369,6 +399,59 @@ export default function RegisterCustomer() {
                 placeholder="Dirección del cliente"
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Codigo postal
+              </label>
+              <input
+                type="text"
+                name="CodigoPostal"
+                value={customer.CodigoPostal}
+                onChange={handleChange}
+                className={cls("CodigoPostal")}
+                placeholder="46001"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Poblacion
+              </label>
+              <input
+                type="text"
+                name="Poblacion"
+                value={customer.Poblacion}
+                onChange={handleChange}
+                className={cls("Poblacion")}
+                placeholder="Valencia"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Provincia
+              </label>
+              <input
+                type="text"
+                name="Provincia"
+                value={customer.Provincia}
+                onChange={handleChange}
+                className={cls("Provincia")}
+                placeholder="Valencia"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Clasificacion
+              </label>
+              <select
+                name="Clasificacion"
+                value={customer.Clasificacion}
+                onChange={handleChange}
+                className={cls("Clasificacion")}
+              >
+                <option value="Particular">Particular</option>
+                <option value="Empresa">Empresa</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -413,6 +496,20 @@ export default function RegisterCustomer() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
+                Bastidor
+              </label>
+              <input
+                type="text"
+                name="Bastidor"
+                value={customer.Bastidor}
+                onChange={handleChange}
+                className={cls("Bastidor")}
+                placeholder="VF1..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 {labels.modelLabel} *
               </label>
 
@@ -427,6 +524,77 @@ export default function RegisterCustomer() {
                     ? "Split, termo, caldera..."
                     : "Corolla"
                 }
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Fecha matriculacion
+              </label>
+              <input
+                type="date"
+                name="FechaMatriculacion"
+                value={customer.FechaMatriculacion}
+                onChange={handleChange}
+                className={cls("FechaMatriculacion")}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Motor
+              </label>
+              <input
+                type="text"
+                name="Motor"
+                value={customer.Motor}
+                onChange={handleChange}
+                className={cls("Motor")}
+                placeholder="1.6 TDI"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                KW
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="Kw"
+                value={customer.Kw}
+                onChange={handleChange}
+                className={cls("Kw")}
+                placeholder="85"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                CV
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                name="Cv"
+                value={customer.Cv}
+                onChange={handleChange}
+                className={cls("Cv")}
+                placeholder="115"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Combustible
+              </label>
+              <input
+                type="text"
+                name="Combustible"
+                value={customer.Combustible}
+                onChange={handleChange}
+                className={cls("Combustible")}
+                placeholder="Gasolina, diesel, hibrido..."
               />
             </div>
 

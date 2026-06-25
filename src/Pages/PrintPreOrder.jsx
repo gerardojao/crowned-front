@@ -114,6 +114,7 @@ export default function PrintPreOrder() {
         fecha: valueOf(data, "fecha"),
         fechaPrevistaEntrega: valueOf(data, "fechaPrevistaEntrega"),
         tiempoEstimadoHoras: valueOf(data, "tiempoEstimadoHoras"),
+        tipoOperacion: valueOf(data, "tipoOperacion", "Mecanica"),
         motivoRecepcion: valueOf(data, "motivoRecepcion"),
         diagnosticoMecanico: valueOf(data, "diagnosticoMecanico"),
         repuestosNecesarios: valueOf(data, "repuestosNecesarios"),
@@ -143,7 +144,7 @@ export default function PrintPreOrder() {
       <div className="p-10 text-center text-slate-600">
         <p className="mb-4 font-semibold">La pre-orden no esta habilitada para este taller.</p>
         <Link
-          to="/"
+          to="/pre-ordenes"
           className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
         >
           <ArrowLeft size={16} />
@@ -182,6 +183,7 @@ export default function PrintPreOrder() {
   }
 
   const documentNumber = String(preOrder.id || "").padStart(9, "0");
+  const operationType = String(preOrder.tipoOperacion || "Mecanica").toUpperCase();
   const motivoLines = lines(preOrder.motivoRecepcion);
   const diagLines = lines(preOrder.diagnosticoMecanico);
   const partsLines = lines(preOrder.repuestosNecesarios);
@@ -283,19 +285,19 @@ export default function PrintPreOrder() {
         <section className="po-title-row">
           <div>
             <h1 className="po-title text-left">PRE-ORDEN</h1>
-            <table className="po-meta">
+            <table className="po-meta text-left">
               <tbody>
                 <tr><th>Nº Documento</th><td><strong>{documentNumber}</strong></td></tr>
                 <tr><th>Fecha</th><td>{formatDate(preOrder.fecha)}</td></tr>
                 <tr><th>Nº Cliente</th><td>{preOrder.id || "-"}</td></tr>
                 <tr><th>NIF</th><td>{preOrder.dni || "-"}</td></tr>
                 <tr><th>Estado</th><td>PENDIENTE</td></tr>
-                <tr><th>Tipo de Operacion</th><td>MECANICA</td></tr>
+                <tr><th>Tipo de Operacion</th><td>{operationType}</td></tr>
               </tbody>
             </table>
           </div>
           <div>
-            <div className="po-client-box">
+            <div className="po-client-box text-left">
               <div className="po-client-corners" />
               <strong>{preOrder.cliente || "-"}</strong><br />
               {preOrder.direccion && <>{preOrder.direccion}<br /></>}
@@ -347,7 +349,7 @@ export default function PrintPreOrder() {
               <td>-</td>
               <td>-</td>
               <td>-</td>
-              <td>MECANICA</td>
+              <td>{operationType}</td>
             </tr>
           </tbody>
         </table>

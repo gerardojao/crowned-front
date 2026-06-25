@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, FileText, Printer, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, FileText, Images, Printer, Search, Trash2, X } from "lucide-react";
 import api from "../Components/api";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 
 const EMPTY_PRE_ORDER = {
   ClienteId: "",
@@ -10,13 +11,24 @@ const EMPTY_PRE_ORDER = {
   Dni: "",
   Telefono: "",
   Direccion: "",
+  CodigoPostal: "",
+  Poblacion: "",
+  Provincia: "",
+  Clasificacion: "Particular",
   Matricula: "",
+  Bastidor: "",
   Marca: "",
   Modelo: "",
+  FechaMatriculacion: "",
+  Motor: "",
+  Kw: "",
+  Cv: "",
+  Combustible: "",
   Kilometraje: "",
   Fecha: new Date().toISOString().slice(0, 10),
   FechaPrevistaEntrega: "",
   TiempoEstimadoHoras: "",
+  TipoOperacion: "Mecanica",
   MotivoRecepcion: "",
   DiagnosticoMecanico: "",
   RepuestosNecesarios: "",
@@ -51,13 +63,24 @@ function normalizePreOrder(row) {
     Dni: row.dni ?? row.Dni ?? "",
     Telefono: row.telefono ?? row.Telefono ?? "",
     Direccion: row.direccion ?? row.Direccion ?? "",
+    CodigoPostal: row.codigoPostal ?? row.CodigoPostal ?? "",
+    Poblacion: row.poblacion ?? row.Poblacion ?? "",
+    Provincia: row.provincia ?? row.Provincia ?? "",
+    Clasificacion: row.clasificacion ?? row.Clasificacion ?? "Particular",
     Matricula: row.matricula ?? row.Matricula ?? "",
+    Bastidor: row.bastidor ?? row.Bastidor ?? "",
     Marca: row.marca ?? row.Marca ?? "",
     Modelo: row.modelo ?? row.Modelo ?? "",
+    FechaMatriculacion: String(row.fechaMatriculacion ?? row.FechaMatriculacion ?? "").slice(0, 10),
+    Motor: row.motor ?? row.Motor ?? "",
+    Kw: row.kw ?? row.Kw ?? "",
+    Cv: row.cv ?? row.Cv ?? "",
+    Combustible: row.combustible ?? row.Combustible ?? "",
     Kilometraje: row.kilometraje ?? row.Kilometraje ?? "",
     Fecha: row.fecha ?? row.Fecha,
     FechaPrevistaEntrega: row.fechaPrevistaEntrega ?? row.FechaPrevistaEntrega ?? "",
     TiempoEstimadoHoras: row.tiempoEstimadoHoras ?? row.TiempoEstimadoHoras ?? "",
+    TipoOperacion: row.tipoOperacion ?? row.TipoOperacion ?? "Mecanica",
     MotivoRecepcion: row.motivoRecepcion ?? row.MotivoRecepcion ?? "",
     DiagnosticoMecanico: row.diagnosticoMecanico ?? row.DiagnosticoMecanico ?? "",
     RepuestosNecesarios: row.repuestosNecesarios ?? row.RepuestosNecesarios ?? "",
@@ -76,9 +99,19 @@ function normalizeCustomer(row) {
     Dni: row.dni ?? row.Dni ?? "",
     Telefono: row.telefono ?? row.Telefono ?? "",
     Direccion: row.direccion ?? row.Direccion ?? "",
+    CodigoPostal: row.codigoPostal ?? row.CodigoPostal ?? "",
+    Poblacion: row.poblacion ?? row.Poblacion ?? "",
+    Provincia: row.provincia ?? row.Provincia ?? "",
+    Clasificacion: row.clasificacion ?? row.Clasificacion ?? "Particular",
     Matricula: row.matricula ?? row.Matricula ?? "",
+    Bastidor: row.bastidor ?? row.Bastidor ?? "",
     Marca: row.marca ?? row.Marca ?? "",
     Modelo: row.modelo ?? row.Modelo ?? "",
+    FechaMatriculacion: String(row.fechaMatriculacion ?? row.FechaMatriculacion ?? "").slice(0, 10),
+    Motor: row.motor ?? row.Motor ?? "",
+    Kw: row.kw ?? row.Kw ?? "",
+    Cv: row.cv ?? row.Cv ?? "",
+    Combustible: row.combustible ?? row.Combustible ?? "",
     Kilometraje: row.kilometraje ?? row.Kilometraje ?? "",
   };
 }
@@ -100,6 +133,11 @@ export default function RegisterPreOrder() {
 
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
+  const [showNewCustomer, setShowNewCustomer] = useState(false);
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [receptionPhotosEnabled, setReceptionPhotosEnabled] = useState(true);
+  const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
+  const [photoTarget, setPhotoTarget] = useState(null);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -118,6 +156,12 @@ export default function RegisterPreOrder() {
           settings.EnablePreOrders ??
           true;
         setAllowed(usesZagaInvoiceTemplate(settings) && moduleEnabled);
+        setReceptionPhotosEnabled(
+          settings.enableReceptionPhotos ??
+            settings.EnableReceptionPhotos ??
+            true,
+        );
+        setOperationTypes(normalizeOperationTypes(settings.operationTypes ?? settings.OperationTypes));
       })
       .catch(() => setAllowed(false));
   }, []);
@@ -200,9 +244,19 @@ export default function RegisterPreOrder() {
       Dni: fullCustomer.Dni || prev.Dni,
       Telefono: fullCustomer.Telefono || prev.Telefono,
       Direccion: fullCustomer.Direccion || prev.Direccion,
+      CodigoPostal: fullCustomer.CodigoPostal || prev.CodigoPostal,
+      Poblacion: fullCustomer.Poblacion || prev.Poblacion,
+      Provincia: fullCustomer.Provincia || prev.Provincia,
+      Clasificacion: fullCustomer.Clasificacion || prev.Clasificacion,
       Matricula: fullCustomer.Matricula || prev.Matricula,
+      Bastidor: fullCustomer.Bastidor || prev.Bastidor,
       Marca: fullCustomer.Marca || prev.Marca,
       Modelo: fullCustomer.Modelo || prev.Modelo,
+      FechaMatriculacion: fullCustomer.FechaMatriculacion || prev.FechaMatriculacion,
+      Motor: fullCustomer.Motor || prev.Motor,
+      Kw: fullCustomer.Kw || prev.Kw,
+      Cv: fullCustomer.Cv || prev.Cv,
+      Combustible: fullCustomer.Combustible || prev.Combustible,
       Kilometraje: fullCustomer.Kilometraje || prev.Kilometraje,
     }));
     setCustomerSearch("");
@@ -214,6 +268,54 @@ export default function RegisterPreOrder() {
     setEditingId(null);
     setCustomerSearch("");
     setCustomerMatches([]);
+    setShowNewCustomer(false);
+  };
+
+  const createCustomerFromPreOrder = async () => {
+    if (savingCustomer) return;
+
+    const payload = {
+      nombre: form.Cliente,
+      dni: form.Dni || null,
+      telefono: form.Telefono,
+      email: null,
+      direccion: form.Direccion || null,
+      codigoPostal: form.CodigoPostal || null,
+      poblacion: form.Poblacion || null,
+      provincia: form.Provincia || null,
+      clasificacion: form.Clasificacion || "Particular",
+      matricula: form.Matricula,
+      bastidor: form.Bastidor || null,
+      marca: form.Marca || null,
+      modelo: form.Modelo,
+      fechaMatriculacion: form.FechaMatriculacion || null,
+      motor: form.Motor || null,
+      kw: form.Kw ? Number(form.Kw) : null,
+      cv: form.Cv ? Number(form.Cv) : null,
+      combustible: form.Combustible || null,
+      kilometraje: form.Kilometraje ? Number(form.Kilometraje) : null,
+      observaciones: form.Observaciones || null,
+    };
+
+    if (!payload.nombre?.trim()) return setError("Indica el nombre del cliente para registrarlo.");
+    if (!payload.telefono?.trim()) return setError("Indica el telefono del cliente para registrarlo.");
+    if (!payload.matricula?.trim()) return setError("Indica la matricula del vehiculo para registrar el cliente.");
+    if (!payload.modelo?.trim()) return setError("Indica el modelo del vehiculo para registrar el cliente.");
+
+    try {
+      setSavingCustomer(true);
+      setError("");
+      ensureOk(await api.post("/Cliente", payload));
+      setNotice("Cliente registrado y cargado en la pre-orden.");
+      setShowNewCustomer(false);
+      setCustomerSearch("");
+      setCustomerMatches([]);
+    } catch (err) {
+      console.error(err);
+      setError(err?.response?.data?.message || err?.message || "No se pudo registrar el cliente.");
+    } finally {
+      setSavingCustomer(false);
+    }
   };
 
   const submit = async (event) => {
@@ -242,15 +344,26 @@ export default function RegisterPreOrder() {
         dni: submitForm.Dni || null,
         telefono: submitForm.Telefono || null,
         direccion: submitForm.Direccion || null,
+        codigoPostal: submitForm.CodigoPostal || null,
+        poblacion: submitForm.Poblacion || null,
+        provincia: submitForm.Provincia || null,
+        clasificacion: submitForm.Clasificacion || "Particular",
         matricula: submitForm.Matricula,
+        bastidor: submitForm.Bastidor || null,
         marca: submitForm.Marca || null,
         modelo: submitForm.Modelo,
+        fechaMatriculacion: submitForm.FechaMatriculacion || null,
+        motor: submitForm.Motor || null,
+        kw: submitForm.Kw ? Number(submitForm.Kw) : null,
+        cv: submitForm.Cv ? Number(submitForm.Cv) : null,
+        combustible: submitForm.Combustible || null,
         kilometraje: submitForm.Kilometraje ? Number(submitForm.Kilometraje) : null,
         fecha: submitForm.Fecha,
         fechaPrevistaEntrega: submitForm.FechaPrevistaEntrega || null,
         tiempoEstimadoHoras: submitForm.TiempoEstimadoHoras
           ? Number(submitForm.TiempoEstimadoHoras)
           : null,
+        tipoOperacion: submitForm.TipoOperacion || "Mecanica",
         motivoRecepcion: submitForm.MotivoRecepcion,
         diagnosticoMecanico: submitForm.DiagnosticoMecanico || null,
         repuestosNecesarios: submitForm.RepuestosNecesarios || null,
@@ -261,8 +374,12 @@ export default function RegisterPreOrder() {
         ensureOk(await api.put(`/PreOrdenTrabajo/${editingId}`, payload));
         setNotice("Pre-orden actualizada correctamente.");
       } else {
-        ensureOk(await api.post("/PreOrdenTrabajo", payload));
+        const createdData = ensureOk(await api.post("/PreOrdenTrabajo", payload));
+        const created = createdData?.data?.[0] ?? createdData?.Data?.[0];
         setNotice("Pre-orden registrada correctamente.");
+        if (created && receptionPhotosEnabled) {
+          setPhotoTarget(normalizePreOrder(created));
+        }
       }
 
       resetForm();
@@ -288,15 +405,28 @@ export default function RegisterPreOrder() {
       Dni: item.Dni,
       Telefono: item.Telefono,
       Direccion: item.Direccion,
+      CodigoPostal: item.CodigoPostal || "",
+      Poblacion: item.Poblacion || "",
+      Provincia: item.Provincia || "",
+      Clasificacion: item.Clasificacion || "Particular",
       Matricula: item.Matricula,
+      Bastidor: item.Bastidor || "",
       Marca: item.Marca,
       Modelo: item.Modelo,
+      FechaMatriculacion: item.FechaMatriculacion
+        ? String(item.FechaMatriculacion).slice(0, 10)
+        : "",
+      Motor: item.Motor || "",
+      Kw: item.Kw || "",
+      Cv: item.Cv || "",
+      Combustible: item.Combustible || "",
       Kilometraje: item.Kilometraje || "",
       Fecha: item.Fecha ? String(item.Fecha).slice(0, 10) : new Date().toISOString().slice(0, 10),
       FechaPrevistaEntrega: item.FechaPrevistaEntrega
         ? String(item.FechaPrevistaEntrega).slice(0, 10)
         : "",
       TiempoEstimadoHoras: item.TiempoEstimadoHoras || "",
+      TipoOperacion: item.TipoOperacion || "Mecanica",
       MotivoRecepcion: item.MotivoRecepcion,
       DiagnosticoMecanico: item.DiagnosticoMecanico,
       RepuestosNecesarios: item.RepuestosNecesarios,
@@ -359,7 +489,7 @@ export default function RegisterPreOrder() {
 
       <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
         <Metric label="Pendientes en pantalla" value={pendingCount} />
-        <Metric label="Total filtrado" value={total} />
+        <Metric label="Total pre-ordenes" value={total} />
         <Metric label="Pagina" value={`${page}/${totalPages}`} />
       </section>
 
@@ -416,6 +546,26 @@ export default function RegisterPreOrder() {
               ))}
             </div>
           )}
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowNewCustomer((value) => !value)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              {showNewCustomer ? "Ocultar alta rapida" : "Registrar nuevo"}
+            </button>
+            {showNewCustomer && (
+              <button
+                type="button"
+                onClick={createCustomerFromPreOrder}
+                disabled={savingCustomer}
+                className="ml-2 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {savingCustomer ? "Guardando cliente..." : "Guardar cliente nuevo"}
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -423,13 +573,31 @@ export default function RegisterPreOrder() {
           <Input name="Dni" value={form.Dni} onChange={setField} placeholder="DNI/NIE" />
           <Input name="Telefono" value={form.Telefono} onChange={setField} placeholder="Telefono" />
           <Input name="Direccion" value={form.Direccion} onChange={setField} placeholder="Direccion" />
+          <Input name="CodigoPostal" value={form.CodigoPostal} onChange={setField} placeholder="Codigo postal" />
+          <Input name="Poblacion" value={form.Poblacion} onChange={setField} placeholder="Poblacion" />
+          <Input name="Provincia" value={form.Provincia} onChange={setField} placeholder="Provincia" />
+          <select value={form.Clasificacion} onChange={(event) => setField("Clasificacion", event.target.value)} className={cls}>
+            <option value="Particular">Particular</option>
+            <option value="Empresa">Empresa</option>
+          </select>
           <Input name="Fecha" type="date" value={form.Fecha} onChange={setField} required />
           <Input name="Matricula" value={form.Matricula} onChange={setField} placeholder="Matricula *" required />
+          <Input name="Bastidor" value={form.Bastidor} onChange={setField} placeholder="Bastidor" />
           <Input name="Marca" value={form.Marca} onChange={setField} placeholder="Marca" />
           <Input name="Modelo" value={form.Modelo} onChange={setField} placeholder="Modelo *" required />
+          <Input name="FechaMatriculacion" type="date" value={form.FechaMatriculacion} onChange={setField} title="Fecha matriculacion" />
+          <Input name="Motor" value={form.Motor} onChange={setField} placeholder="Motor" />
+          <Input name="Kw" type="number" value={form.Kw} onChange={setField} placeholder="KW" />
+          <Input name="Cv" type="number" value={form.Cv} onChange={setField} placeholder="CV" />
+          <Input name="Combustible" value={form.Combustible} onChange={setField} placeholder="Combustible" />
           <Input name="Kilometraje" type="number" value={form.Kilometraje} onChange={setField} placeholder="Kilometraje" />
           <Input name="FechaPrevistaEntrega" type="date" value={form.FechaPrevistaEntrega} onChange={setField} title="Fecha prevista de entrega" />
           <Input name="TiempoEstimadoHoras" type="number" value={form.TiempoEstimadoHoras} onChange={setField} placeholder="Tiempo estimado horas" />
+          <select value={form.TipoOperacion} onChange={(event) => setField("TipoOperacion", event.target.value)} className={cls}>
+            {operationTypes.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
 
           <Textarea
             name="MotivoRecepcion"
@@ -532,6 +700,16 @@ export default function RegisterPreOrder() {
                   <Printer size={16} />
                   Imprimir
                 </a>
+                {receptionPhotosEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => setPhotoTarget(item)}
+                    className="inline-flex justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                  >
+                    <Images size={16} />
+                    Fotos
+                  </button>
+                )}
                 {!item.ConvertidaEnOrden && (
                   <>
                     <button
@@ -606,6 +784,22 @@ export default function RegisterPreOrder() {
       </section>
         </>
       )}
+
+      {photoTarget && (
+        <ReceptionPhotosModal
+          open={!!photoTarget}
+          onClose={() => setPhotoTarget(null)}
+          preOrderId={photoTarget.Id}
+          title="Fotos del vehiculo"
+          subtitle={`${photoTarget.Matricula || ""} - ${photoTarget.Cliente || ""}`}
+          canUpload={!photoTarget.ConvertidaEnOrden}
+          context={{
+            preOrderId: photoTarget.Id,
+            cliente: photoTarget.Cliente,
+            matricula: photoTarget.Matricula,
+          }}
+        />
+      )}
     </>
   );
 }
@@ -642,4 +836,10 @@ function Metric({ label, value }) {
       <p className="mt-2 text-xl font-bold text-slate-900">{value}</p>
     </div>
   );
+}
+
+function normalizeOperationTypes(types) {
+  const list = Array.isArray(types) ? types : ["Mecanica"];
+  const filtered = list.filter((type) => type && type !== "Recambio");
+  return filtered.length ? filtered : ["Mecanica"];
 }

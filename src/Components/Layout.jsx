@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
+﻿import { useEffect, useState } from "react";
+import { Link, NavLink, useNavigate, useLocation, matchPath } from "react-router-dom";
 import {
   Menu,
   X,
@@ -32,7 +32,8 @@ const heroBtnBase =
 const heroBtnIcon =
   "flex h-12 w-12 items-center justify-center rounded-xl bg-white/20";
 
-const mobileLink = "px-3 py-2 rounded-lg hover:bg-slate-100";
+const mobileLink =
+  "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-slate-700 ring-1 ring-transparent transition hover:bg-white hover:text-slate-950 hover:shadow-sm hover:ring-slate-200";
 const DEMO_SITE_URL = "https://demo.zagapro.store";
 
 export default function Layout({ children }) {
@@ -56,6 +57,30 @@ export default function Layout({ children }) {
 
   const isAuthRoute = /^\/(login|register)(\/|$)?/.test(location.pathname);
   const isPrintRoute = /^\/print-(pre-)?order\/.+/.test(location.pathname);
+
+  const compactRoutes = [
+    "/pre-ordenes",
+    "/register-work-order",
+    "/print-order/:id",
+    "/print-pre-order/:id",
+    "/print-budget/:id",
+    "/workshop-invoice/:id",
+    "/workshop-invoice",
+    "/special-invoices/parts",
+    "/special-invoices/:type",
+    "/reprint-invoice/order/:idOrden",
+    "/reprint-invoice/number/:numeroFactura",
+    "/presupuestos",
+    "/stock-parts",
+    "/statement",
+    "/accounts-receivable",
+    "/ledger",
+    "/invoices-history",
+  ];
+
+  const isCompactRoute = compactRoutes.some((pattern) =>
+    matchPath({ path: pattern, end: true }, location.pathname)
+  );
 
   const onLogout = () => {
     logout();
@@ -148,6 +173,14 @@ export default function Layout({ children }) {
     activeWorkshop?.enableSpecialInvoices ??
     activeWorkshop?.EnableSpecialInvoices ??
     true;
+  const rapelInvoicesEnabled =
+    activeWorkshop?.enableRapelInvoices ??
+    activeWorkshop?.EnableRapelInvoices ??
+    false;
+  const noVatInvoicesEnabled =
+    activeWorkshop?.enableNoVatInvoices ??
+    activeWorkshop?.EnableNoVatInvoices ??
+    false;
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
   };
@@ -194,8 +227,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-cyan-50 via-white to-amber-50">
-      {!isPrintRoute && (
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
           <div className="mx-auto w-full max-w-screen-2xl px-4 pr-5 sm:px-6 lg:px-8 py-3 flex items-center">
             <Link
               to="/"
@@ -208,7 +240,7 @@ export default function Layout({ children }) {
               />
             </Link>
 
-            {!isAuthRoute && !isPrintRoute && (
+            {!isAuthRoute && (
               <div className="ml-auto flex items-center gap-2">
                 <nav className="hidden md:flex items-center gap-3">
                   {isAuthed ? (
@@ -289,12 +321,12 @@ export default function Layout({ children }) {
           </div>
 
           {!isAuthRoute && open && (
-            <div className="border-t border-slate-200 bg-white">
-              <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 py-2">
-                <div className="flex flex-col">
+            <div className="border-t border-slate-200 bg-slate-50/95 shadow-lg shadow-slate-900/5">
+              <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-2">
                   {isAuthed ? (
                     <>
-                      <div className="border-b border-slate-100 px-3 py-3">
+                      <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                           Sesión
                         </div>
@@ -303,13 +335,13 @@ export default function Layout({ children }) {
                         </div>
                         {workshops.length > 1 && (
                           <label className="mt-3 block">
-                            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                            <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">
                               Negocio activo
                             </span>
                             <select
                               value={activeWorkshopId}
                               onChange={onWorkshopChange}
-                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800"
+                              className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800"
                               aria-label="Negocio activo"
                             >
                               {workshops.map((workshop) => (
@@ -324,11 +356,13 @@ export default function Layout({ children }) {
                           </label>
                         )}
                       </div>
+                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       <NavLink
                         to="/register-work-order"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <ClipboardList size={18} className="text-orange-600" />
                         Nueva orden
                       </NavLink>
                       {preOrdersEnabled && (
@@ -337,6 +371,7 @@ export default function Layout({ children }) {
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
+                          <Truck size={18} className="text-emerald-600" />
                           Pre-ordenes
                         </NavLink>
                       )}
@@ -345,6 +380,7 @@ export default function Layout({ children }) {
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <Users size={18} className="text-sky-600" />
                         Registrar cliente
                       </NavLink>
                       <NavLink
@@ -352,6 +388,7 @@ export default function Layout({ children }) {
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <Truck size={18} className="text-violet-600" />
                         Registrar proveedor
                       </NavLink>
                       <NavLink
@@ -359,6 +396,7 @@ export default function Layout({ children }) {
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <BarChart3 size={18} className="text-emerald-600" />
                         Registrar ingreso
                       </NavLink>
                       <NavLink
@@ -366,6 +404,7 @@ export default function Layout({ children }) {
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <BarChart3 size={18} className="text-rose-600" />
                         Registrar gasto
                       </NavLink>
                       <NavLink
@@ -373,6 +412,7 @@ export default function Layout({ children }) {
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <FileText size={18} className="text-slate-600" />
                         Ver balance
                       </NavLink>
                       {accountsReceivableEnabled && (
@@ -381,7 +421,8 @@ export default function Layout({ children }) {
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
-                          Finanzas / Cuentas por cobrar
+                          <FileText size={18} className="text-cyan-600" />
+                          Cuentas por cobrar
                         </NavLink>
                       )}
                       {ledgerEnabled && (
@@ -390,7 +431,8 @@ export default function Layout({ children }) {
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
-                          Finanzas / Mayor
+                          <FileText size={18} className="text-indigo-600" />
+                          Mayor
                         </NavLink>
                       )}
                       <Link
@@ -398,6 +440,7 @@ export default function Layout({ children }) {
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
+                        <FileText size={18} className="text-orange-600" />
                         Listado de facturas
                       </Link>
                       {specialInvoicesEnabled && (
@@ -406,7 +449,28 @@ export default function Layout({ children }) {
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
-                          Facturas especiales / Recambio
+                          <ClipboardList size={18} className="text-teal-600" />
+                          Facturas de recambio
+                        </Link>
+                      )}
+                      {rapelInvoicesEnabled && (
+                        <Link
+                          to="/special-invoices/rapel"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          <ClipboardList size={18} className="text-amber-600" />
+                          Facturas Rapel
+                        </Link>
+                      )}
+                      {noVatInvoicesEnabled && (
+                        <Link
+                          to="/special-invoices/no-vat"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          <ClipboardList size={18} className="text-slate-600" />
+                          Facturas sin IVA
                         </Link>
                       )}
                       {isSuperAdmin && (
@@ -415,23 +479,25 @@ export default function Layout({ children }) {
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
+                          <Users size={18} className="text-slate-700" />
                           Administrar negocios
                         </NavLink>
                       )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => {
                           openClientAlerts();
                           setOpen(false);
                         }}
-                        className="px-3 py-2 rounded-lg hover:bg-orange-50 text-left"
+                        className="flex w-full items-center justify-between rounded-2xl bg-orange-50 px-3 py-3 text-left text-sm font-bold text-orange-800 ring-1 ring-orange-100 transition hover:bg-orange-100"
                       >
                         <span className="inline-flex items-center gap-2">
                           <Bell size={16} />
                           Alertas clientes
                           {alertCount > 0 && (
-                            <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs font-bold text-white">
-                              {alertCount}
+                            <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs font-black text-white">
+                              {alertCount > 99 ? "99+" : alertCount}
                             </span>
                           )}
                         </span>
@@ -439,7 +505,7 @@ export default function Layout({ children }) {
 
                       <button
                         onClick={onLogout}
-                        className="mt-1 px-3 py-2 rounded-lg hover:bg-rose-50 text-rose-700 text-left"
+                        className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold text-rose-700 transition hover:bg-rose-50"
                       >
                         <span className="inline-flex items-center gap-2">
                           <LogOut size={16} />
@@ -467,9 +533,8 @@ export default function Layout({ children }) {
             </div>
           )}
         </header>
-      )}
 
-      {!isAuthRoute && (
+      {!isAuthRoute && !isCompactRoute && (
         <div
           className={`relative mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 ${
             isAuthed ? "pt-6 md:pt-8 pb-4 md:pb-6" : "pt-10 md:pt-14 pb-2 md:pb-3"
@@ -583,29 +648,6 @@ export default function Layout({ children }) {
                       <span className="text-xl opacity-80">›</span>
                     </Link>
 
-                          {/* {preOrdersEnabled && (
-                      <Link
-                        to="/pre-ordenes"
-                        className={`${heroBtnBase} bg-slate-700 hover:bg-slate-800`}
-                      >
-                        <span className={heroBtnIcon}>
-                          <FileText size={26} />
-                        </span>
-
-                        <span className="flex-1">
-                          <span className="block text-base font-bold">
-                            Pre-orden
-                          </span>
-
-                          <span className="block text-xs text-white/90">
-                            Recepcion inicial
-                          </span>
-                        </span>
-
-                        <span className="text-xl opacity-80">›</span>
-                      </Link>
-                    )} */}
-
                     <Link
                       to="/register-customer"
                       className={`${heroBtnBase} bg-emerald-600 hover:bg-emerald-700`}
@@ -713,8 +755,8 @@ export default function Layout({ children }) {
 
       <main
         className={
-          isPrintRoute
-            ? "w-full flex-1"
+          isCompactRoute
+            ? "w-full flex-1 px-4 sm:px-6 lg:px-8 pb-12"
             : "mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pb-12 space-y-6 flex-1"
         }
       >
@@ -864,7 +906,7 @@ export default function Layout({ children }) {
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center justify-center gap-3 py-4 md:py-6 text-sm text-slate-500 md:flex-row md:justify-between">
               <div className="order-2 md:order-1 text-center md:text-left">
-               `© {new Date().getFullYear()} ZagaPro. Todos los derechos reservados.`
+                © {new Date().getFullYear()} ZagaPro. Todos los derechos reservados.
               </div>
 
               <nav className="order-1 md:order-2 w-full md:w-auto">
@@ -904,3 +946,4 @@ export default function Layout({ children }) {
     </div>
   );
 }
+

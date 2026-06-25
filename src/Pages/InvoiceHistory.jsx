@@ -218,7 +218,9 @@ export default function InvoiceHistory() {
   const getOriginLabel = (row) => {
     if (row.origin === "workshop") return "Taller";
     if (row.origin === "sparePart") return "Recambio";
-    return "—";
+    if (row.origin === "rapel") return "Rapel";
+    if (row.origin === "noVat") return "Sin IVA";
+    return "-";
   };
 
   const getTypeLabel = (row) => {
@@ -353,6 +355,8 @@ const filteredRows = useMemo(() => {
               <option value="">Todos</option>
               <option value="workshop">Taller</option>
               <option value="sparePart">Recambio</option>
+              <option value="rapel">Rapel</option>
+              <option value="noVat">Sin IVA</option>
             </select>
           </div>
 

@@ -88,6 +88,7 @@ function App() {
 
             <Route path="/workshop-invoice" element={protectedElement(<WorkshopInvoice />)} />
             <Route path="/special-invoices/parts" element={protectedElement(<SpecialPartsInvoice />)} />
+            <Route path="/special-invoices/:type" element={protectedElement(<SpecialPartsInvoice />)} />
 
             <Route path="/stock-parts" element={protectedElement(<StockParts />)} />
             <Route

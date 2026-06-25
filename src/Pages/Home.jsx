@@ -89,12 +89,21 @@ export default function Home() {
   const { isAuthed } = useAuth();
   const labels = useBusinessTerminology();
   const [ordenes, setOrdenes] = useState([]);
-  const [vehiculosReparacion, setVehiculosReparacion] = useState(0);
+  const [vehiculosEstado, setVehiculosEstado] = useState({
+    reparando: 0,
+    entregado: 0,
+  });
   const [vehiculosReparacionLoading, setVehiculosReparacionLoading] =
     useState(true);
   const [saldoCuentasPorCobrar, setSaldoCuentasPorCobrar] = useState(0);
+  const [facturacionDashboard, setFacturacionDashboard] = useState({
+    todayTotal: 0,
+    monthTotal: 0,
+  });
+  const [facturacionLoading, setFacturacionLoading] = useState(true);
   const [dashboardFeatures, setDashboardFeatures] = useState({
     enableDashboardRepairVehicles: false,
+    enableDashboardBilling: false,
     enablePreOrders: false,
     enableAccountsReceivable: false,
     enableLedger: false,
@@ -119,11 +128,14 @@ export default function Home() {
   useEffect(() => {
     if (!isAuthed) {
       setOrdenes([]);
-      setVehiculosReparacion(0);
+      setVehiculosEstado({ reparando: 0, entregado: 0 });
       setSaldoCuentasPorCobrar(0);
+      setFacturacionDashboard({ todayTotal: 0, monthTotal: 0 });
       setVehiculosReparacionLoading(false);
+      setFacturacionLoading(false);
       setDashboardFeatures({
         enableDashboardRepairVehicles: false,
+        enableDashboardBilling: false,
         enablePreOrders: false,
         enableAccountsReceivable: false,
         enableLedger: false,
@@ -136,12 +148,23 @@ export default function Home() {
 
     (async () => {
       setVehiculosReparacionLoading(true);
+      setFacturacionLoading(true);
 
       try {
-        const [movRes, reparacionRes, settingsRes, ingresosRes, gastosRes] = await Promise.all([
+        const [
+          movRes,
+          reparacionRes,
+          entregadosRes,
+          settingsRes,
+          ingresosRes,
+          gastosRes,
+        ] = await Promise.all([
           api.get("/OrdenTrabajo/ultimas", { params: { take: 10 } }),
           api.get("/OrdenTrabajo", {
             params: { estado: "Reparando", page: 1, pageSize: 1 },
+          }),
+          api.get("/OrdenTrabajo", {
+            params: { estado: "Entregado", page: 1, pageSize: 1 },
           }),
           api.get("/WorkshopSettings"),
           api.get("/Ingreso/totales"),
@@ -154,9 +177,32 @@ export default function Home() {
           settings.enableAccountsReceivable ??
           settings.EnableAccountsReceivable ??
           false;
+        const enableDashboardBilling =
+          settings.enableDashboardBilling ??
+          settings.EnableDashboardBilling ??
+          false;
 
         setOrdenes(pickDataList(movRes));
-        setVehiculosReparacion(pickPagingTotal(reparacionRes));
+        setVehiculosEstado({
+          reparando: pickPagingTotal(reparacionRes),
+          entregado: pickPagingTotal(entregadosRes),
+        });
+
+        if (enableDashboardBilling) {
+          const billingRes = await api.get("/FacturaEmitida/dashboard-summary");
+          const billingData = billingRes?.data?.data ?? billingRes?.data?.Data ?? {};
+          setFacturacionDashboard({
+            todayTotal: Number(
+              billingData.todayTotal ?? billingData.TodayTotal ?? 0,
+            ),
+            monthTotal: Number(
+              billingData.monthTotal ?? billingData.MonthTotal ?? 0,
+            ),
+          });
+        } else {
+          setFacturacionDashboard({ todayTotal: 0, monthTotal: 0 });
+        }
+
         const cxcIncome = await fetchAccountsReceivableIncome();
         const incomeRows = appendAccountsReceivableSummary(
           ingresosRes?.data?.data?.[0] || [],
@@ -185,6 +231,7 @@ export default function Home() {
             settings.enableDashboardRepairVehicles ??
             settings.EnableDashboardRepairVehicles ??
             false,
+          enableDashboardBilling,
           enablePreOrders:
             settings.enablePreOrders ??
             settings.EnablePreOrders ??
@@ -199,11 +246,13 @@ export default function Home() {
         console.error(err);
 
         setOrdenes([]);
-        setVehiculosReparacion(0);
+        setVehiculosEstado({ reparando: 0, entregado: 0 });
         setSaldoCuentasPorCobrar(0);
+        setFacturacionDashboard({ todayTotal: 0, monthTotal: 0 });
         setDashboardTotals({ ingresos: 0, gastos: 0 });
       } finally {
         setVehiculosReparacionLoading(false);
+        setFacturacionLoading(false);
         setLastStatement(loadStatementSummary());
       }
     })();
@@ -215,6 +264,7 @@ export default function Home() {
 
   const showDashboardModules =
     dashboardFeatures.enableDashboardRepairVehicles ||
+    dashboardFeatures.enableDashboardBilling ||
     dashboardFeatures.enableAccountsReceivable;
   const preOrdersEnabled = useZagaDocuments && dashboardFeatures.enablePreOrders;
 
@@ -236,15 +286,82 @@ export default function Home() {
 
                 <div>
                   <p className="text-xl text-left font-semibold text-slate-900">
-                    Vehículos en reparación
+                    Vehículos por estado
                   </p>
 
-                  <div className="mt-2 text-3xl font-extrabold text-amber-700">
-                    {vehiculosReparacionLoading ? "..." : vehiculosReparacion}
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-amber-50 px-3 py-2 ring-1 ring-amber-100">
+                      <p className="text-xs font-semibold text-amber-700">
+                        Reparando
+                      </p>
+                      <p className="mt-1 text-3xl font-extrabold text-amber-700">
+                        {vehiculosReparacionLoading
+                          ? "..."
+                          : vehiculosEstado.reparando}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold text-slate-600">
+                        Entregado
+                      </p>
+                      <p className="mt-1 text-3xl font-extrabold text-slate-700">
+                        {vehiculosReparacionLoading
+                          ? "..."
+                          : vehiculosEstado.entregado}
+                      </p>
+                    </div>
                   </div>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Órdenes con estado Reparando
+                    Órdenes en reparación y entregadas
+                  </p>
+                </div>
+              </div>
+            </Link>
+          )}
+
+          {dashboardFeatures.enableDashboardBilling && (
+            <Link
+              to="/invoices-history"
+              className="rounded-3xl border border-violet-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-center gap-5">
+                <div className="flex h-24 w-24 items-center justify-center rounded-full bg-violet-50">
+                  <ReceiptText size={46} className="text-violet-700" />
+                </div>
+
+                <div>
+                  <p className="text-xl text-left font-semibold text-slate-900">
+                    Facturación
+                  </p>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-violet-50 px-3 py-2 ring-1 ring-violet-100">
+                      <p className="text-xs font-semibold text-violet-700">
+                        Hoy
+                      </p>
+                      <p className="mt-1 text-xl font-extrabold text-violet-700">
+                        {facturacionLoading
+                          ? "..."
+                          : currency(facturacionDashboard.todayTotal)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                      <p className="text-xs font-semibold text-slate-600">
+                        Mes
+                      </p>
+                      <p className="mt-1 text-xl font-extrabold text-slate-700">
+                        {facturacionLoading
+                          ? "..."
+                          : currency(facturacionDashboard.monthTotal)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    Total facturado del día y del mes
                   </p>
                 </div>
               </div>

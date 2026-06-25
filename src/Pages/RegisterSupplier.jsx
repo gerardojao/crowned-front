@@ -10,6 +10,10 @@ const EMPTY_SUPPLIER = {
   Telefono: "",
   Email: "",
   Direccion: "",
+  CodigoPostal: "",
+  Poblacion: "",
+  Provincia: "",
+  Clasificacion: "Particular",
   NifCif: "",
   Categoria: "",
   Observaciones: "",
@@ -144,6 +148,10 @@ export default function RegisterSupplier() {
         telefono: supplier.Telefono || null,
         email: supplier.Email || null,
         direccion: supplier.Direccion || null,
+        codigoPostal: supplier.CodigoPostal || null,
+        poblacion: supplier.Poblacion || null,
+        provincia: supplier.Provincia || null,
+        clasificacion: supplier.Clasificacion || "Particular",
         categoria: supplier.Categoria || null,
         nifCif: supplier.NifCif || null,
         observaciones: supplier.Observaciones || null,
@@ -197,6 +205,10 @@ export default function RegisterSupplier() {
       Telefono: s.telefono ?? s.Telefono ?? "",
       Email: s.email ?? s.Email ?? "",
       Direccion: s.direccion ?? s.Direccion ?? "",
+      CodigoPostal: s.codigoPostal ?? s.CodigoPostal ?? "",
+      Poblacion: s.poblacion ?? s.Poblacion ?? "",
+      Provincia: s.provincia ?? s.Provincia ?? "",
+      Clasificacion: s.clasificacion ?? s.Clasificacion ?? "Particular",
       NifCif: s.nifCif ?? s.NifCif ?? "",
       Categoria: s.categoria ?? s.Categoria ?? "",
       Observaciones: s.observaciones ?? s.Observaciones ?? "",
@@ -369,6 +381,63 @@ export default function RegisterSupplier() {
                 className={cls("Direccion")}
                 placeholder="Dirección"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Código postal
+              </label>
+              <input
+                type="text"
+                name="CodigoPostal"
+                value={supplier.CodigoPostal}
+                onChange={handleChange}
+                className={cls("CodigoPostal")}
+                placeholder="46001"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Población
+              </label>
+              <input
+                type="text"
+                name="Poblacion"
+                value={supplier.Poblacion}
+                onChange={handleChange}
+                className={cls("Poblacion")}
+                placeholder="Valencia"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Provincia
+              </label>
+              <input
+                type="text"
+                name="Provincia"
+                value={supplier.Provincia}
+                onChange={handleChange}
+                className={cls("Provincia")}
+                placeholder="Valencia"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Clasificación
+              </label>
+              <select
+                name="Clasificacion"
+                value={supplier.Clasificacion}
+                onChange={handleChange}
+                className={cls("Clasificacion")}
+              >
+                <option value="Particular">Particular</option>
+                <option value="Empresa">Empresa</option>
+              </select>
             </div>
           </div>
 

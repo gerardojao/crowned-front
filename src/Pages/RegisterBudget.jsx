@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
 import api from "../Components/api";
@@ -19,11 +19,22 @@ const EMPTY_BUDGET = {
   Dni: "",
   Telefono: "",
   Direccion: "",
+  CodigoPostal: "",
+  Poblacion: "",
+  Provincia: "",
+  Clasificacion: "Particular",
   Matricula: "",
+  Bastidor: "",
   Marca: "",
   Modelo: "",
+  FechaMatriculacion: "",
+  Motor: "",
+  Kw: "",
+  Cv: "",
+  Combustible: "",
   Kilometraje: "",
   Fecha: new Date().toISOString().slice(0, 10),
+  TipoOperacion: "Mecanica",
   Trabajo: "",
   Items: [],
   Repuestos: "",
@@ -54,7 +65,9 @@ const normalizeFrequentServiceName = (value) => {
 const ensureOk = (res) => {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
-    throw new Error(data?.message || data?.Message || "La operacion no se pudo completar.");
+    throw new Error(
+      data?.message || data?.Message || "La operacion no se pudo completar.",
+    );
   }
   return data;
 };
@@ -78,6 +91,7 @@ export default function RegisterBudget() {
   const [budgetPage, setBudgetPage] = useState(1);
   const [budgetTotal, setBudgetTotal] = useState(0);
   const [frequentServices, setFrequentServices] = useState([]);
+  const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
   const budgetPageSize = 10;
@@ -86,7 +100,8 @@ export default function RegisterBudget() {
   const detailTotal = detailItems.reduce(
     (sum, item) =>
       sum +
-      Number(item.cantidad || 0) * Number(item.precioUnitario || item.importe || 0),
+      Number(item.cantidad || 0) *
+        Number(item.precioUnitario || item.importe || 0),
     0,
   );
   const total = detailItems.length
@@ -109,13 +124,23 @@ export default function RegisterBudget() {
     try {
       const res = await api.get("/ServicioFrecuente");
       const list = res?.data?.data?.[0] || [];
-      const names = list
-        .map((x) => x.nombre ?? x.Nombre)
-        .filter(Boolean);
+      const names = list.map((x) => x.nombre ?? x.Nombre).filter(Boolean);
       setFrequentServices(names.length ? names : DEFAULT_FREQUENT_SERVICES);
     } catch (err) {
       console.error(err);
       setFrequentServices(DEFAULT_FREQUENT_SERVICES);
+    }
+  };
+
+  const loadWorkshopSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      const data = res?.data || {};
+      setOperationTypes(
+        normalizeOperationTypes(data.operationTypes ?? data.OperationTypes),
+      );
+    } catch {
+      setOperationTypes(["Mecanica"]);
     }
   };
 
@@ -134,7 +159,12 @@ export default function RegisterBudget() {
     }));
   };
 
-  const createDetailItem = (descripcion, cantidad = 1, precioUnitario = 0, extra = {}) => ({
+  const createDetailItem = (
+    descripcion,
+    cantidad = 1,
+    precioUnitario = 0,
+    extra = {},
+  ) => ({
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     descripcion,
     cantidad,
@@ -244,11 +274,25 @@ export default function RegisterBudget() {
     Cliente: x.cliente ?? x.Cliente ?? "",
     Dni: x.dni ?? x.Dni ?? "",
     Telefono: x.telefono ?? x.Telefono ?? "",
+    Direccion: x.direccion ?? x.Direccion ?? "",
+    CodigoPostal: x.codigoPostal ?? x.CodigoPostal ?? "",
+    Poblacion: x.poblacion ?? x.Poblacion ?? "",
+    Provincia: x.provincia ?? x.Provincia ?? "",
+    Clasificacion: x.clasificacion ?? x.Clasificacion ?? "Particular",
     Matricula: x.matricula ?? x.Matricula ?? "",
+    Bastidor: x.bastidor ?? x.Bastidor ?? "",
     Marca: x.marca ?? x.Marca ?? "",
     Modelo: x.modelo ?? x.Modelo ?? "",
+    FechaMatriculacion: String(
+      x.fechaMatriculacion ?? x.FechaMatriculacion ?? "",
+    ).slice(0, 10),
+    Motor: x.motor ?? x.Motor ?? "",
+    Kw: x.kw ?? x.Kw ?? "",
+    Cv: x.cv ?? x.Cv ?? "",
+    Combustible: x.combustible ?? x.Combustible ?? "",
     Kilometraje: x.kilometraje ?? x.Kilometraje ?? "",
     Fecha: x.fecha ?? x.Fecha,
+    TipoOperacion: x.tipoOperacion ?? x.TipoOperacion ?? "Mecanica",
     Trabajo: x.trabajo ?? x.Trabajo ?? "",
     Repuestos: x.repuestos ?? x.Repuestos ?? 0,
     Cantidad: x.cantidad ?? x.Cantidad ?? 1,
@@ -283,7 +327,8 @@ export default function RegisterBudget() {
               item.IdRepuesto ??
               null,
             idProveedor: item.idProveedor ?? item.IdProveedor ?? null,
-            nombreProveedor: item.nombreProveedor ?? item.NombreProveedor ?? null,
+            nombreProveedor:
+              item.nombreProveedor ?? item.NombreProveedor ?? null,
             precioCompra: item.precioCompra ?? item.PrecioCompra ?? null,
           }))
         : [];
@@ -298,11 +343,23 @@ export default function RegisterBudget() {
     Dni: c.dni ?? c.Dni ?? "",
     Telefono: c.telefono ?? c.Telefono ?? "",
     Matricula: c.matricula ?? c.Matricula ?? "",
+    Bastidor: c.bastidor ?? c.Bastidor ?? "",
     Marca: c.marca ?? c.Marca ?? "",
     Modelo: c.modelo ?? c.Modelo ?? "",
+    FechaMatriculacion: String(
+      c.fechaMatriculacion ?? c.FechaMatriculacion ?? "",
+    ).slice(0, 10),
+    Motor: c.motor ?? c.Motor ?? "",
+    Kw: c.kw ?? c.Kw ?? "",
+    Cv: c.cv ?? c.Cv ?? "",
+    Combustible: c.combustible ?? c.Combustible ?? "",
     Kilometraje: c.kilometraje ?? c.Kilometraje ?? "",
     Email: c.email ?? c.Email ?? "",
     Direccion: c.direccion ?? c.Direccion ?? "",
+    CodigoPostal: c.codigoPostal ?? c.CodigoPostal ?? "",
+    Poblacion: c.poblacion ?? c.Poblacion ?? "",
+    Provincia: c.provincia ?? c.Provincia ?? "",
+    Clasificacion: c.clasificacion ?? c.Clasificacion ?? "Particular",
     Observaciones: c.observaciones ?? c.Observaciones ?? "",
   });
 
@@ -313,10 +370,23 @@ export default function RegisterBudget() {
       Dni: customer.Dni || prev.Dni,
       Telefono: customer.Telefono || prev.Telefono,
       Direccion: customer.Direccion || prev.Direccion,
+      CodigoPostal: customer.CodigoPostal || prev.CodigoPostal,
+      Poblacion: customer.Poblacion || prev.Poblacion,
+      Provincia: customer.Provincia || prev.Provincia,
+      Clasificacion: customer.Clasificacion || prev.Clasificacion,
       Matricula: customer.Matricula || prev.Matricula,
+      Bastidor: customer.Bastidor || prev.Bastidor,
       Marca: customer.Marca || prev.Marca,
       Modelo: customer.Modelo || prev.Modelo,
-      Kilometraje: customer.Kilometraje ? String(customer.Kilometraje) : prev.Kilometraje,
+      FechaMatriculacion:
+        customer.FechaMatriculacion || prev.FechaMatriculacion,
+      Motor: customer.Motor || prev.Motor,
+      Kw: customer.Kw || prev.Kw,
+      Cv: customer.Cv || prev.Cv,
+      Combustible: customer.Combustible || prev.Combustible,
+      Kilometraje: customer.Kilometraje
+        ? String(customer.Kilometraje)
+        : prev.Kilometraje,
     }));
     setCustomerSearch("");
     setCustomerMatches([]);
@@ -362,10 +432,14 @@ export default function RegisterBudget() {
       },
     });
     const pack = res?.data?.data?.[0];
-    const items = Array.isArray(pack?.items) ? pack.items.map(normalizeCustomer) : [];
-    return items.find(
-      (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
-    ) || null;
+    const items = Array.isArray(pack?.items)
+      ? pack.items.map(normalizeCustomer)
+      : [];
+    return (
+      items.find(
+        (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
+      ) || null
+    );
   };
 
   const createCustomerFromBudget = async () => {
@@ -377,9 +451,19 @@ export default function RegisterBudget() {
       telefono: budget.Telefono,
       email: null,
       direccion: budget.Direccion || null,
+      codigoPostal: budget.CodigoPostal || null,
+      poblacion: budget.Poblacion || null,
+      provincia: budget.Provincia || null,
+      clasificacion: budget.Clasificacion || "Particular",
       matricula: budget.Matricula,
+      bastidor: budget.Bastidor || null,
       marca: budget.Marca || null,
       modelo: budget.Modelo,
+      fechaMatriculacion: budget.FechaMatriculacion || null,
+      motor: budget.Motor || null,
+      kw: budget.Kw ? Number(budget.Kw) : null,
+      cv: budget.Cv ? Number(budget.Cv) : null,
+      combustible: budget.Combustible || null,
       kilometraje: budget.Kilometraje ? Number(budget.Kilometraje) : null,
       observaciones: budget.Observaciones || null,
     };
@@ -407,7 +491,9 @@ export default function RegisterBudget() {
       const existing = await findExistingCustomerByPlate(payload.matricula);
       if (existing) {
         fillBudgetFromCustomer(existing);
-        setNotice("Cliente ya registrado; se cargaron sus datos en el presupuesto.");
+        setNotice(
+          "Cliente ya registrado; se cargaron sus datos en el presupuesto.",
+        );
         return;
       }
 
@@ -454,6 +540,7 @@ export default function RegisterBudget() {
 
   useEffect(() => {
     loadFrequentServices();
+    loadWorkshopSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -494,13 +581,18 @@ export default function RegisterBudget() {
           repuestoStockId: item.repuestoStockId || null,
           idProveedor: item.idProveedor || null,
           nombreProveedor: item.nombreProveedor || null,
-          precioCompra: item.precioCompra != null ? Number(item.precioCompra || 0) : null,
+          precioCompra:
+            item.precioCompra != null ? Number(item.precioCompra || 0) : null,
         }));
       const laborTotal = normalizedItems
-        .filter((item) => item.descripcion.trim().toLowerCase() === "mano de obra")
+        .filter(
+          (item) => item.descripcion.trim().toLowerCase() === "mano de obra",
+        )
         .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
       const partsTotal = normalizedItems
-        .filter((item) => item.descripcion.trim().toLowerCase() !== "mano de obra")
+        .filter(
+          (item) => item.descripcion.trim().toLowerCase() !== "mano de obra",
+        )
         .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
 
       const payload = {
@@ -508,18 +600,34 @@ export default function RegisterBudget() {
         cliente: budget.Cliente,
         dni: budget.Dni || null,
         telefono: budget.Telefono || null,
+        direccion: budget.Direccion || null,
+        codigoPostal: budget.CodigoPostal || null,
+        poblacion: budget.Poblacion || null,
+        provincia: budget.Provincia || null,
+        clasificacion: budget.Clasificacion || "Particular",
         matricula: budget.Matricula,
+        bastidor: budget.Bastidor || null,
         marca: budget.Marca || null,
         modelo: budget.Modelo,
+        fechaMatriculacion: budget.FechaMatriculacion || null,
+        motor: budget.Motor || null,
+        kw: budget.Kw ? Number(budget.Kw) : null,
+        cv: budget.Cv ? Number(budget.Cv) : null,
+        combustible: budget.Combustible || null,
         kilometraje: budget.Kilometraje ? Number(budget.Kilometraje) : null,
         fecha: budget.Fecha,
+        tipoOperacion: budget.TipoOperacion || "Mecanica",
         trabajo: budget.Trabajo,
         itemsJson: normalizedItems.length
           ? JSON.stringify(normalizedItems)
           : null,
-        repuestos: normalizedItems.length ? partsTotal : Number(budget.Repuestos || 0),
+        repuestos: normalizedItems.length
+          ? partsTotal
+          : Number(budget.Repuestos || 0),
         cantidad: Number(budget.Cantidad || 1),
-        manoObra: normalizedItems.length ? laborTotal : Number(budget.ManoObra || 0),
+        manoObra: normalizedItems.length
+          ? laborTotal
+          : Number(budget.ManoObra || 0),
         estado: budget.Estado || "Pendiente",
         observaciones: budget.Observaciones || null,
       };
@@ -558,13 +666,27 @@ export default function RegisterBudget() {
       Cliente: p.Cliente || "",
       Dni: p.Dni || "",
       Telefono: p.Telefono || "",
+      Direccion: p.Direccion || "",
+      CodigoPostal: p.CodigoPostal || "",
+      Poblacion: p.Poblacion || "",
+      Provincia: p.Provincia || "",
+      Clasificacion: p.Clasificacion || "Particular",
       Matricula: p.Matricula || "",
+      Bastidor: p.Bastidor || "",
       Marca: p.Marca || "",
       Modelo: p.Modelo || "",
+      FechaMatriculacion: p.FechaMatriculacion
+        ? String(p.FechaMatriculacion).slice(0, 10)
+        : "",
+      Motor: p.Motor || "",
+      Kw: p.Kw || "",
+      Cv: p.Cv || "",
+      Combustible: p.Combustible || "",
       Kilometraje: p.Kilometraje || "",
       Fecha: p.Fecha
         ? String(p.Fecha).slice(0, 10)
         : new Date().toISOString().slice(0, 10),
+      TipoOperacion: p.TipoOperacion || "Mecanica",
       Trabajo: p.Trabajo || "",
       Items: p.Items || [],
       Repuestos: p.Repuestos || "",
@@ -632,7 +754,7 @@ export default function RegisterBudget() {
           </h2>
 
           <p className="text-sm text-slate-500 mt-1">
-            Crea presupuestos y conviértelos en órdenes de trabajo.
+            Crea presupuestos y conviertelos en Ordenes de trabajo.
           </p>
         </div>
 
@@ -666,58 +788,49 @@ export default function RegisterBudget() {
         </h3>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end">
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Buscar cliente registrado
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={customerSearch}
-                  onChange={(e) => setCustomerSearch(e.target.value)}
-                  className={`${cls} pl-10`}
-                  placeholder="Nombre, telefono, matricula, modelo o email"
-                />
-                <Search
-                  size={16}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                {customerSearch && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomerSearch("");
-                      setCustomerMatches([]);
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                    aria-label="Limpiar busqueda"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-            </div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Buscar cliente registrado
+          </label>
 
-            <button
-              type="button"
-              onClick={() => setShowNewCustomer((v) => !v)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-            >
-              <UserPlus size={17} />
-              {showNewCustomer ? "Ocultar alta rapida" : "Registrar nuevo"}
-            </button>
+          <div className="relative">
+            <input
+              type="text"
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              className={`${cls} pl-10`}
+              placeholder="Nombre, telefono, matricula o modelo"
+            />
+
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+
+            {customerSearch && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomerSearch("");
+                  setCustomerMatches([]);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
 
           {loadingCustomers && (
             <p className="mt-3 text-sm text-slate-500">Buscando clientes...</p>
           )}
 
-          {!loadingCustomers && customerSearch.trim().length >= 2 && customerMatches.length === 0 && (
-            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
-              No encontramos ese cliente. Puedes completar los campos y usar "Registrar nuevo".
-            </div>
-          )}
+          {!loadingCustomers &&
+            customerSearch.trim().length >= 2 &&
+            customerMatches.length === 0 && (
+              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+                No encontramos ese cliente.
+              </div>
+            )}
 
           {customerMatches.length > 0 && (
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -726,39 +839,51 @@ export default function RegisterBudget() {
                   key={customer.Id}
                   type="button"
                   onClick={() => fillBudgetFromCustomer(customer)}
-                  className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-violet-300 hover:bg-violet-50"
+                  className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
                 >
                   <span className="block font-semibold text-slate-900">
                     {customer.Nombre}
                   </span>
+
                   <span className="mt-1 block text-slate-600">
-                    {customer.Matricula || `Sin ${labels.referenceLabel.toLowerCase()}`} · {customer.Marca} {customer.Modelo}
+                    {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
+                    {customer.Modelo}
                   </span>
+
                   <span className="mt-1 block text-xs text-slate-500">
-                    {customer.Telefono || "Sin telefono"}
+                    {customer.Telefono || "Sin teléfono"}
                   </span>
                 </button>
               ))}
             </div>
           )}
 
-          {showNewCustomer && (
-            <div className="mt-4 rounded-xl bg-white p-3 text-sm text-slate-600 ring-1 ring-slate-200">
-              <p>
-                Completa nombre, telefono, matricula y modelo en los campos del presupuesto.
-                Luego pulsa este boton para guardar el cliente en la base de datos.
-              </p>
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowNewCustomer((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              <UserPlus size={17} />
+
+              {showNewCustomer ? "Ocultar alta rápida" : "Registrar nuevo"}
+            </button>
+
+            {showNewCustomer && (
               <button
                 type="button"
                 onClick={createCustomerFromBudget}
                 disabled={savingCustomer}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                className="ml-2 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 <UserPlus size={17} />
-                {savingCustomer ? "Guardando cliente..." : "Guardar cliente nuevo"}
+
+                {savingCustomer
+                  ? "Guardando cliente..."
+                  : "Guardar cliente nuevo"}
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -803,6 +928,37 @@ export default function RegisterBudget() {
             placeholder="Dirección del cliente"
           />
           <input
+            name="CodigoPostal"
+            value={budget.CodigoPostal}
+            onChange={handleChange}
+            className={cls}
+            placeholder="Codigo postal"
+          />
+          <input
+            name="Poblacion"
+            value={budget.Poblacion}
+            onChange={handleChange}
+            className={cls}
+            placeholder="Poblacion"
+          />
+          <input
+            name="Provincia"
+            value={budget.Provincia}
+            onChange={handleChange}
+            className={cls}
+            placeholder="Provincia"
+          />
+          <select
+            name="Clasificacion"
+            value={budget.Clasificacion}
+            onChange={handleChange}
+            className={cls}
+          >
+            <option value="Particular">Particular</option>
+            <option value="Empresa">Empresa</option>
+          </select>
+
+          <input
             name="Matricula"
             value={budget.Matricula}
             onChange={(e) =>
@@ -822,12 +978,61 @@ export default function RegisterBudget() {
           />
 
           <input
+            name="Bastidor"
+            value={budget.Bastidor}
+            onChange={handleChange}
+            className={cls}
+            placeholder="Bastidor"
+          />
+
+          <input
             name="Modelo"
             value={budget.Modelo}
             onChange={handleChange}
             className={cls}
             placeholder={`${labels.modelLabel} *`}
             required
+          />
+
+          <input
+            name="FechaMatriculacion"
+            type="date"
+            value={budget.FechaMatriculacion}
+            onChange={handleChange}
+            className={cls}
+            title="Fecha matriculacion"
+          />
+          <input
+            name="Motor"
+            value={budget.Motor}
+            onChange={handleChange}
+            className={cls}
+            placeholder="Motor"
+          />
+          <input
+            name="Kw"
+            type="number"
+            step="0.01"
+            value={budget.Kw}
+            onChange={handleChange}
+            className={cls}
+            placeholder="KW"
+          />
+          <input
+            name="Cv"
+            type="number"
+            step="0.01"
+            value={budget.Cv}
+            onChange={handleChange}
+            className={cls}
+            placeholder="CV"
+          />
+          <input
+            name="Combustible"
+            value={budget.Combustible}
+            onChange={handleChange}
+            className={cls}
+            placeholder="Combustible"
           />
 
           <input
@@ -846,6 +1051,19 @@ export default function RegisterBudget() {
             onChange={handleChange}
             className={cls}
           />
+
+          <select
+            name="TipoOperacion"
+            value={budget.TipoOperacion}
+            onChange={handleChange}
+            className={cls}
+          >
+            {operationTypes.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
 
           <select
             name="Estado"
@@ -946,17 +1164,16 @@ export default function RegisterBudget() {
             <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
               Mano de obra (EUR)
             </label>
-          <input
-            name="ManoObra"
-            type="number"
-            step="0.01"
-            value={budget.ManoObra}
-            onChange={handleChange}
-            onBlur={(e) => upsertLaborItem(e.target.value)}
-            className={cls}
-            placeholder="Mano de obra €"
-          />
-
+            <input
+              name="ManoObra"
+              type="number"
+              step="0.01"
+              value={budget.ManoObra}
+              onChange={handleChange}
+              onBlur={(e) => upsertLaborItem(e.target.value)}
+              className={cls}
+              placeholder="Mano de obra â‚¬"
+            />
           </div>
 
           <textarea
@@ -985,9 +1202,7 @@ export default function RegisterBudget() {
 
           {detailItems.length > 0 && (
             <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                
-              </div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600"></div>
               <div className="hidden lg:grid grid-cols-[100px_minmax(0,1fr)_150px_150px_40px] gap-2 px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <div>Cantidad</div>
                 <div>Detalle del presupuesto</div>
@@ -1012,7 +1227,11 @@ export default function RegisterBudget() {
                         step="0.01"
                         value={item.cantidad}
                         onChange={(e) =>
-                          setDetailItemField(item.id, "cantidad", e.target.value)
+                          setDetailItemField(
+                            item.id,
+                            "cantidad",
+                            e.target.value,
+                          )
                         }
                         className={cls}
                         placeholder="Cantidad"
@@ -1020,7 +1239,11 @@ export default function RegisterBudget() {
                       <input
                         value={item.descripcion}
                         onChange={(e) =>
-                          setDetailItemField(item.id, "descripcion", e.target.value)
+                          setDetailItemField(
+                            item.id,
+                            "descripcion",
+                            e.target.value,
+                          )
                         }
                         className={cls}
                         placeholder="Descripcion"
@@ -1097,186 +1320,190 @@ export default function RegisterBudget() {
         </div>
       </form>
 
-<section className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6">
-  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-    <h3 className="text-lg font-semibold text-slate-800">
-      Presupuestos recientes
-    </h3>
+      <section className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <h3 className="text-lg font-semibold text-slate-800">
+            Presupuestos recientes
+          </h3>
 
-    <div className="flex flex-col md:flex-row gap-3">
-      <input
-        type="date"
-        value={dateFrom}
-        onChange={(e) => {
-          setDateFrom(e.target.value);
-          setBudgetPage(1);
-        }}
-        className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-      />
+          <div className="flex flex-col md:flex-row gap-3">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setBudgetPage(1);
+              }}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
 
-      <input
-        type="date"
-        value={dateTo}
-        onChange={(e) => {
-          setDateTo(e.target.value);
-          setBudgetPage(1);
-        }}
-        className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-      />
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setBudgetPage(1);
+              }}
+              className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
 
-      {(dateFrom || dateTo) && (
-        <button
-          type="button"
-          onClick={() => {
-            setDateFrom("");
-            setDateTo("");
-            setBudgetPage(1);
-          }}
-          className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
-        >
-          Limpiar
-        </button>
-      )}
-    </div>
-  </div>
-
-  <div className="grid grid-cols-1 gap-4">
-    {budgets.map((p) => (
-      <article
-        key={p.Id}
-        className="rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h4 className="text-lg font-bold text-slate-900">
-              {p.NumeroPresupuesto}
-            </h4>
-
-            <p className="text-sm text-slate-500">
-              {p.Matricula} · {p.Marca} {p.Modelo}
-            </p>
+            {(dateFrom || dateTo) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFrom("");
+                  setDateTo("");
+                  setBudgetPage(1);
+                }}
+                className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+              >
+                Limpiar
+              </button>
+            )}
           </div>
+        </div>
 
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-medium ring-1 ring-violet-200 text-violet-700">
-            {p.Estado}
+        <div className="grid grid-cols-1 gap-4">
+          {budgets.map((p) => (
+            <article
+              key={p.Id}
+              className="rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-lg font-bold text-slate-900">
+                    {p.NumeroPresupuesto}
+                  </h4>
+
+                  <p className="text-sm text-slate-500">
+                    {p.Matricula} · {p.Marca} {p.Modelo}
+                  </p>
+                </div>
+
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-medium ring-1 ring-violet-200 text-violet-700">
+                  {p.Estado}
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Cliente
+                  </p>
+                  <p className="font-semibold text-slate-800">{p.Cliente}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Trabajo
+                  </p>
+                  <p className="text-slate-700 line-clamp-2">{p.Trabajo}</p>
+                </div>
+
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Total
+                  </p>
+                  <p className="text-xl font-bold text-slate-900">
+                    {(
+                      Number(p.ManoObra || 0) +
+                      Number(p.Repuestos || 0) * Number(p.Cantidad || 1)
+                    ).toLocaleString("es-ES", {
+                      style: "currency",
+                      currency: "EUR",
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => startEdit(p)}
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
+                >
+                  Editar
+                </button>
+
+                {!p.ConvertidoEnOrden && (
+                  <button
+                    type="button"
+                    onClick={() => convertToOrder(p)}
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                  >
+                    Convertir en orden
+                  </button>
+                )}
+
+                {p.ConvertidoEnOrden && (
+                  <Link
+                    to="/register-work-order#ordenes-recientes"
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium"
+                  >
+                    Orden creada #{p.IdOrdenTrabajo}
+                  </Link>
+                )}
+
+                <Link
+                  to={`/print-budget/${p.Id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-violet-600 text-white hover:bg-violet-700"
+                >
+                  Imprimir presupuesto
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => deleteBudget(p)}
+                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </article>
+          ))}
+
+          {budgets.length === 0 && (
+            <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+              <h4 className="text-lg font-semibold text-slate-800">
+                {dateFrom || dateTo
+                  ? "No se encontraron presupuestos"
+                  : "No hay presupuestos registrados"}
+              </h4>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+          <button
+            type="button"
+            disabled={budgetPage <= 1}
+            onClick={() => loadBudgets(budgetPage - 1)}
+            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <span className="text-slate-600">
+            Página {budgetPage} de {budgetTotalPages} · {budgetTotal}{" "}
+            presupuestos
           </span>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">
-              Cliente
-            </p>
-            <p className="font-semibold text-slate-800">{p.Cliente}</p>
-          </div>
-
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">
-              Trabajo
-            </p>
-            <p className="text-slate-700 line-clamp-2">{p.Trabajo}</p>
-          </div>
-
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">
-              Total
-            </p>
-            <p className="text-xl font-bold text-slate-900">
-              {(
-                Number(p.ManoObra || 0) +
-                Number(p.Repuestos || 0) * Number(p.Cantidad || 1)
-              ).toLocaleString(
-                "es-ES",
-                {
-                  style: "currency",
-                  currency: "EUR",
-                },
-              )}
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button
             type="button"
-            onClick={() => startEdit(p)}
-            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
+            disabled={budgetPage >= budgetTotalPages}
+            onClick={() => loadBudgets(budgetPage + 1)}
+            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
           >
-            Editar
-          </button>
-
-          {!p.ConvertidoEnOrden && (
-            <button
-              type="button"
-              onClick={() => convertToOrder(p)}
-              className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-            >
-              Convertir en orden
-            </button>
-          )}
-
-          {p.ConvertidoEnOrden && (
-            <Link
-              to="/register-work-order#ordenes-recientes"
-              className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium"
-            >
-              Orden creada #{p.IdOrdenTrabajo}
-            </Link>
-          )}
-          
-          <Link
-  to={`/print-budget/${p.Id}`}
-  target="_blank"
-  rel="noopener noreferrer"
-  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-violet-600 text-white hover:bg-violet-700"
->
-  Imprimir presupuesto
-</Link>
-
-          <button
-            type="button"
-            onClick={() => deleteBudget(p)}
-            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
-          >
-            Eliminar
+            Siguiente
           </button>
         </div>
-      </article>
-    ))}
-
-    {budgets.length === 0 && (
-      <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-        <h4 className="text-lg font-semibold text-slate-800">
-          {(dateFrom || dateTo)
-            ? "No se encontraron presupuestos"
-            : "No hay presupuestos registrados"}
-        </h4>
-      </div>
-    )}
-  </div>
-
-  <div className="mt-5 flex items-center justify-center gap-3 text-sm">
-    <button
-      type="button"
-      disabled={budgetPage <= 1}
-      onClick={() => loadBudgets(budgetPage - 1)}
-      className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-    >
-      Anterior
-    </button>
-    <span className="text-slate-600">
-      Pagina {budgetPage} de {budgetTotalPages} · {budgetTotal} presupuestos
-    </span>
-    <button
-      type="button"
-      disabled={budgetPage >= budgetTotalPages}
-      onClick={() => loadBudgets(budgetPage + 1)}
-      className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-    >
-      Siguiente
-    </button>
-  </div>
-</section>
+      </section>
     </>
   );
+}
+
+function normalizeOperationTypes(types) {
+  const list = Array.isArray(types) ? types : ["Mecanica"];
+  const filtered = list.filter((type) => type && type !== "Recambio");
+  return filtered.length ? filtered : ["Mecanica"];
 }

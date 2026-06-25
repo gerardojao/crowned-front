@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
+import vehicleDamageDiagram from "../assets/vehicle-damage-diagram.png";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 
 const DEFAULT_TALLER = {
@@ -163,10 +164,14 @@ export default function PrintWorkOrder() {
         fecha: valueOf(data, "fecha"),
         fechaPrevistaEntrega: valueOf(data, "fechaPrevistaEntrega"),
         tiempoEstimadoHoras: valueOf(data, "tiempoEstimadoHoras"),
+        tipoOperacion: valueOf(data, "tipoOperacion", "Mecanica"),
         trabajo: valueOf(data, "trabajo"),
         itemsJson: valueOf(data, "itemsJson"),
         estado: valueOf(data, "estado"),
         observaciones: valueOf(data, "observaciones"),
+        codigoPostal: valueOf(data, "codigoPostal"),
+        poblacion: valueOf(data, "poblacion"),
+        provincia: valueOf(data, "provincia"),
       });
     } catch (err) {
       console.error(err);
@@ -211,21 +216,35 @@ export default function PrintWorkOrder() {
       : "ORDEN DE TRABAJO";
   const documentNumber = String(order.id || "").padStart(9, "0");
   const pageLabel = "Pag. 1";
+  const operationType = String(order.tipoOperacion || "Mecanica").toUpperCase();
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
+  const actionTitle = isPreOrder
+    ? "Pre-orden"
+    : isCustody
+      ? "Resguardo de deposito"
+      : "Orden de trabajo";
+  const actionSubtitle = isPreOrder
+    ? "Revisa la recepción inicial del vehículo antes de convertirla en orden."
+    : isCustody
+      ? "Emite el resguardo de depósito del vehículo recibido."
+      : "Registra trabajos, vehículo, estado y costes del servicio.";
 
   if (!useZagaTemplate) {
     return <CrowerWorkOrderDocument order={order} workshopName={taller.nombre || "Multiservicios Crower"} />;
   }
-
   return (
-    <main className="print-page bg-white text-black">
-      <PrintActions />
+    <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <PrintActions title={actionTitle} subtitle={actionSubtitle} />
       <style>{`
         .workorder-sheet {
           width: 190mm;
           min-height: 255mm;
           margin: 0 auto;
           padding: 4mm 5mm;
+          background: #fff;
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          border-radius: 16px;
+          box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
           font-family: Arial, Helvetica, sans-serif;
           font-size: 8.2px;
           line-height: 1.18;
@@ -233,10 +252,10 @@ export default function PrintWorkOrder() {
         }
         .wo-header {
           display: grid;
-          grid-template-columns: 48% 52%;
+          grid-template-columns: 56% 1fr;
           align-items: start;
-          gap: 8mm;
-          margin-bottom: 9mm;
+          gap: 5mm;
+          margin-bottom: 6mm;
         }
         .wo-logo {
           width: 72mm;
@@ -245,52 +264,58 @@ export default function PrintWorkOrder() {
           object-position: left center;
         }
         .wo-company {
+          width: 60mm;
+          justify-self: end;
+          margin-top: 7mm;
           font-size: 9px;
           line-height: 1.22;
           text-transform: uppercase;
         }
         .wo-title-row {
           display: grid;
-          grid-template-columns: 47mm 1fr;
-          gap: 6mm;
+          grid-template-columns: 72mm 1fr;
+          gap: 4mm;
           align-items: start;
           margin-bottom: 2mm;
-          
+        
         }
         .wo-title {
           font-size: 15px;
           font-weight: 800;
           letter-spacing: .2px;
-          margin: 0 0 5mm;
+          margin: 0 0 3mm;
           text-align: left;
+   
         }
         .wo-meta {
-          width: 36mm;
+          width: 52mm;
           border-collapse: collapse;
-          font-size: 8px;
+          font-size: 10px;
         }
         .wo-meta th {
-          width: 21mm;
+          width: 32mm;
           background: #b7b7b7;
-          border: 1px solid #b7b7b7;
-          padding: 2.1mm 1.4mm;
+          border-bottom: 1px solid #fff;
+          padding: 1.7mm 1.6mm;
           text-align: left;
           font-weight: 800;
         }
         .wo-meta td {
-          border: 1px solid transparent;
-          padding: 2.1mm 1.4mm;
+          border-bottom: 1px solid #fff;
+          padding: 1.7mm 1.5mm;
           font-weight: 700;
+          text-align: left;
         }
         .wo-client-box {
           position: relative;
+          width: 68mm;
           min-height: 24mm;
-          padding: 5mm 10mm 4mm;
+          padding: 5mm 8mm 4mm;
           font-size: 10px;
           line-height: 1.25;
           text-transform: uppercase;
-          margin-top:25mm;
-          margin-left: 55mm;
+          margin-top: 14mm;
+          margin-left: 34mm;
         }
         .wo-client-box:before,
         .wo-client-box:after,
@@ -401,34 +426,17 @@ export default function PrintWorkOrder() {
         }
         .wo-car-box {
           height: 38mm;
-          position: relative;
-          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5mm 0 0;
         }
-        .wo-car {
-          position: absolute;
-          left: 12mm;
-          top: 6mm;
-          width: 44mm;
-          height: 23mm;
-          border: 1px solid #999;
-          border-radius: 42% 42% 34% 34%;
-        }
-        .wo-car:before {
-          content: "";
-          position: absolute;
-          left: 11mm;
-          top: 4mm;
-          width: 22mm;
-          height: 14mm;
-          border: 1px solid #bbb;
-          border-radius: 38%;
-        }
-        .wo-car-note {
-          position: absolute;
-          right: 2mm;
-          bottom: 1mm;
-          font-size: 7px;
-          color: #333;
+        .wo-car-diagram {
+          display: block;
+          width: 51mm;
+          max-width: 100%;
+          height: auto;
+          object-fit: contain;
         }
         @media print {
           @page { size: letter portrait; margin: 8mm; }
@@ -437,6 +445,9 @@ export default function PrintWorkOrder() {
             min-height: auto;
             margin: 0;
             padding: 0;
+            border: 0;
+            border-radius: 0;
+            box-shadow: none;
           }
         }
       `}</style>
@@ -465,18 +476,19 @@ export default function PrintWorkOrder() {
                 <tr><th>N. Cliente</th><td>{order.id || "-"}</td></tr>
                 <tr><th>NIF</th><td>{order.dni || "-"}</td></tr>
                 <tr><th>Forma de Pago</th><td>{isCustody ? "PENDIENTE" : "-"}</td></tr>
-                <tr><th>Tipo de Operacion</th><td>MECANICA</td></tr>
+                <tr><th>Tipo de Operacion</th><td>{operationType}</td></tr>
               </tbody>
             </table>
           </div>
 
           <div>
-            <div className="wo-client-box">
+            <div className="wo-client-box text-left">
               <div className="wo-client-corners" />
               <strong>{order.cliente || "-"}</strong><br />
               {order.direccion && <>{order.direccion}<br /></>}
+              {order.codigoPostal && <>{order.codigoPostal}-{order.poblacion}<br /></>}
+              {order.provincia && <>{order.provincia}<br /></>}
               {order.telefono && <>{order.telefono}<br /></>}
-              {order.dni && <>{order.dni}</>}
             </div>
             <div className="wo-page-label">{pageLabel}</div>
           </div>
@@ -509,8 +521,8 @@ export default function PrintWorkOrder() {
           <thead>
             <tr>
               <th>Matricula</th>
-              <th>Nº peritacion</th>
-              <th>F. matriculacion</th>
+              <th>Nº peritación</th>
+              <th>F. matriculación</th>
               <th>Nº de chasis</th>
               <th>Nº motor</th>
               <th>Recepcion</th>
@@ -610,10 +622,13 @@ export default function PrintWorkOrder() {
             <div className="wo-sign">Firma taller</div>
           </div>
           <div className="wo-footer-cell">
-            <div>DANOS OBSERVADOS EN LA CARROCERIA</div>
+            <div>DAÑOS OBSERVADOS EN LA CARROCERÍA</div>
             <div className="wo-car-box">
-              <div className="wo-car" />
-              <div className="wo-car-note">Marcar danos visibles</div>
+              <img
+                src={vehicleDamageDiagram}
+                alt="Diagrama de daños observados en la carrocería"
+                className="wo-car-diagram"
+              />
             </div>
           </div>
         </footer>
@@ -677,23 +692,31 @@ function CrowerWorkOrderDocument({ order, workshopName }) {
   );
 }
 
-function PrintActions() {
+function PrintActions({ title, subtitle }) {
   return (
-    <div className="no-print fixed right-4 top-4 z-50 flex items-center gap-2">
-      <button
-        type="button"
-        onClick={() => window.print()}
-        className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-orange-700"
-      >
-        Imprimir
-      </button>
-      <Link
-        to="/register-work-order#ordenes-recientes"
-        className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white shadow-lg transition hover:bg-slate-800"
-      >
-        <ArrowLeft size={16} />
-        Volver
-      </Link>
+    <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3 text-slate-900">
+      <div>
+        <h2 className="text-2xl font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-white transition hover:bg-orange-700"
+        >
+          <Printer size={18} />
+          Emitir e Imprimir
+        </button>
+        <Link
+          to="/register-work-order#ordenes-recientes"
+          className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-white transition hover:bg-slate-800"
+        >
+          <ArrowLeft size={18} />
+          Volver
+        </Link>
+      </div>
     </div>
   );
 }
