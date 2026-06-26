@@ -434,6 +434,7 @@ export default function RegisterWorkOrder() {
 
   const normalizeOrder = (o) => ({
     Id: o.id ?? o.Id,
+    PreOrdenId: o.preOrdenId ?? o.PreOrdenId ?? null,
     Cliente: o.cliente ?? o.Cliente,
     Dni: o.dni ?? o.Dni ?? "",
     Telefono: o.telefono ?? o.Telefono,
@@ -814,6 +815,19 @@ export default function RegisterWorkOrder() {
                 ]
               : [],
           Observaciones: observaciones,
+          CodigoPostal: data.codigoPostal ?? data.CodigoPostal ?? "",
+          Poblacion: data.poblacion ?? data.Poblacion ?? "",
+          Provincia: data.provincia ?? data.Provincia ?? "",
+          Clasificacion: data.clasificacion ?? data.Clasificacion ?? "Particular",
+          Bastidor: data.bastidor ?? data.Bastidor ?? "",
+          FechaMatriculacion: String(
+            data.fechaMatriculacion ?? data.FechaMatriculacion ?? ""
+          ).slice(0, 10),
+          Motor: data.motor ?? data.Motor ?? "",
+          Kw: data.kw ?? data.Kw ?? "",
+          Cv: data.cv ?? data.Cv ?? "",
+          Combustible: data.combustible ?? data.Combustible ?? "",
+
         });
         setNotice("Pre-orden cargada. Completa la orden y guardala.");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1949,12 +1963,18 @@ export default function RegisterWorkOrder() {
                       <>
                         {preOrdersEnabled && (
                           <a
-                            href={`/print-order/${o.Id}?type=preorden`}
+                            href={o.PreOrdenId ? `/print-pre-order/${o.PreOrdenId}` : "#"}
                             target="_blank"
                             rel="noopener noreferrer"
+                            onClick={(event) => {
+                              if (!o.PreOrdenId) {
+                                event.preventDefault();
+                                setError("Esta orden no tiene una pre-orden asociada.");
+                              }
+                            }}
                             className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
                           >
-                            Pre-orden
+                           ver Pre-orden
                           </a>
                         )}
 

@@ -59,7 +59,9 @@ function parseItems(itemsJson) {
           item.Nombre ||
           "",
         cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
-        kind: String(item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "").toLowerCase(),
+        kind: String(
+          item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "",
+        ).toLowerCase(),
       }))
       .filter((item) => normalizeText(item.descripcion));
   } catch {
@@ -86,7 +88,11 @@ function buildFallbackItems(order) {
 
 function isMaterial(item) {
   const kind = item.kind.toLowerCase();
-  return kind.includes("repuesto") || kind.includes("material") || kind.includes("part");
+  return (
+    kind.includes("repuesto") ||
+    kind.includes("material") ||
+    kind.includes("part")
+  );
 }
 
 function isLabor(item) {
@@ -97,11 +103,13 @@ function isLabor(item) {
 export default function PrintWorkOrder() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const documentType = String(params.get("type") || params.get("tipo") || "orden").toLowerCase();
+  const documentType = String(
+    params.get("type") || params.get("tipo") || "orden",
+  ).toLowerCase();
   const isCustody = documentType === "resguardo" || documentType === "deposito";
-  const isPreOrder = documentType === "preorden" || documentType === "pre-orden";
 
   const [order, setOrder] = useState(null);
+  const [customer, setCustomer] = useState(null);
   const [taller, setTaller] = useState(DEFAULT_TALLER);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -110,7 +118,7 @@ export default function PrintWorkOrder() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, documentType]);
 
   useEffect(() => {
     if (loading || error || !order || printed) return;
@@ -126,17 +134,21 @@ export default function PrintWorkOrder() {
 
       const [settingsRes, orderRes] = await Promise.all([
         api.get("/WorkshopSettings").catch(() => null),
-        api.get(`/OrdenTrabajo/${id}`),
+        api.get(`/OrdenTrabajo/${id}`).catch(() => null),
       ]);
 
       const settings = settingsRes?.data || {};
       setTaller({
         nombre: settings.nombre ?? settings.Nombre ?? DEFAULT_TALLER.nombre,
         razonSocial:
-          settings.razonSocial ?? settings.RazonSocial ?? DEFAULT_TALLER.razonSocial,
+          settings.razonSocial ??
+          settings.RazonSocial ??
+          DEFAULT_TALLER.razonSocial,
         nif: settings.nif ?? settings.Nif ?? DEFAULT_TALLER.nif,
-        direccion: settings.direccion ?? settings.Direccion ?? DEFAULT_TALLER.direccion,
-        telefono: settings.telefono ?? settings.Telefono ?? DEFAULT_TALLER.telefono,
+        direccion:
+          settings.direccion ?? settings.Direccion ?? DEFAULT_TALLER.direccion,
+        telefono:
+          settings.telefono ?? settings.Telefono ?? DEFAULT_TALLER.telefono,
         email: settings.email ?? settings.Email ?? DEFAULT_TALLER.email,
         logoUrl: settings.logoUrl ?? settings.LogoUrl ?? DEFAULT_TALLER.logoUrl,
         documentTemplateKey:
@@ -153,6 +165,8 @@ export default function PrintWorkOrder() {
 
       setOrder({
         id: valueOf(data, "id"),
+        idCliente: valueOf(data, "idCliente"),
+        numeroCliente: valueOf(data, "numeroCliente"),
         cliente: valueOf(data, "cliente"),
         dni: valueOf(data, "dni"),
         telefono: valueOf(data, "telefono"),
@@ -171,7 +185,7 @@ export default function PrintWorkOrder() {
         observaciones: valueOf(data, "observaciones"),
         codigoPostal: valueOf(data, "codigoPostal"),
         poblacion: valueOf(data, "poblacion"),
-        provincia: valueOf(data, "provincia"),
+        provincia: valueOf(data, "provincia")
       });
     } catch (err) {
       console.error(err);
@@ -198,39 +212,49 @@ export default function PrintWorkOrder() {
   }, [items]);
 
   const materialItems = useMemo(() => items.filter(isMaterial), [items]);
-  const operationLines = useMemo(() => splitOperationLines(order?.trabajo), [order?.trabajo]);
+  const operationLines = useMemo(
+    () => splitOperationLines(order?.trabajo),
+    [order?.trabajo],
+  );
 
   if (loading) {
-    return <div className="p-10 text-center text-slate-500">Cargando orden...</div>;
+    return (
+      <div className="p-10 text-center text-slate-500">Cargando orden...</div>
+    );
   }
 
   if (error || !order) {
-    return <div className="p-10 text-center text-rose-600">{error || "No se encontro la orden."}</div>;
+    return (
+      <div className="p-10 text-center text-rose-600">
+        {error || "No se encontro la orden."}
+      </div>
+    );
   }
 
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
-  const title = isPreOrder
-    ? "PRE-ORDEN"
-    : isCustody
+  const title = isCustody
       ? "RESGUARDO DE DEPOSITO"
       : "ORDEN DE TRABAJO";
-  const documentNumber = String(order.id || "").padStart(9, "0");
+  const baseDocumentNumber = String(order.id || "").padStart(9, "0");
+  const documentNumber = isCustody ? `R-${baseDocumentNumber}` : baseDocumentNumber;
+  const customerNumber = order.numeroCliente || order.idCliente || "-";
   const pageLabel = "Pag. 1";
   const operationType = String(order.tipoOperacion || "Mecanica").toUpperCase();
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
-  const actionTitle = isPreOrder
-    ? "Pre-orden"
-    : isCustody
+  const actionTitle = isCustody
       ? "Resguardo de deposito"
       : "Orden de trabajo";
-  const actionSubtitle = isPreOrder
-    ? "Revisa la recepción inicial del vehículo antes de convertirla en orden."
-    : isCustody
+  const actionSubtitle = isCustody
       ? "Emite el resguardo de depósito del vehículo recibido."
       : "Registra trabajos, vehículo, estado y costes del servicio.";
 
   if (!useZagaTemplate) {
-    return <CrowerWorkOrderDocument order={order} workshopName={taller.nombre || "Multiservicios Crower"} />;
+    return (
+      <CrowerWorkOrderDocument
+        order={order}
+        workshopName={taller.nombre || "Multiservicios Crower"}
+      />
+    );
   }
   return (
     <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -355,6 +379,7 @@ export default function PrintWorkOrder() {
           padding: 1.4mm 1mm;
           text-align: center;
           border: 1px solid #fff;
+          font-size: 10px;
         }
         .wo-body {
           margin-top: 2mm;
@@ -371,7 +396,8 @@ export default function PrintWorkOrder() {
         }
         .wo-section-head span {
           padding: 1.5mm 1.5mm;
-        }
+        }       
+
         .wo-block {
           padding: 1.7mm 1.5mm 1mm;
         }
@@ -438,6 +464,103 @@ export default function PrintWorkOrder() {
           height: auto;
           object-fit: contain;
         }
+
+     
+      /* footer */
+      .po-section-head {
+          display: grid;
+          grid-template-columns: 26mm 1fr 20mm 26mm 16mm;
+          background: #b7b7b7;
+          font-weight: 800;
+          text-transform: uppercase;
+          border-bottom: 1px solid #fff;
+          align-items: center;
+     
+        }
+        .po-section-head span {
+            padding: 1.5mm;
+            font-size: 8px;
+        }
+
+        .po-client-info {
+          padding: 1.5mm 1.5mm 0;
+          font-size: 12px;
+        }
+        .po-footer {
+          border: 1px solid #111;
+          border-top: 0;
+          min-height: 50mm;
+          padding: 2mm;
+          font-size: 7px;
+        }
+
+        .po-footer-topbar {
+          height: 3.5mm;
+          background: #b7b7b7;
+          margin: 0 0 1.5mm;
+        }
+
+        .po-departments {
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr 1fr 2.2fr;
+          gap: 1.5mm;
+          margin-bottom: 2mm;
+        }
+
+        .po-department {
+          height: 18mm;
+          border-left: 1px solid #111;
+          border-right: 1px solid #111;
+          position: relative;
+        }
+
+        .po-department-head,
+        .po-check-head {
+          background: #d9d9d9;
+          text-align: center;
+          font-weight: 800;
+          padding: 0.8mm 1mm;
+        }
+
+        .po-sign-line {
+          position: absolute;
+          left: 4mm;
+          right: 4mm;
+          bottom: 3mm;
+          border-bottom: 1px solid #111;
+        }
+
+        .po-checks {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1.5mm;
+        }
+
+        .po-check {
+          min-height: 18mm;
+        }
+
+        .po-options {
+          display: grid;
+          grid-template-columns: 4mm auto 4mm auto;
+          align-items: center;
+          column-gap: 2.5mm;
+          padding: 5mm 8mm 0;
+        }
+
+        .po-box {
+          width: 3.8mm;
+          height: 3.8mm;
+          border: 1px solid #111;
+          display: inline-block;
+        }
+
+        .po-final-line {
+          width: 32mm;
+          border-bottom: 1px solid #111;
+          margin: 13mm auto 0;
+        }
+
         @media print {
           @page { size: letter portrait; margin: 8mm; }
           .workorder-sheet {
@@ -450,6 +573,7 @@ export default function PrintWorkOrder() {
             box-shadow: none;
           }
         }
+          
       `}</style>
 
       <section className="workorder-sheet">
@@ -458,10 +582,26 @@ export default function PrintWorkOrder() {
             <img src={logoSrc} alt="Logo taller" className="wo-logo" />
           </div>
           <div className="wo-company text-left">
-            <strong>{taller.razonSocial || taller.nombre}</strong><br />
-            {taller.nif && <>{taller.nif}<br /></>}
-            {taller.direccion && <>{taller.direccion}<br /></>}
-            {taller.telefono && <>Tel: {taller.telefono}<br /></>}
+            <strong>{taller.razonSocial || taller.nombre}</strong>
+            <br />
+            {taller.nif && (
+              <>
+                {taller.nif}
+                <br />
+              </>
+            )}
+            {taller.direccion && (
+              <>
+                {taller.direccion}
+                <br />
+              </>
+            )}
+            {taller.telefono && (
+              <>
+                Tel: {taller.telefono}
+                <br />
+              </>
+            )}
             {taller.email && <>E-mail: {taller.email}</>}
           </div>
         </header>
@@ -471,25 +611,67 @@ export default function PrintWorkOrder() {
             <h1 className="wo-title">{title}</h1>
             <table className="wo-meta">
               <tbody>
-                <tr><th>Nº Documento</th><td>{documentNumber}</td></tr>
-                <tr><th>Fecha</th><td>{formatDate(order.fecha)}</td></tr>
-                <tr><th>N. Cliente</th><td>{order.id || "-"}</td></tr>
-                <tr><th>NIF</th><td>{order.dni || "-"}</td></tr>
-                <tr><th>Forma de Pago</th><td>{isCustody ? "PENDIENTE" : "-"}</td></tr>
-                <tr><th>Tipo de Operacion</th><td>{operationType}</td></tr>
+                <tr>
+                  <th>Nº Documento</th>
+                  <td>{documentNumber}</td>
+                </tr>
+                <tr>
+                  <th>Fecha</th>
+                  <td>{formatDate(order.fecha)}</td>
+                </tr>
+                <tr>
+                  <th>N. Cliente</th>
+                  <td>{customerNumber}</td>
+                </tr>
+                <tr>
+                  <th>NIF</th>
+                  <td>{order.dni || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Forma de Pago</th>
+                  <td>{isCustody ? "PENDIENTE" : "-"}</td>
+                </tr>
+                <tr>
+                  <th>Tipo de Operacion</th>
+                  <td>{operationType}</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
           <div>
+          
             <div className="wo-client-box text-left">
               <div className="wo-client-corners" />
-              <strong>{order.cliente || "-"}</strong><br />
-              {order.direccion && <>{order.direccion}<br /></>}
-              {order.codigoPostal && <>{order.codigoPostal}-{order.poblacion}<br /></>}
-              {order.provincia && <>{order.provincia}<br /></>}
-              {order.telefono && <>{order.telefono}<br /></>}
+                  <strong>{order.cliente || "-"}</strong>
+                  <br />
+                  {order.direccion && (
+                    <>
+                      {order.direccion}
+                      <br />
+                    </>
+                  )}
+                  {order.codigoPostal && (
+                    <>
+                      {order.codigoPostal}-{order.poblacion}
+                      <br />
+                    </>
+                  )}
+                  {order.provincia && (
+                    <>
+                      {order.provincia}
+                      <br />
+                    </>
+                  )}
+                  {order.telefono && (
+                    <>
+                      {order.telefono}
+                      <br />
+                    </>
+                  )}
+           
             </div>
+
             <div className="wo-page-label">{pageLabel}</div>
           </div>
         </section>
@@ -508,11 +690,13 @@ export default function PrintWorkOrder() {
           <tbody>
             <tr>
               <td>-</td>
-              <td>{formatDateTime(order.fecha)}</td>
+              <td>{formatDate(order.fecha)}</td>
               <td>{formatDate(order.fechaPrevistaEntrega || order.fecha)}</td>
               <td>{order.kilometraje || "-"}</td>
               <td>-</td>
-              <td>{[order.marca, order.modelo].filter(Boolean).join(" ") || "-"}</td>
+              <td>
+                {[order.marca, order.modelo].filter(Boolean).join(" ") || "-"}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -550,7 +734,9 @@ export default function PrintWorkOrder() {
           <div className="wo-block">
             {operationLines.length ? (
               operationLines.map((line, index) => (
-                <p key={`${line}-${index}`} className="wo-op-line">* {line}</p>
+                <p key={`${line}-${index}`} className="wo-op-line">
+                  * {line}
+                </p>
               ))
             ) : (
               <p className="wo-op-line">* Sin descripcion de trabajo.</p>
@@ -565,7 +751,16 @@ export default function PrintWorkOrder() {
           <div className="wo-block">
             <table className="wo-lines">
               <tbody>
-                {(laborItems.length ? laborItems : [{ id: "labor-empty", descripcion: "Mano de obra", cantidad: 1 }]).map((item, index) => (
+                {(laborItems.length
+                  ? laborItems
+                  : [
+                      {
+                        id: "labor-empty",
+                        descripcion: "Mano de obra",
+                        cantidad: 1,
+                      },
+                    ]
+                ).map((item, index) => (
                   <tr key={item.id || index}>
                     <td className="wo-code">MO</td>
                     <td>{item.descripcion}</td>
@@ -588,12 +783,23 @@ export default function PrintWorkOrder() {
           <div className="wo-block">
             <table className="wo-lines">
               <tbody>
-                {(materialItems.length ? materialItems : [{ id: "mat-empty", descripcion: "Pendiente de asignar", cantidad: "" }]).map((item, index) => (
+                {(materialItems.length
+                  ? materialItems
+                  : [
+                      {
+                        id: "mat-empty",
+                        descripcion: "Pendiente de asignar",
+                        cantidad: "",
+                      },
+                    ]
+                ).map((item, index) => (
                   <tr key={item.id || index}>
                     <td className="wo-code">MAT</td>
                     <td>{item.descripcion}</td>
                     <td className="wo-qty">
-                      {item.cantidad === "" ? "-" : Number(item.cantidad || 1).toLocaleString("es-ES")}
+                      {item.cantidad === ""
+                        ? "-"
+                        : Number(item.cantidad || 1).toLocaleString("es-ES")}
                     </td>
                   </tr>
                 ))}
@@ -603,7 +809,9 @@ export default function PrintWorkOrder() {
 
           {order.observaciones && (
             <div className="wo-block">
-              <p className="wo-op-line">* OBSERVACIONES: {order.observaciones}</p>
+              <p className="wo-op-line">
+                * OBSERVACIONES: {order.observaciones}
+              </p>
             </div>
           )}
         </section>
@@ -614,10 +822,15 @@ export default function PrintWorkOrder() {
             <div className="wo-sign">Firma cliente</div>
           </div>
           <div className="wo-footer-cell">
-            <div>AUTORIZO REPARACION DESCRITA. DESEO RECOGER PIEZAS SUSTITUIDAS: SI NO</div>
+            <div>
+              AUTORIZO REPARACION DESCRITA. DESEO RECOGER PIEZAS SUSTITUIDAS: SI
+              NO
+            </div>
             <div className="wo-sign">Firma cliente</div>
             <div className="wo-footer-head" style={{ marginTop: "9mm" }}>
-              {isCustody ? "Resguardo de deposito" : "Acepto renuncia presupuesto"}
+              {isCustody
+                ? "Resguardo de deposito"
+                : "Acepto renuncia presupuesto"}
             </div>
             <div className="wo-sign">Firma taller</div>
           </div>
