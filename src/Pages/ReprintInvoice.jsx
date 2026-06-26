@@ -56,11 +56,15 @@ export default function ReprintInvoice() {
     poblacionCliente: "",
     provinciaCliente: "",
     telefonoCliente: "",
+    clasificacionCliente: "Particular",
+    franquiciaImporte: 0,
     matricula: "",
     km: "",
     observaciones: "",
     tipoOperacion: "Mecanica",
     ivaPct: 21,
+    tipoPago: "",
+    metodoPagoDetalle: "",
     tipoFactura: "Normal",
     numeroFacturaRectificada: "",
     motivoRectificacion: "",
@@ -151,6 +155,8 @@ export default function ReprintInvoice() {
         poblacionCliente: f.poblacionCliente ?? f.PoblacionCliente ?? "",
         provinciaCliente: f.provinciaCliente ?? f.ProvinciaCliente ?? "",
         telefonoCliente: f.telefonoCliente ?? f.TelefonoCliente ?? "",
+        clasificacionCliente: f.clasificacionCliente ?? f.ClasificacionCliente ?? "Particular",
+        franquiciaImporte: f.franquiciaImporte ?? f.FranquiciaImporte ?? 0,
         matricula: f.matricula ?? f.Matricula ?? "",
         km: f.km ?? f.Km ?? "",
         observaciones: f.observaciones ?? f.Observaciones ?? "",
@@ -159,6 +165,8 @@ export default function ReprintInvoice() {
           f.TipoOperacion ??
           (tipoFactura === "Recambio" ? "Recambio" : "Mecanica"),
         ivaPct,
+        tipoPago: f.tipoPago ?? f.TipoPago ?? "",
+        metodoPagoDetalle: f.metodoPagoDetalle ?? f.MetodoPagoDetalle ?? "",
         tipoFactura,
         numeroFacturaRectificada: f.numeroFacturaRectificada ?? f.NumeroFacturaRectificada ?? "",
         motivoRectificacion: f.motivoRectificacion ?? f.MotivoRectificacion ?? "",
@@ -200,6 +208,12 @@ export default function ReprintInvoice() {
   const reprintDocumentTitle = isRectificativa
     ? "Factura rectificativa"
     : "Factura duplicada";
+  const franchiseAmount = Math.max(0, Number(invoice.franquiciaImporte || 0));
+  const isInsuranceInvoice =
+    franchiseAmount > 0 ||
+    String(invoice.clasificacionCliente || "").toLowerCase().includes("seguro");
+  const companyPayable = Math.max(0, Number(totals.total || 0) - franchiseAmount);
+  const paymentText = getPaymentText(invoice);
   const linkedRectificativas = Array.isArray(invoice.rectificativas)
     ? invoice.rectificativas
     : [];
@@ -421,6 +435,13 @@ export default function ReprintInvoice() {
                   <p className="font-bold">Nº FACTURA:</p>
                   <p className="text-xl font-extrabold">{invoice.numero}</p>
 
+                  {paymentText && (
+                    <>
+                      <p className="font-bold">PAGO:</p>
+                      <p className="font-bold">{paymentText}</p>
+                    </>
+                  )}
+
                   {isRectificativa && (
                     <>
                       <p className="font-bold">RECTIFICA:</p>
@@ -528,6 +549,12 @@ export default function ReprintInvoice() {
                 <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
                 <Row label="IVA" value={formatMoney(totals.iva)} />
                 <Row label="OTROS" value={`- ${formatMoney(totals.otros)}`} />
+                {isInsuranceInvoice && (
+                  <>
+                    <Row label="FRANQUICIA" value={`- ${formatMoney(franchiseAmount)}`} />
+                    <Row label="PAGA COMPANIA" value={formatMoney(companyPayable)} strong />
+                  </>
+                )}
                 <Row label="TOTAL" value={formatMoney(totals.total)} strong />
               </div>
             </div>
@@ -712,4 +739,19 @@ function formatDate(value) {
     month: "long",
     year: "numeric",
   });
+}
+
+function getPaymentText(invoice) {
+  const tipo = String(invoice.tipoPago || "").trim().toLowerCase();
+  if (tipo === "credito") return "Pago a credito";
+
+  const detail = String(invoice.metodoPagoDetalle || "").trim();
+  if (detail) return detail;
+
+  if (tipo === "transferencia") return "Transferencia";
+  if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TDC";
+  if (tipo === "efectivo") return "Efectivo";
+  if (tipo === "bizum") return "Bizum";
+  if (tipo === "contado") return "Contado";
+  return invoice.tipoPago || "";
 }

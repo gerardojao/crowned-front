@@ -8,7 +8,7 @@ import { useRef } from "react";
 const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 const EMPTY_EXPENSE = {
-  Id:"", Foto:"", Fecha:"", Mes:"", Importe:"", NombreEgreso:"", Referencia:"", Descripcion:"", BankAccountId:"",
+  Id:"", Foto:"", Fecha:"", Mes:"", Importe:"", NombreEgreso:"", Referencia:"", Descripcion:"", NumeroFactura:"", BankAccountId:"",
 };
 
 const splitExpenseReference = (value = "") => {
@@ -163,6 +163,7 @@ useEffect(() => {
       NombreEgreso: r.tipoId ?? "",
       Referencia: parsedDescription.referencia,
       Descripcion: parsedDescription.descripcion,
+      NumeroFactura: r.numeroFactura ?? r.NumeroFactura ?? "",
       BankAccountId: r.bankAccountId ?? r.BankAccountId ?? "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,7 +177,6 @@ useEffect(() => {
     switch (name) {
       case "NombreEgreso":
       case "Fecha":
-      case "Referencia":
       case "Descripcion":
         if (!value) msg = REQUIRED;
         break;
@@ -197,7 +197,7 @@ useEffect(() => {
   };
 
   const validateAll = () => {
-    const fields = ["NombreEgreso", "Fecha", "Referencia", "Descripcion", "Importe"];
+    const fields = ["NombreEgreso", "Fecha", "Descripcion", "Importe"];
     if (bankAccounts.length > 1) fields.push("BankAccountId");
     const next = {};
     for (const f of fields) {
@@ -214,7 +214,7 @@ useEffect(() => {
     }
     setErrors(prev => ({ ...prev, ...next }));
     // enfocar el primero con error
-    const firstError = ["NombreEgreso", "Fecha", "Referencia", "Descripcion", "Importe", "BankAccountId"].find(f => next[f]);
+    const firstError = ["NombreEgreso", "Fecha", "Descripcion", "Importe", "BankAccountId"].find(f => next[f]);
     if (firstError) {
       const el = document.getElementById(firstError);
       el?.focus();
@@ -242,6 +242,7 @@ useEffect(() => {
           mes: expense.Mes || null,
           nombreEgreso: expense.NombreEgreso ? Number(expense.NombreEgreso) : null,
           descripcion: buildExpenseDescription(expense),
+          numeroFactura: expense.NumeroFactura?.trim() || null,
           importe: Number(expense.Importe ?? 0),
           foto: expense.Foto ?? null,
           ...(expense.BankAccountId ? { bankAccountId: Number(expense.BankAccountId) } : {}),
@@ -268,6 +269,7 @@ useEffect(() => {
         Importe: Number(expense.Importe), // requerido > 0
         NombreEgreso: Number(expense.NombreEgreso), // requerido
         Descripcion: buildExpenseDescription(expense),
+        NumeroFactura: expense.NumeroFactura?.trim() || null,
         BankAccountId: expense.BankAccountId ? Number(expense.BankAccountId) : null,
       });
 
@@ -432,7 +434,20 @@ useEffect(() => {
           </div> */}
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Referencia">Fact/Ref</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="NumeroFactura">Nº Factura</label>
+            <input
+              id="NumeroFactura"
+              type="text"
+              className={cls("NumeroFactura")}
+              name="NumeroFactura"
+              value={expense.NumeroFactura ?? ""}
+              onChange={handleChange}
+              placeholder="Opcional"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Referencia">Referencia interna</label>
             <input
               id="Referencia"
               type="text"
@@ -440,9 +455,7 @@ useEffect(() => {
               name="Referencia"
               value={expense.Referencia ?? ""}
               onChange={handleChange}
-              placeholder="fact-215"
-              onBlur={onBlurValidate}
-              required
+              placeholder="Opcional"
               aria-invalid={!!errors.Referencia}
               aria-describedby={errors.Referencia ? "Referencia-error" : undefined}
             />

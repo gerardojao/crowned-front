@@ -62,6 +62,7 @@ export default function PartPicker({
     precioCompra: "",
     marca: "",
     codigoReferencia: "",
+    numeroFactura: "",
     idProveedor: "",
   });
   const wrapperRef = useRef(null);
@@ -264,6 +265,11 @@ export default function PartPicker({
       return;
     }
 
+    if (!newPart.numeroFactura.trim()) {
+      setCreateError("Indica el Nº Factura del repuesto.");
+      return;
+    }
+
     try {
       setCreating(true);
       setCreateError("");
@@ -271,6 +277,7 @@ export default function PartPicker({
       const payload = {
         nombre,
         codigoReferencia: newPart.codigoReferencia.trim() || null,
+        numeroFactura: newPart.numeroFactura.trim(),
         marca: newPart.marca.trim() || null,
         categoria: "Repuestos",
         cantidad: 0,
@@ -299,6 +306,7 @@ export default function PartPicker({
         precioCompra: "",
         marca: "",
         codigoReferencia: "",
+        numeroFactura: "",
         idProveedor: "",
       });
       setCreateOpen(false);
@@ -402,6 +410,12 @@ export default function PartPicker({
                       placeholder="Referencia opcional"
                       value={newPart.codigoReferencia}
                       onChange={(e) => setNewPartField("codigoReferencia", e.target.value)}
+                    />
+                    <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="Nº Factura"
+                      value={newPart.numeroFactura}
+                      onChange={(e) => setNewPartField("numeroFactura", e.target.value)}
                     />
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"

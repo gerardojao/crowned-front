@@ -450,6 +450,9 @@ export default function ExpenseDetails() {
                       {r.tipo === "Transporte" ? "Gastos casa" : r.tipo} · {r.mes ?? "—"}
                     </div>
                     <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
+                    {r.numeroFactura && (
+                      <div className="text-xs text-slate-500 mt-1">Factura: {r.numeroFactura}</div>
+                    )}
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-semibold text-rose-700">{eur.format(Number(r.importe ?? 0))}</div>
@@ -485,6 +488,7 @@ export default function ExpenseDetails() {
                       <th className="py-2.5 px-3 font-semibold text-center">Fecha</th>
                       <th className="py-2.5 px-3 font-semibold text-center"> </th>
                       <th className="py-2.5 px-3 font-semibold text-center">Tipo</th>
+                      <th className="py-2.5 px-3 font-semibold text-center">Nº Factura</th>
                       <th className="py-2.5 px-3 font-semibold text-center">Descripción</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Importe</th>
                     </tr>
@@ -492,7 +496,7 @@ export default function ExpenseDetails() {
                   <tbody className="divide-y divide-slate-100">
                     {rows.length === 0 ? (
                       <tr>
-                        <td className="py-6 px-3 text-slate-500" colSpan={5}>
+                        <td className="py-6 px-3 text-slate-500" colSpan={6}>
                           Sin resultados
                         </td>
                       </tr>
@@ -504,6 +508,7 @@ export default function ExpenseDetails() {
                           </td>
                           <td className="py-2.5 px-3 text-right">{""}</td>
                           <td className="py-2.5 px-3">{r.tipo === 'Transporte' ? 'Gastos Casa' : r.tipo ?? "—"}</td>
+                          <td className="py-2.5 px-3 text-slate-700">{r.numeroFactura ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-rose-700 whitespace-nowrap">
                             {eur.format(Number(r.importe ?? 0))}

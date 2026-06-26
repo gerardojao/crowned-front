@@ -38,6 +38,7 @@ const emptyPartForm = {
   precioVenta: "",
   ubicacion: "",
   observaciones: "",
+  numeroFactura: "",
   idProveedor: "",
 };
 
@@ -101,6 +102,7 @@ function toPayload(form) {
     precioVenta: form.precioVenta === "" ? null : toNumber(form.precioVenta),
     ubicacion: form.ubicacion.trim(),
     observaciones: form.observaciones.trim(),
+    numeroFactura: form.numeroFactura.trim(),
     idProveedor: form.idProveedor ? Number(form.idProveedor) : null,
   };
 }
@@ -313,6 +315,7 @@ export default function StockParts() {
           : String(getValue(row, "precioVenta", "")),
       ubicacion: String(getValue(row, "ubicacion", "") || ""),
       observaciones: String(getValue(row, "observaciones", "") || ""),
+      numeroFactura: String(getValue(row, "numeroFactura", "") || ""),
       idProveedor: String(getValue(row, "idProveedor", "") || ""),
     });
   };
@@ -326,6 +329,13 @@ export default function StockParts() {
       setNotice({
         type: "error",
         text: "El nombre del repuesto es requerido.",
+      });
+      return;
+    }
+    if (!payload.numeroFactura) {
+      setNotice({
+        type: "error",
+        text: "El Nº Factura es requerido.",
       });
       return;
     }
@@ -595,6 +605,11 @@ export default function StockParts() {
                 }
               />
               <Input
+                label="Nº Factura *"
+                value={form.numeroFactura}
+                onChange={(v) => setForm((f) => ({ ...f, numeroFactura: v }))}
+              />
+              <Input
                 label="Nombre *"
                 value={form.nombre}
                 onChange={(v) => setForm((f) => ({ ...f, nombre: v }))}
@@ -712,7 +727,7 @@ export default function StockParts() {
                   />
                   <input
                     type="search"
-                    placeholder="Buscar referencia, nombre, marca, categoria o proveedor..."
+                    placeholder="Buscar factura, referencia, nombre, marca, categoria o proveedor..."
                     value={inventorySearch}
                     onChange={(e) => {
                       setInventoryPage(1);
@@ -752,6 +767,7 @@ export default function StockParts() {
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
                     <th className="px-3 py-3">Referencia</th>
+                    <th className="px-3 py-3">Factura</th>
                     <th className="px-3 py-3">Repuesto</th>
                     <th className="px-3 py-3">Marca</th>
                     <th className="px-3 py-3">Proveedor</th>
@@ -779,6 +795,9 @@ export default function StockParts() {
                       >
                         <td className="px-3 py-3 font-semibold text-slate-800">
                           {getValue(row, "codigoReferencia", "-") || "-"}
+                        </td>
+                        <td className="px-3 py-3 font-semibold text-slate-800">
+                          {getValue(row, "numeroFactura", "-") || "-"}
                         </td>
                         <td className="px-3 py-3 font-semibold text-slate-900">
                           {getValue(row, "nombre", "-")}
@@ -847,7 +866,7 @@ export default function StockParts() {
                   {!inventoryLoading && inventoryParts.length === 0 && (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         className="py-8 text-center text-slate-500"
                       >
                         No hay repuestos para mostrar.
@@ -858,7 +877,7 @@ export default function StockParts() {
                   {inventoryLoading && (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={11}
                         className="py-8 text-center text-slate-500"
                       >
                         Cargando inventario...

@@ -20,11 +20,7 @@ export default function ZagaInvoiceDocument({
   const ivaPct = Number(invoice.ivaPct || 21);
   const laborTotal = sumItems(items.filter((item) => isLaborItem(item)));
   const partsTotal = sumItems(items.filter((item) => !isLaborItem(item)));
-  const paymentText =
-    invoice.tipoPago ||
-    (selectedPaymentMethods.length > 0
-      ? selectedPaymentMethods.map((x) => x.label).join(" / ")
-      : "CONTADO");
+  const paymentText = getPaymentDisplayText(invoice, selectedPaymentMethods);
   const paymentLegend = getPaymentLegend(
     invoice,
     taller,
@@ -45,6 +41,17 @@ export default function ZagaInvoiceDocument({
     invoice.idCliente ??
     invoice.IdCliente ??
     "";
+  const franchiseAmount = Math.max(
+    0,
+    Number(invoice.franquiciaImporte ?? invoice.FranquiciaImporte ?? 0),
+  );
+  const isInsuranceInvoice =
+    franchiseAmount > 0 ||
+    String(invoice.clasificacionCliente ?? invoice.ClasificacionCliente ?? invoice.clasificacion ?? "")
+      .trim()
+      .toLowerCase()
+      .includes("seguro");
+  const companyPayable = Math.max(0, Number(totals.total || 0) - franchiseAmount);
 
   return (
     <>
@@ -428,6 +435,26 @@ export default function ZagaInvoiceDocument({
           </div>
 
           <div className="border-x border-b border-black text-[10px]">
+            {isInsuranceInvoice && (
+              <div className="grid grid-cols-2 border-b border-black text-left text-[12px]">
+                <div className="min-h-[28mm] border-r border-black px-2 py-1">
+                  <div>
+                    <strong>A pagar por :</strong> {invoice.cliente || ""}
+                  </div>
+                  <div className="mt-10">
+                    Importe : <strong>{eur.format(companyPayable)}</strong>
+                  </div>
+                </div>
+                <div className="min-h-[28mm] px-2 py-1">
+                  <div>
+                    <strong>Franquicia (a pagar por el asegurado)</strong>
+                  </div>
+                  <div className="mt-10">
+                    Importe : <strong>{eur.format(franchiseAmount)}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-3 border-b border-black text-center">
               <div className="py-1">
                 <div>% I.V.A.</div>
@@ -644,7 +671,26 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
   const tipo = String(invoice.tipoPago || "")
     .trim()
     .toLowerCase();
-  if (tipo === "credito") return "";
+  if (tipo === "credito") return "PAGO A CREDITO";
+
+  const labels = selectedPaymentMethods
+    .map((method) => {
+      const label = method.label;
+      const amount = Number(method.amount || 0);
+      return label && amount > 0 ? `${label} ${eur.format(amount)}` : label;
+    })
+    .filter(Boolean)
+    .join(" / ");
+
+  const detail = invoice.metodoPagoDetalle ?? invoice.MetodoPagoDetalle ?? labels;
+  if (detail) {
+    const iban = invoice.bankAccountIban || taller.iban;
+    const bankName = invoice.bankAccountName || "";
+    return iban
+      ? `PAGO ${String(detail).toUpperCase()}. CUENTA ${bankName} ${iban}`.trim()
+      : `PAGO ${String(detail).toUpperCase()}`;
+  }
+
   if (tipo === "transferencia") {
     const iban = invoice.bankAccountIban || taller.iban;
     return iban ? `TRANSFERENCIA EN IBAN ${iban}` : "PAGO POR TRANSFERENCIA";
@@ -652,13 +698,30 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
   if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta")
     return "PAGO POR TPV";
   if (tipo === "efectivo") return "PAGO EN EFECTIVO";
+  if (tipo === "bizum") return "PAGO POR BIZUM";
   if (tipo === "contado") return "PAGO AL CONTADO";
+
+  return labels ? `PAGO ${labels.toUpperCase()}` : "";
+}
+
+function getPaymentDisplayText(invoice, selectedPaymentMethods) {
+  const tipo = String(invoice.tipoPago || "").trim().toLowerCase();
+  if (tipo === "credito") return "Pago a credito";
 
   const labels = selectedPaymentMethods
     .map((method) => method.label)
     .filter(Boolean)
     .join(" / ");
-  return labels ? `PAGO ${labels.toUpperCase()}` : "";
+  if (labels) return labels;
+
+  const detail = invoice.metodoPagoDetalle ?? invoice.MetodoPagoDetalle;
+  if (detail) return detail;
+
+  if (tipo === "transferencia") return "Transferencia";
+  if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TDC";
+  if (tipo === "efectivo") return "Efectivo";
+  if (tipo === "bizum") return "Bizum";
+  return "Contado";
 }
 
 function maskIban(iban) {

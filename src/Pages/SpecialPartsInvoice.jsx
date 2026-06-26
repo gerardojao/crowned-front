@@ -39,10 +39,10 @@ const EMPTY_ITEM = {
 };
 
 const PAYMENT_OPTIONS = [
-  { value: "Contado", label: "Contado" },
   { value: "Efectivo", label: "Efectivo" },
   { value: "Transferencia", label: "Transferencia" },
-  { value: "TPV", label: "TPV" },
+  { value: "TDC", label: "TDC" },
+  { value: "Bizum", label: "Bizum" },
   { value: "Credito", label: "Credito" },
 ];
 
@@ -155,10 +155,11 @@ export default function SpecialPartsInvoice() {
     combustible: "",
     km: "",
     clasificacion: "Particular",
+    franquiciaImporte: "",
     observaciones: "",
     tipoOperacion: invoiceMode.operationType,
     ivaPct: invoiceMode.ivaPct,
-    tipoPago: "Contado",
+    tipoPago: "Efectivo",
     plazoCreditoDias: 30,
     fechaVencimiento: "",
   });
@@ -184,6 +185,9 @@ export default function SpecialPartsInvoice() {
   );
   const iva = round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
   const total = round2(subtotal + iva);
+  const isInsuranceCustomer = String(invoice.clasificacion || "").toLowerCase().includes("seguro");
+  const franchiseAmount = isInsuranceCustomer ? round2(Math.max(0, Number(invoice.franquiciaImporte || 0))) : 0;
+  const companyPayable = round2(Math.max(0, total - franchiseAmount));
   const totals = { subtotal, iva, otros: 0, total };
 
   useEffect(() => {
@@ -431,6 +435,9 @@ export default function SpecialPartsInvoice() {
     if (!isCredit && bankAccounts.length > 1 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
+    if (franchiseAmount > total) {
+      throw new Error("La franquicia no puede superar el total de la factura.");
+    }
 
     const res = await api.post("/FacturaEmitida/emitir", {
       tipoFactura: invoiceMode.tipoFactura,
@@ -444,6 +451,8 @@ export default function SpecialPartsInvoice() {
       poblacionCliente: invoice.poblacionCliente || null,
       provinciaCliente: invoice.provinciaCliente || null,
       telefonoCliente: invoice.telefonoCliente || null,
+      clasificacionCliente: invoice.clasificacion || "Particular",
+      franquiciaImporte: isInsuranceCustomer ? franchiseAmount : 0,
       matricula: invoice.matricula || null,
       km: invoice.km ? String(invoice.km) : null,
       marca: invoice.marca || null,
@@ -452,7 +461,8 @@ export default function SpecialPartsInvoice() {
       tipoOperacion: invoiceMode.operationType,
       ivaPct: Number(invoice.ivaPct || 0),
       tipoPago: invoice.tipoPago,
-      totalAbonado: isCredit || invoiceMode.isRapel ? 0 : total,
+      metodoPagoDetalle: isCredit ? "Pago a credito" : invoice.tipoPago,
+      totalAbonado: isCredit || invoiceMode.isRapel ? 0 : companyPayable,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
       bankAccountId: !isCredit && selectedBankId ? Number(selectedBankId) : null,
@@ -635,8 +645,17 @@ export default function SpecialPartsInvoice() {
               >
                 <option value="Particular">Particular</option>
                 <option value="Empresa">Empresa</option>
+                <option value="Compania de seguro">Compania de seguro</option>
               </select>
             </label>
+            {isInsuranceCustomer && (
+              <Input
+                label="Franquicia"
+                type="number"
+                value={invoice.franquiciaImporte}
+                onChange={(v) => setInvoiceField("franquiciaImporte", v)}
+              />
+            )}
             <Input label="Matricula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
             <Input label="Bastidor" value={invoice.bastidor} onChange={(v) => setInvoiceField("bastidor", v)} />
             <Input label="Km" value={invoice.km} onChange={(v) => setInvoiceField("km", v)} />
@@ -789,6 +808,18 @@ export default function SpecialPartsInvoice() {
               <span>Total</span>
               <strong>{eur.format(total)}</strong>
             </div>
+            {isInsuranceCustomer && (
+              <>
+                <div className="mt-2 flex justify-between text-slate-700">
+                  <span>Franquicia</span>
+                  <strong>{eur.format(franchiseAmount)}</strong>
+                </div>
+                <div className="mt-2 flex justify-between text-slate-900">
+                  <span>Paga compania</span>
+                  <strong>{eur.format(companyPayable)}</strong>
+                </div>
+              </>
+            )}
           </div>
         </aside>
       </section>
@@ -800,6 +831,8 @@ export default function SpecialPartsInvoice() {
             ...invoice,
             tipoFactura: invoiceMode.tipoFactura,
             tipoOperacion: invoiceMode.operationType,
+            franquiciaImporte: franchiseAmount,
+            clasificacionCliente: invoice.clasificacion,
           }}
           items={printableItems}
           totals={totals}
@@ -812,6 +845,8 @@ export default function SpecialPartsInvoice() {
             ...invoice,
             tipoFactura: invoiceMode.tipoFactura,
             tipoOperacion: invoiceMode.operationType,
+            franquiciaImporte: franchiseAmount,
+            clasificacionCliente: invoice.clasificacion,
           }}
           items={printableItems}
           totals={totals}
@@ -838,6 +873,11 @@ function Input({ label, value, onChange, type = "text", readOnly = false }) {
 
 function StandardInvoiceDocument({ taller, invoice, items, totals }) {
   const logo = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
+  const franchiseAmount = Math.max(0, Number(invoice.franquiciaImporte || 0));
+  const isInsuranceInvoice =
+    franchiseAmount > 0 ||
+    String(invoice.clasificacionCliente || invoice.clasificacion || "").toLowerCase().includes("seguro");
+  const companyPayable = Math.max(0, Number(totals.total || 0) - franchiseAmount);
 
   return (
     <section className="invoice-print rounded-2xl bg-white p-8 text-slate-950 shadow-sm ring-1 ring-slate-200">
@@ -868,7 +908,7 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
         </div>
         <div className="md:text-right">
           <p>Fecha: {invoice.fecha}</p>
-          <p>Pago: {invoice.tipoPago}</p>
+          <p>Pago: {isCredit ? "Pago a credito" : invoice.tipoPago}</p>
           {invoice.fechaVencimiento && <p>Vencimiento: {invoice.fechaVencimiento}</p>}
         </div>
       </div>
@@ -911,6 +951,18 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
           <span>Total</span>
           <strong>{eur.format(totals.total)}</strong>
         </div>
+        {isInsuranceInvoice && (
+          <>
+            <div className="flex justify-between">
+              <span>Franquicia</span>
+              <strong>{eur.format(franchiseAmount)}</strong>
+            </div>
+            <div className="flex justify-between">
+              <span>Paga compania</span>
+              <strong>{eur.format(companyPayable)}</strong>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );

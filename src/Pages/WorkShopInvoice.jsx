@@ -107,6 +107,8 @@ export default function WorkshopInvoice() {
     poblacionCliente: "",
     provinciaCliente: "",
     telefonoCliente: "",
+    clasificacionCliente: "Particular",
+    franquiciaImporte: "",
     matricula: "",
     km: "",
     observaciones: "",
@@ -160,6 +162,7 @@ export default function WorkshopInvoice() {
     codigoPostal: c.codigoPostal ?? c.CodigoPostal ?? "",
     poblacion: c.poblacion ?? c.Poblacion ?? "",
     provincia: c.provincia ?? c.Provincia ?? "",
+    clasificacion: c.clasificacion ?? c.Clasificacion ?? "Particular",
     matricula: c.matricula ?? c.Matricula ?? "",
   });
 
@@ -322,6 +325,8 @@ export default function WorkshopInvoice() {
         codigoPostalCliente: customerForOrder?.codigoPostal || "",
         poblacionCliente: customerForOrder?.poblacion || "",
         provinciaCliente: customerForOrder?.provincia || "",
+        clasificacionCliente: customerForOrder?.clasificacion || "Particular",
+        franquiciaImporte: "",
         telefonoCliente: o.telefono,
         matricula: o.matricula,
         km: o.kilometraje || "",
@@ -385,6 +390,22 @@ export default function WorkshopInvoice() {
     return round2(subtotal + iva);
   }, [subtotal, iva]);
 
+  const isInsuranceCustomer = useMemo(() => {
+    return String(invoice.clasificacionCliente || "")
+      .trim()
+      .toLowerCase()
+      .includes("seguro");
+  }, [invoice.clasificacionCliente]);
+
+  const franchiseAmount = useMemo(() => {
+    if (!isInsuranceCustomer) return 0;
+    return round2(Math.max(0, Number(invoice.franquiciaImporte || 0)));
+  }, [isInsuranceCustomer, invoice.franquiciaImporte]);
+
+  const companyPayable = useMemo(() => {
+    return round2(Math.max(0, totalFinal - franchiseAmount));
+  }, [totalFinal, franchiseAmount]);
+
   const selectedPaymentMethods = useMemo(
     () =>
       PAYMENT_METHODS.map((method) => ({
@@ -408,12 +429,20 @@ export default function WorkshopInvoice() {
   );
 
   const paymentDifference = useMemo(
-    () => round2(totalFinal - paymentTotal),
-    [totalFinal, paymentTotal],
+    () => round2(companyPayable - paymentTotal),
+    [companyPayable, paymentTotal],
   );
 
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
   const isCredit = invoice.tipoPago === "Credito";
+  const paymentDetailText = useMemo(() => {
+    if (isCredit) return "Pago a credito";
+    return selectedPaymentMethods.map((method) => method.label).join(" / ");
+  }, [isCredit, selectedPaymentMethods]);
+  const selectedBank = useMemo(
+    () => bankAccounts.find((item) => String(item.id ?? item.Id) === String(selectedBankId)),
+    [bankAccounts, selectedBankId],
+  );
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
 
   useEffect(() => {
@@ -608,6 +637,8 @@ const saveIssuedInvoice = async () => {
     poblacionCliente: invoice.poblacionCliente || null,
     provinciaCliente: invoice.provinciaCliente || null,
     telefonoCliente: invoice.telefonoCliente || null,
+    clasificacionCliente: invoice.clasificacionCliente || "Particular",
+    franquiciaImporte: isInsuranceCustomer ? franchiseAmount : 0,
     matricula: invoice.matricula || null,
     km: invoice.km ? String(invoice.km) : null,
     otros,
@@ -616,7 +647,8 @@ const saveIssuedInvoice = async () => {
     observaciones: invoice.observaciones || null,
     tipoOperacion: invoice.tipoOperacion || "Mecanica",
     tipoPago: invoice.tipoPago,
-    totalAbonado: isCredit ? paymentTotal : totalFinal,
+    metodoPagoDetalle: paymentDetailText || null,
+    totalAbonado: isCredit ? paymentTotal : companyPayable,
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
     fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
     bankAccountId: selectedBankId ? Number(selectedBankId) : null,
@@ -639,14 +671,18 @@ const printInvoice = async () => {
       throw new Error(`Indica un importe mayor que 0 para ${paymentWithoutAmount.label}.`);
     }
 
+    if (franchiseAmount > totalFinal) {
+      throw new Error("La franquicia no puede superar el total de la factura.");
+    }
+
     if (!isCredit && Math.abs(paymentDifference) >= 0.01) {
       throw new Error(
-        `La suma de los metodos de pago (${formatMoney(paymentTotal)}) debe coincidir con el total de la factura (${formatMoney(totalFinal)}).`,
+        `La suma de los metodos de pago (${formatMoney(paymentTotal)}) debe coincidir con el importe a pagar por el cliente (${formatMoney(companyPayable)}).`,
       );
     }
 
-    if (isCredit && paymentTotal > totalFinal) {
-      throw new Error("El abono inicial no puede superar el total de la factura.");
+    if (isCredit && paymentTotal > companyPayable) {
+      throw new Error("El abono inicial no puede superar el importe a pagar por el cliente.");
     }
 
     if (bankAccounts.length > 1 && !selectedBankId) {
@@ -686,6 +722,31 @@ const printInvoice = async () => {
       numero: numeroFactura,
       idCliente: emittedClientId || prev.idCliente,
       numeroCliente: emittedClientId || prev.numeroCliente,
+      metodoPagoDetalle:
+        emittedInvoice.metodoPagoDetalle ??
+        emittedInvoice.MetodoPagoDetalle ??
+        paymentDetailText ??
+        prev.metodoPagoDetalle,
+      bankAccountName:
+        emittedInvoice.bankAccountName ??
+        emittedInvoice.BankAccountName ??
+        selectedBank?.nombre ??
+        selectedBank?.Nombre ??
+        prev.bankAccountName,
+      bankAccountIban:
+        emittedInvoice.bankAccountIban ??
+        emittedInvoice.BankAccountIban ??
+        selectedBank?.iban ??
+        selectedBank?.Iban ??
+        prev.bankAccountIban,
+      franquiciaImporte:
+        emittedInvoice.franquiciaImporte ??
+        emittedInvoice.FranquiciaImporte ??
+        prev.franquiciaImporte,
+      clasificacionCliente:
+        emittedInvoice.clasificacionCliente ??
+        emittedInvoice.ClasificacionCliente ??
+        prev.clasificacionCliente,
     }));
 
     localStorage.setItem("tc:invoice-issued", JSON.stringify(issuedEvent));
@@ -925,6 +986,32 @@ const printInvoice = async () => {
               }
             />
 
+            <label className="block text-sm font-semibold text-slate-700">
+              Clasificacion
+              <select
+                className={`mt-1 w-full ${clientFieldsLocked ? lockedInputCls : inputCls}`}
+                value={invoice.clasificacionCliente}
+                disabled={clientFieldsLocked}
+                onChange={(e) => setInvoiceField("clasificacionCliente", e.target.value)}
+              >
+                <option value="Particular">Particular</option>
+                <option value="Empresa">Empresa</option>
+                <option value="Compania de seguro">Compania de seguro</option>
+              </select>
+            </label>
+
+            {isInsuranceCustomer && (
+              <input
+                type="number"
+                step="0.01"
+                className={inputCls}
+                placeholder="Franquicia"
+                value={invoice.franquiciaImporte}
+                onChange={(e) => setInvoiceField("franquiciaImporte", e.target.value)}
+                onBlur={(e) => setInvoiceField("franquiciaImporte", amountInput(e.target.value))}
+              />
+            )}
+
             <input
               className={clientFieldsLocked ? lockedInputCls : inputCls}
               placeholder={labels.referenceLabel}
@@ -1016,6 +1103,9 @@ const printInvoice = async () => {
               </div>
               <div className="text-xs font-semibold text-slate-600">
                 Total factura: {formatMoney(totalFinal)}
+                {isInsuranceCustomer && (
+                  <> · Paga compania: {formatMoney(companyPayable)}</>
+                )}
               </div>
             </div>
 
@@ -1214,6 +1304,10 @@ const printInvoice = async () => {
             ...invoice,
             idOrdenTrabajo: id || "",
             marcaModelo: [order?.marca, order?.modelo].filter(Boolean).join(" "),
+            franquiciaImporte: franchiseAmount,
+            metodoPagoDetalle: paymentDetailText,
+            bankAccountName: selectedBank?.nombre ?? selectedBank?.Nombre ?? "",
+            bankAccountIban: selectedBank?.iban ?? selectedBank?.Iban ?? taller.iban,
           }}
           items={items}
           totals={{
@@ -1261,7 +1355,7 @@ const printInvoice = async () => {
                 <p className="text-xl font-extrabold">{invoice.numero}</p>
 
                 <p className="font-bold">TIPO PAGO:</p>
-                <p>{invoice.tipoPago}</p>
+                <p>{isCredit ? "Pago a credito" : paymentDetailText || invoice.tipoPago}</p>
 
                 {isCredit && (
                   <>
@@ -1388,6 +1482,12 @@ const printInvoice = async () => {
               <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
               <Row label="IVA" value={formatMoney(iva)} />
               <Row label="OTROS" value={`- ${formatMoney(otros)}`} />
+              {isInsuranceCustomer && (
+                <>
+                  <Row label="FRANQUICIA" value={`- ${formatMoney(franchiseAmount)}`} />
+                  <Row label="PAGA COMPANIA" value={formatMoney(companyPayable)} strong />
+                </>
+              )}
               <Row label="TOTAL" value={formatMoney(totalFinal)} strong />
             </div>
           </div>

@@ -450,6 +450,7 @@ export default function RegisterCustomer() {
               >
                 <option value="Particular">Particular</option>
                 <option value="Empresa">Empresa</option>
+                <option value="Compania de seguro">Compania de seguro</option>
               </select>
             </div>
           </div>

@@ -579,6 +579,7 @@ export default function RegisterPreOrder() {
           <select value={form.Clasificacion} onChange={(event) => setField("Clasificacion", event.target.value)} className={cls}>
             <option value="Particular">Particular</option>
             <option value="Empresa">Empresa</option>
+            <option value="Compania de seguro">Compania de seguro</option>
           </select>
           <Input name="Fecha" type="date" value={form.Fecha} onChange={setField} required />
           <Input name="Matricula" value={form.Matricula} onChange={setField} placeholder="Matricula *" required />

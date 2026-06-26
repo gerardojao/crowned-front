@@ -55,7 +55,7 @@ export default function Layout({ children }) {
   const [helpSubmitting, setHelpSubmitting] = useState(false);
   const [helpStatus, setHelpStatus] = useState(null);
 
-  const isAuthRoute = /^\/(login|register)(\/|$)?/.test(location.pathname);
+  const isAuthRoute = /^\/(login|register)(\/|$)/.test(location.pathname);
   const isPrintRoute = /^\/print-(pre-)?order\/.+/.test(location.pathname);
 
   const compactRoutes = [
