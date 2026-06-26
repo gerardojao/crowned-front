@@ -214,6 +214,7 @@ export default function ReprintInvoice() {
     String(invoice.clasificacionCliente || "").toLowerCase().includes("seguro");
   const companyPayable = Math.max(0, Number(totals.total || 0) - franchiseAmount);
   const paymentText = getPaymentText(invoice);
+  const hasTransferPayment = paymentText.toLowerCase().includes("transferencia");
   const linkedRectificativas = Array.isArray(invoice.rectificativas)
     ? invoice.rectificativas
     : [];
@@ -449,9 +450,17 @@ export default function ReprintInvoice() {
                     </>
                   )}
 
-                  <div className="col-span-2 pt-2">
-                    <InvoiceCustomerBox invoice={invoice} />
-                  </div>
+                  <p className="font-bold">FACTURAR A:</p>
+                  <p className="font-bold">{invoice.cliente}</p>
+
+                  <p className="font-bold">DNI/NIE/NIF:</p>
+                  <p>{invoice.dni}</p>
+
+                  <p className="font-bold">DIRECCION:</p>
+                  <p>{formatCustomerAddress(invoice)}</p>
+
+                  <p className="font-bold">TELEFONO:</p>
+                  <p>{invoice.telefonoCliente}</p>
 
                   <p className="font-bold">MATRICULA:</p>
                   <p className="font-bold">{invoice.matricula}</p>
@@ -462,7 +471,7 @@ export default function ReprintInvoice() {
               </div>
             </div>
 
-          {documentTaller.iban && (
+          {documentTaller.iban && hasTransferPayment && (
             <div className="text-center text-sm font-bold italic border-b border-black py-2">
               Transferencias a la cuenta {documentTaller.iban} a nombre de{" "}
               {documentTaller.razonSocial}
@@ -732,6 +741,16 @@ function formatMoney(value) {
   return eur.format(Number(value || 0));
 }
 
+function formatCustomerAddress(invoice) {
+  return [
+    invoice.direccionCliente,
+    [invoice.codigoPostalCliente, invoice.poblacionCliente].filter(Boolean).join(" "),
+    invoice.provinciaCliente,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleDateString("es-ES", {
@@ -752,6 +771,6 @@ function getPaymentText(invoice) {
   if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TDC";
   if (tipo === "efectivo") return "Efectivo";
   if (tipo === "bizum") return "Bizum";
-  if (tipo === "contado") return "Contado";
+  if (tipo === "contado") return "Efectivo";
   return invoice.tipoPago || "";
 }

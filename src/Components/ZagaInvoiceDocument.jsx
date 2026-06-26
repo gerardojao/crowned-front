@@ -699,7 +699,7 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
     return "PAGO POR TPV";
   if (tipo === "efectivo") return "PAGO EN EFECTIVO";
   if (tipo === "bizum") return "PAGO POR BIZUM";
-  if (tipo === "contado") return "PAGO AL CONTADO";
+  if (tipo === "contado") return "PAGO EN EFECTIVO";
 
   return labels ? `PAGO ${labels.toUpperCase()}` : "";
 }
@@ -721,7 +721,7 @@ function getPaymentDisplayText(invoice, selectedPaymentMethods) {
   if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TDC";
   if (tipo === "efectivo") return "Efectivo";
   if (tipo === "bizum") return "Bizum";
-  return "Contado";
+  return tipo === "contado" ? "Efectivo" : "Contado";
 }
 
 function maskIban(iban) {

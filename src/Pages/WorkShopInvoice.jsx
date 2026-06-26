@@ -115,7 +115,7 @@ export default function WorkshopInvoice() {
     tipoOperacion: "Mecanica",
     ivaPct: 21,
     otros: "",
-    tipoPago: "Contado",
+    tipoPago: "Efectivo",
     plazoCreditoDias: 30,
     fechaVencimiento: "",
   });
@@ -437,8 +437,16 @@ export default function WorkshopInvoice() {
   const isCredit = invoice.tipoPago === "Credito";
   const paymentDetailText = useMemo(() => {
     if (isCredit) return "Pago a credito";
-    return selectedPaymentMethods.map((method) => method.label).join(" / ");
-  }, [isCredit, selectedPaymentMethods]);
+    const selectedLabels = selectedPaymentMethods.map((method) => method.label).join(" / ");
+    if (selectedLabels) return selectedLabels;
+    return invoice.tipoPago === "Contado" ? "Efectivo" : invoice.tipoPago;
+  }, [invoice.tipoPago, isCredit, selectedPaymentMethods]);
+  const hasTransferPayment = useMemo(
+    () =>
+      selectedPaymentMethods.some((method) => method.key === "transferencia") ||
+      String(paymentDetailText || "").toLowerCase().includes("transferencia"),
+    [paymentDetailText, selectedPaymentMethods],
+  );
   const selectedBank = useMemo(
     () => bankAccounts.find((item) => String(item.id ?? item.Id) === String(selectedBankId)),
     [bankAccounts, selectedBankId],
@@ -1053,7 +1061,7 @@ const printInvoice = async () => {
                 value={invoice.tipoPago}
                 onChange={(e) => setTipoPago(e.target.value)}
               >
-                <option value="Contado">Contado</option>
+                <option value="Efectivo">Efectivo</option>
                 <option value="Credito">Credito</option>
               </select>
             </label>
@@ -1346,27 +1354,35 @@ const printInvoice = async () => {
               </div>
             </div>
 
-            <div className="text-sm">
-              <div className="grid grid-cols-[112px_1fr] gap-x-2 gap-y-1">
-                <p className="font-bold">FECHA:</p>
-                <p>{formatDate(invoice.fecha)}</p>
+              <div className="text-sm">
+                <div className="grid grid-cols-[112px_1fr] gap-x-2 gap-y-1">
+                  <p className="font-bold">FECHA:</p>
+                  <p>{formatDate(invoice.fecha)}</p>
 
-                <p className="font-bold">Nº FACTURA:</p>
-                <p className="text-xl font-extrabold">{invoice.numero}</p>
+                  <p className="font-bold">Nº FACTURA:</p>
+                  <p className="text-xl font-extrabold">{invoice.numero}</p>
 
-                <p className="font-bold">TIPO PAGO:</p>
-                <p>{isCredit ? "Pago a credito" : paymentDetailText || invoice.tipoPago}</p>
+                  <p className="font-bold">TIPO PAGO:</p>
+                  <p>{isCredit ? "Pago a credito" : paymentDetailText || invoice.tipoPago}</p>
 
-                {isCredit && (
-                  <>
-                    <p className="font-bold">VENCIMIENTO:</p>
-                    <p>{formatDate(invoice.fechaVencimiento)}</p>
-                  </>
-                )}
+                  {isCredit && (
+                    <>
+                      <p className="font-bold">VENCIMIENTO:</p>
+                      <p>{formatDate(invoice.fechaVencimiento)}</p>
+                    </>
+                  )}
 
-                <div className="col-span-2 pt-2">
-                  <InvoiceCustomerBox invoice={invoice} />
-                </div>
+                  <p className="font-bold">FACTURAR A:</p>
+                  <p className="font-bold">{invoice.cliente}</p>
+
+                  <p className="font-bold">DNI/NIE/NIF:</p>
+                  <p>{invoice.dni}</p>
+
+                  <p className="font-bold">DIRECCION:</p>
+                  <p>{formatCustomerAddress(invoice)}</p>
+
+                  <p className="font-bold">TELEFONO:</p>
+                  <p>{invoice.telefonoCliente}</p>
 
                 <p className="font-bold">{labels.referenceLabel.toUpperCase()}:</p>
                 <p className="font-bold">{invoice.matricula}</p>
@@ -1377,7 +1393,7 @@ const printInvoice = async () => {
             </div>
           </div>
 
-          {taller.iban && (
+          {taller.iban && hasTransferPayment && (
             <div className="text-center text-sm font-bold italic border-b border-black py-2">
               Transferencias a la cuenta {taller.iban} a nombre de{" "}
               {taller.razonSocial}
@@ -1547,6 +1563,16 @@ function InvoiceCustomerCorner({ className }) {
 
 function formatMoney(value) {
   return eur.format(Number(value || 0));
+}
+
+function formatCustomerAddress(invoice) {
+  return [
+    invoice.direccionCliente,
+    [invoice.codigoPostalCliente, invoice.poblacionCliente].filter(Boolean).join(" "),
+    invoice.provinciaCliente,
+  ]
+    .filter(Boolean)
+    .join(", ");
 }
 
 function parseOrderItems(itemsJson) {
