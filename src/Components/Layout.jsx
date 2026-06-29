@@ -670,7 +670,7 @@ export default function Layout({ children }) {
                     </Link>
 
                     <Link
-                      to="/register-supplier"
+                      to="/stock-parts"
                       className={`${heroBtnBase} bg-slate-700 hover:bg-slate-800`}
                     >
                       <span className={heroBtnIcon}>

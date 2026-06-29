@@ -52,6 +52,8 @@ function parseItems(itemsJson) {
     return parsed
       .map((item, index) => ({
         id: item.id || item.Id || `item-${index}`,
+        codigo: item.codigo ?? item.Codigo ?? "",
+        section: normalizeLineSection(item),
         descripcion:
           item.descripcion ||
           item.Descripcion ||
@@ -59,11 +61,12 @@ function parseItems(itemsJson) {
           item.Nombre ||
           "",
         cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
+        tiempo: Number(item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1),
         kind: String(
           item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "",
         ).toLowerCase(),
       }))
-      .filter((item) => normalizeText(item.descripcion));
+      .filter((item) => normalizeText(item.descripcion) || normalizeText(item.codigo));
   } catch {
     return [];
   }
@@ -82,11 +85,30 @@ function buildFallbackItems(order) {
     id: `fallback-${index}`,
     descripcion,
     cantidad: 1,
+    tiempo: 1,
+    section: index === 0 ? "ManoObra" : "ManoObra",
     kind: index === 0 ? "labor" : "",
   }));
 }
 
+function normalizeLineSection(item) {
+  const raw = String(item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw.includes("pintura")) return "Pintura";
+  if (
+    raw.includes("pieza") ||
+    raw.includes("recambio") ||
+    raw.includes("repuesto") ||
+    raw.includes("material") ||
+    raw.includes("part")
+  )
+    return "Materiales";
+  return "ManoObra";
+}
+
 function isMaterial(item) {
+  if (normalizeLineSection(item) === "Materiales") return true;
   const kind = item.kind.toLowerCase();
   return (
     kind.includes("repuesto") ||
@@ -96,8 +118,18 @@ function isMaterial(item) {
 }
 
 function isLabor(item) {
+  if (normalizeLineSection(item) === "ManoObra" || normalizeLineSection(item) === "Pintura")
+    return true;
   const kind = item.kind.toLowerCase();
   return kind.includes("labor") || kind.includes("mano");
+}
+
+function formatLineQuantity(value) {
+  if (value === "" || value == null) return "-";
+  return Number(value || 0).toLocaleString("es-ES", {
+    minimumFractionDigits: Number(value) % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 export default function PrintWorkOrder() {
@@ -240,6 +272,8 @@ export default function PrintWorkOrder() {
   const customerNumber = order.numeroCliente || order.idCliente || "-";
   const pageLabel = "Pag. 1";
   const operationType = String(order.tipoOperacion || "Mecanica").toUpperCase();
+  const isBodyPaintOperation = operationType.includes("CHAPA") || operationType.includes("PINTURA");
+  const materialGroupTitle = isBodyPaintOperation ? "Materiales" : "Piezas";
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
   const actionTitle = isCustody
       ? "Resguardo de deposito"
@@ -762,12 +796,12 @@ export default function PrintWorkOrder() {
                     ]
                 ).map((item, index) => (
                   <tr key={item.id || index}>
-                    <td className="wo-code">MO</td>
+                    <td className="wo-code">{item.codigo || "MO"}</td>
                     <td>{item.descripcion}</td>
                     <td className="wo-qty">
                       {order.tiempoEstimadoHoras && index === 0
-                        ? `${order.tiempoEstimadoHoras} h`
-                        : Number(item.cantidad || 1).toLocaleString("es-ES")}
+                        ? formatLineQuantity(order.tiempoEstimadoHoras)
+                        : formatLineQuantity(item.tiempo ?? item.cantidad ?? 1)}
                     </td>
                   </tr>
                 ))}
@@ -776,7 +810,7 @@ export default function PrintWorkOrder() {
           </div>
 
           <div className="wo-section-head">
-            <span>Materiales</span>
+            <span>{materialGroupTitle}</span>
             <span />
             <span>Cantidad</span>
           </div>
@@ -794,12 +828,12 @@ export default function PrintWorkOrder() {
                     ]
                 ).map((item, index) => (
                   <tr key={item.id || index}>
-                    <td className="wo-code">MAT</td>
+                    <td className="wo-code">{item.codigo || "MAT"}</td>
                     <td>{item.descripcion}</td>
                     <td className="wo-qty">
                       {item.cantidad === ""
                         ? "-"
-                        : Number(item.cantidad || 1).toLocaleString("es-ES")}
+                        : formatLineQuantity(item.cantidad || 1)}
                     </td>
                   </tr>
                 ))}

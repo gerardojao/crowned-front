@@ -231,16 +231,14 @@ export default function RegisterWorkOrder() {
   const [useZagaDocuments, setUseZagaDocuments] = useState(false);
   const [preOrdersEnabled, setPreOrdersEnabled] = useState(false);
   const [receptionPhotosEnabled, setReceptionPhotosEnabled] = useState(true);
+  const [detailedRepairLinesEnabled, setDetailedRepairLinesEnabled] = useState(false);
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [photoTarget, setPhotoTarget] = useState(null);
   const [preOrderSourceId, setPreOrderSourceId] = useState(null);
   const orderPageSize = 10;
   const detailItems = Array.isArray(order.Items) ? order.Items : [];
   const detailTotal = detailItems.reduce(
-    (sum, item) =>
-      sum +
-      Number(item.cantidad || 0) *
-        Number(item.precioUnitario || item.importe || 0),
+    (sum, item) => sum + getRepairLineTotal(item),
     0,
   );
 
@@ -262,6 +260,11 @@ export default function RegisterWorkOrder() {
         data.enableReceptionPhotos ??
           data.EnableReceptionPhotos ??
           true,
+      );
+      setDetailedRepairLinesEnabled(
+        data.enableDetailedRepairInvoiceLines ??
+          data.EnableDetailedRepairInvoiceLines ??
+          false,
       );
       setOperationTypes(normalizeOperationTypes(data.operationTypes ?? data.OperationTypes));
 
@@ -331,7 +334,11 @@ export default function RegisterWorkOrder() {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     descripcion,
     cantidad,
+    tiempo: cantidad,
     precioUnitario: Number(precioUnitario || 0).toFixed(2),
+    descuentoPct: 0,
+    ivaPct: 21,
+    section: extra.kind === "repuesto" ? "Piezas" : "ManoObra",
     ...extra,
   });
 
@@ -339,7 +346,9 @@ export default function RegisterWorkOrder() {
     setOrder((prev) => ({
       ...prev,
       Items: (Array.isArray(prev.Items) ? prev.Items : []).map((item) =>
-        item.id === id ? { ...item, [field]: value } : item,
+        item.id === id
+          ? normalizeRepairLine({ ...item, [field]: value }, detailedRepairLinesEnabled)
+          : item,
       ),
     }));
   };
@@ -352,8 +361,10 @@ export default function RegisterWorkOrder() {
       const nextLabor = {
         ...(existing || createDetailItem("Mano de obra", 1, amount)),
         kind: "labor",
+        section: "ManoObra",
         descripcion: "Mano de obra",
         cantidad: 1,
+        tiempo: 1,
         precioUnitario: amount,
       };
 
@@ -376,6 +387,24 @@ export default function RegisterWorkOrder() {
     }));
   };
 
+  const addManualDetailLine = () => {
+    const section =
+      detailedRepairLinesEnabled && order.TipoOperacion === "Chapa y pintura"
+        ? "Piezas"
+        : "ManoObra";
+    setOrder((prev) => ({
+      ...prev,
+      Items: [
+        ...(Array.isArray(prev.Items) ? prev.Items : []),
+        createDetailItem("", 1, 0, {
+          section,
+          kind: section === "Piezas" ? "repuesto" : "labor",
+          codigo: section === "Piezas" ? "MAT" : "MO",
+        }),
+      ],
+    }));
+  };
+
   const addPartToOrder = (part) => {
     const name = getPartDisplayName(part);
     const price = getPartSalePrice(part);
@@ -394,6 +423,7 @@ export default function RegisterWorkOrder() {
           ...(Array.isArray(prev.Items) ? prev.Items : []),
           createDetailItem(name, 1, price, {
             kind: "repuesto",
+            section: "Piezas",
             repuestoStockId: getPartId(part),
             idProveedor: getPartProviderId(part),
             nombreProveedor: getPartProviderName(part),
@@ -481,13 +511,24 @@ export default function RegisterWorkOrder() {
       return Array.isArray(parsed)
         ? parsed.map((item, index) => ({
             id: item.id || `stored-${index}`,
+            codigo: item.codigo ?? item.Codigo ?? "",
+            section: getRepairLineSection(item),
             descripcion: item.descripcion || item.Descripcion || "",
             cantidad: item.cantidad ?? item.Cantidad ?? 1,
+            tiempo: item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
+            descuentoPct: item.descuentoPct ?? item.DescuentoPct ?? 0,
+            ivaPct: item.ivaPct ?? item.IvaPct ?? 21,
             precioUnitario:
               item.precioUnitario ??
               item.PrecioUnitario ??
               item.importe ??
               item.Importe ??
+              0,
+            importe:
+              item.importe ??
+              item.Importe ??
+              item.precioUnitario ??
+              item.PrecioUnitario ??
               0,
             kind: item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? null,
             repuestoStockId:
@@ -810,6 +851,7 @@ export default function RegisterWorkOrder() {
                     0,
                     {
                       kind: "labor",
+                      section: "ManoObra",
                     },
                   ),
                 ]
@@ -983,28 +1025,43 @@ export default function RegisterWorkOrder() {
       setError("");
 
       const normalizedItems = detailItems
-        .filter((item) => String(item.descripcion || "").trim())
-        .map((item) => ({
-          descripcion: String(item.descripcion || "").trim(),
-          cantidad: Number(item.cantidad || 1),
-          precioUnitario: Number(item.precioUnitario || 0),
-          kind: item.kind || null,
-          repuestoStockId: item.repuestoStockId || null,
-          idProveedor: item.idProveedor || null,
-          nombreProveedor: item.nombreProveedor || null,
-          precioCompra:
-            item.precioCompra != null ? Number(item.precioCompra || 0) : null,
-        }));
+        .filter((item) => {
+          const normalized = normalizeRepairLine(item, detailedRepairLinesEnabled);
+          return (
+            String(normalized.descripcion || normalized.codigo || "").trim() ||
+            Number(normalized.cantidad || 0) * Number(normalized.importe || 0) > 0
+          );
+        })
+        .map((item) => {
+          const normalized = normalizeRepairLine(item, detailedRepairLinesEnabled);
+          return {
+            codigo: normalized.codigo || null,
+            section: normalized.section || "ManoObra",
+            descripcion: String(normalized.descripcion || "").trim(),
+            cantidad: Number(normalized.cantidad || 1),
+            tiempo: normalized.tiempo ? Number(normalized.tiempo || 0) : null,
+            precioUnitario: Number(normalized.precioUnitario || 0),
+            descuentoPct: Number(normalized.descuentoPct || 0),
+            ivaPct: Number(normalized.ivaPct || 21),
+            importe: Number(normalized.importe ?? normalized.precioUnitario ?? 0),
+            kind: normalized.kind || null,
+            repuestoStockId: normalized.repuestoStockId || null,
+            idProveedor: normalized.idProveedor || null,
+            nombreProveedor: normalized.nombreProveedor || null,
+            precioCompra:
+              normalized.precioCompra != null ? Number(normalized.precioCompra || 0) : null,
+          };
+        });
       const laborTotal = normalizedItems
         .filter(
-          (item) => item.descripcion.trim().toLowerCase() === "mano de obra",
+          (item) => item.kind === "labor",
         )
-        .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+        .reduce((sum, item) => sum + item.cantidad * item.importe, 0);
       const partsTotal = normalizedItems
         .filter(
-          (item) => item.descripcion.trim().toLowerCase() !== "mano de obra",
+          (item) => item.kind !== "labor",
         )
-        .reduce((sum, item) => sum + item.cantidad * item.precioUnitario, 0);
+        .reduce((sum, item) => sum + item.cantidad * item.importe, 0);
 
       const payload = {
         cliente: order.Cliente,
@@ -1581,6 +1638,18 @@ export default function RegisterWorkOrder() {
               Lineas de detalle / costes
             </div>
 
+            {detailedRepairLinesEnabled && (
+              <div className="md:col-span-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={addManualDetailLine}
+                  className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                >
+                  Agregar linea
+                </button>
+              </div>
+            )}
+
             <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Repuesto
@@ -1631,39 +1700,69 @@ export default function RegisterWorkOrder() {
 
             {detailItems.length > 0 && (
               <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
-                <div className="hidden lg:grid grid-cols-[100px_minmax(0,1fr)_150px_150px_40px] gap-2 px-1 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <div>Cantidad</div>
-                  <div>Detalle de la orden</div>
-                  <div>P. Unit.</div>
-                  <div className="text-center">Importe</div>
-                  <div />
-                </div>
+                {detailedRepairLinesEnabled && (
+                  <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div>Codigo</div>
+                    <div>Seccion</div>
+                    <div>Descripcion</div>
+                    <div>Tiempo/Cant.</div>
+                    <div>Precio</div>
+                    <div>%DTO</div>
+                    <div>%IVA</div>
+                    <div className="text-right">Importe</div>
+                    <div />
+                  </div>
+                )}
+                {!detailedRepairLinesEnabled && (
+                  <div className="hidden lg:grid grid-cols-[100px_minmax(0,1fr)_150px_150px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div>Cantidad</div>
+                    <div>Detalle de la orden</div>
+                    <div>P. Unit.</div>
+                    <div className="text-center">Importe</div>
+                    <div />
+                  </div>
+                )}
                 <div className="space-y-2">
                   {detailItems.map((item) => {
-                    const lineTotal =
-                      Number(item.cantidad || 0) *
-                      Number(item.precioUnitario || item.importe || 0);
+                    const section = getRepairLineSection(item);
+                    const lineTotal = getRepairLineTotal(item);
 
                     return (
                       <div
                         key={item.id}
-                        className="grid grid-cols-1 gap-2 lg:grid-cols-[100px_minmax(0,1fr)_150px_150px_40px]"
+                        className={
+                          detailedRepairLinesEnabled
+                            ? "grid grid-cols-1 gap-2 xl:grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px]"
+                            : "grid grid-cols-1 gap-2 lg:grid-cols-[100px_minmax(0,1fr)_150px_150px_40px]"
+                        }
                       >
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={item.cantidad}
-                          onChange={(e) =>
-                            setDetailItemField(
-                              item.id,
-                              "cantidad",
-                              e.target.value,
-                            )
-                          }
-                          className={cls}
-                          placeholder="Cantidad"
-                        />
+                        {detailedRepairLinesEnabled && (
+                          <>
+                            <input
+                              value={item.codigo || ""}
+                              onChange={(e) =>
+                                setDetailItemField(item.id, "codigo", e.target.value)
+                              }
+                              className={cls}
+                              placeholder="Codigo"
+                            />
+                            <select
+                              value={section}
+                              onChange={(e) =>
+                                setDetailItemField(item.id, "section", e.target.value)
+                              }
+                              className={cls}
+                            >
+                              <option value="ManoObra">Mano obra</option>
+                              <option value="Piezas">
+                                {order.TipoOperacion === "Chapa y pintura" ? "Materiales" : "Piezas"}
+                              </option>
+                              {order.TipoOperacion === "Chapa y pintura" && (
+                                <option value="Pintura">Pintura</option>
+                              )}
+                            </select>
+                          </>
+                        )}
                         <input
                           value={item.descripcion}
                           onChange={(e) =>
@@ -1675,6 +1774,21 @@ export default function RegisterWorkOrder() {
                           }
                           className={cls}
                           placeholder="Descripcion"
+                        />
+                        <input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={detailedRepairLinesEnabled ? getRepairLineQuantity(item) : item.cantidad}
+                          onChange={(e) =>
+                            setDetailItemField(
+                              item.id,
+                              detailedRepairLinesEnabled && section !== "Piezas" ? "tiempo" : "cantidad",
+                              e.target.value,
+                            )
+                          }
+                          className={cls}
+                          placeholder={section === "Piezas" ? "Cantidad" : "Tiempo"}
                         />
                         <input
                           type="number"
@@ -1695,8 +1809,32 @@ export default function RegisterWorkOrder() {
                             )
                           }
                           className={cls}
-                          placeholder="Precio unit."
+                          placeholder="Precio"
                         />
+                        {detailedRepairLinesEnabled && (
+                          <>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.descuentoPct ?? 0}
+                              onChange={(e) =>
+                                setDetailItemField(item.id, "descuentoPct", e.target.value)
+                              }
+                              className={cls}
+                              placeholder="%DTO"
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.ivaPct ?? 21}
+                              onChange={(e) =>
+                                setDetailItemField(item.id, "ivaPct", e.target.value)
+                              }
+                              className={cls}
+                              placeholder="%IVA"
+                            />
+                          </>
+                        )}
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-semibold text-slate-800">
                           {lineTotal.toLocaleString("es-ES", {
                             style: "currency",
@@ -2108,6 +2246,61 @@ function normalizeOperationTypes(types) {
   const list = Array.isArray(types) ? types : ["Mecanica"];
   const filtered = list.filter((type) => type && type !== "Recambio");
   return filtered.length ? filtered : ["Mecanica"];
+}
+
+function getRepairLineSection(item) {
+  const raw = String(item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw.includes("pintura")) return "Pintura";
+  if (
+    raw.includes("pieza") ||
+    raw.includes("recambio") ||
+    raw.includes("repuesto") ||
+    raw.includes("material")
+  )
+    return "Piezas";
+  return "ManoObra";
+}
+
+function getRepairLineQuantity(item) {
+  const section = getRepairLineSection(item);
+  const value =
+    section === "Piezas"
+      ? item.cantidad ?? item.Cantidad
+      : item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad;
+  const number = Number(value || 0);
+  return number > 0 ? number : 1;
+}
+
+function getRepairLineTotal(item) {
+  const quantity = getRepairLineQuantity(item);
+  const price = Number(item.precioUnitario ?? item.PrecioUnitario ?? item.importe ?? item.Importe ?? 0);
+  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
+  return quantity * price * (1 - discount / 100);
+}
+
+function normalizeRepairLine(item, detailed = false) {
+  if (!detailed) return item;
+
+  const section = getRepairLineSection(item);
+  const quantity = getRepairLineQuantity({ ...item, section });
+  const price = Number(item.precioUnitario ?? item.PrecioUnitario ?? item.importe ?? item.Importe ?? 0);
+  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
+  const netTotal = getRepairLineTotal({ ...item, section, precioUnitario: price, descuentoPct: discount });
+  const unitNet = quantity > 0 ? Math.round((netTotal / quantity + Number.EPSILON) * 100) / 100 : 0;
+
+  return {
+    ...item,
+    section,
+    cantidad: quantity,
+    tiempo: section === "Piezas" ? item.tiempo ?? item.Tiempo ?? "" : quantity,
+    precioUnitario: price,
+    descuentoPct: discount,
+    ivaPct: Number(item.ivaPct ?? item.IvaPct ?? 21),
+    importe: unitNet,
+    kind: section === "Piezas" ? "repuesto" : "labor",
+  };
 }
 
 function Metric({ label, value }) {

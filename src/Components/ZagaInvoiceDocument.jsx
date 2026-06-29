@@ -425,7 +425,11 @@ export default function ZagaInvoiceDocument({
               </div>
             )}
 
-            <LineItems items={items} ivaPct={ivaPct} />
+            <LineItems
+              items={items}
+              ivaPct={ivaPct}
+              operationType={invoice.tipoOperacion || invoice.TipoOperacion}
+            />
 
             <div className="min-h-[260px]" />
 
@@ -543,19 +547,30 @@ function VehicleTable({ invoice, paymentText }) {
   );
 }
 
-function LineItems({ items, ivaPct }) {
-  const groups = [
-    {
-      title: "Mano obra",
-      items: items.filter((item) => isLaborItem(item)),
-      codePrefix: "MO",
-    },
-    {
-      title: "Recambios",
-      items: items.filter((item) => !isLaborItem(item)),
-      codePrefix: "RC",
-    },
-  ].filter((group) => group.items.length > 0);
+function LineItems({ items, ivaPct, operationType }) {
+  const isBodyPaint = String(operationType || "")
+    .toLowerCase()
+    .includes("chapa");
+  const groupDefinitions = isBodyPaint
+    ? [
+        { key: "ManoObra", title: "Mano obra", codePrefix: "MO" },
+        { key: "Pintura", title: "Pintura", codePrefix: "PT", includeMaterials: true },
+      ]
+    : [
+        { key: "ManoObra", title: "Mano obra", codePrefix: "MO" },
+        { key: "Piezas", title: "Piezas", codePrefix: "PI" },
+      ];
+  const groups = groupDefinitions
+    .map((group) => ({
+      ...group,
+      items: items.filter((item) => {
+        const section = getLineSection(item);
+        return group.includeMaterials
+          ? section === "Pintura" || section === "Piezas"
+          : section === group.key;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
 
   return (
     <div className="px-1 py-1">
@@ -571,9 +586,20 @@ function LineItems({ items, ivaPct }) {
             <div className="text-right">Importe</div>
           </div>
           {group.items.map((item, index) => {
-            const quantity = Number(item.cantidad ?? item.Cantidad ?? 1);
-            const price = Number(item.importe ?? item.Importe ?? 0);
-            const amount = quantity * price;
+            const section = getLineSection(item);
+            const quantity = getLineQuantity(item);
+            const price = Number(
+              item.precioUnitario ??
+                item.PrecioUnitario ??
+                item.precio ??
+                item.Precio ??
+                item.importe ??
+                item.Importe ??
+                0,
+            );
+            const discount = Number(item.descuentoPct ?? item.DescuentoPct ?? 0);
+            const lineIva = Number(item.ivaPct ?? item.IvaPct ?? ivaPct);
+            const amount = quantity * price * (1 - Math.min(100, Math.max(0, discount)) / 100);
             return (
               <div
                 key={`${group.title}-${index}`}
@@ -581,13 +607,16 @@ function LineItems({ items, ivaPct }) {
               >
                 <div>
                   {item.codigo ||
-                    `${group.codePrefix}${String(index + 1).padStart(2, "0")}`}
+                    item.Codigo ||
+                    (section === "Piezas" && group.includeMaterials
+                      ? "MAT."
+                      : `${group.codePrefix}${String(index + 1).padStart(2, "0")}`)}
                 </div>
-                <div>{item.descripcion ?? item.Descripcion}</div>
+                <div>{item.descripcion ?? item.Descripcion ?? ""}</div>
                 <div className="text-right">{formatPlain(price)}</div>
                 <div className="text-right">{formatPlain(quantity)}</div>
-                <div className="text-right">0,00</div>
-                <div className="text-right">{formatPlain(ivaPct)}</div>
+                <div className="text-right">{formatPlain(discount)}</div>
+                <div className="text-right">{formatPlain(lineIva)}</div>
                 <div className="text-right">{formatPlain(amount)}</div>
               </div>
             );
@@ -645,7 +674,50 @@ function InvoiceCustomerBlock({ invoice }) {
   );
 }
 
+function getLineSection(item) {
+  const raw = `${item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? ""} ${
+    item.descripcion ?? item.Descripcion ?? ""
+  }`.toLowerCase();
+  if (
+    raw.includes("pieza") ||
+    raw.includes("recambio") ||
+    raw.includes("repuesto") ||
+    raw.includes("material")
+  )
+    return "Piezas";
+  if (raw.includes("pintura")) return "Pintura";
+  return "ManoObra";
+}
+
+function getLineQuantity(item) {
+  const section = getLineSection(item);
+  const value =
+    section === "Piezas"
+      ? item.cantidad ?? item.Cantidad
+      : item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad;
+  const number = Number(value || 0);
+  return number > 0 ? number : 1;
+}
+
+function getLineTotal(item) {
+  const quantity = getLineQuantity(item);
+  const price = Number(
+    item.precioUnitario ??
+      item.PrecioUnitario ??
+      item.precio ??
+      item.Precio ??
+      item.importe ??
+      item.Importe ??
+      0,
+  );
+  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
+  return quantity * price * (1 - discount / 100);
+}
+
 function isLaborItem(item) {
+  const section = getLineSection(item);
+  if (section === "ManoObra" || section === "Pintura") return true;
+
   const raw = `${item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? ""} ${
     item.descripcion ?? item.Descripcion ?? ""
   }`.toLowerCase();
@@ -656,11 +728,7 @@ function isLaborItem(item) {
 
 function sumItems(items) {
   return items.reduce((sum, item) => {
-    return (
-      sum +
-      Number(item.cantidad ?? item.Cantidad ?? 1) *
-        Number(item.importe ?? item.Importe ?? 0)
-    );
+    return sum + getLineTotal(item);
   }, 0);
 }
 
@@ -671,7 +739,7 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
   const tipo = String(invoice.tipoPago || "")
     .trim()
     .toLowerCase();
-  if (tipo === "credito") return "PAGO A CREDITO";
+  if (tipo === "credito") return getCreditPaymentLegend(invoice);
 
   const labels = selectedPaymentMethods
     .map((method) => {
@@ -706,7 +774,12 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
 
 function getPaymentDisplayText(invoice, selectedPaymentMethods) {
   const tipo = String(invoice.tipoPago || "").trim().toLowerCase();
-  if (tipo === "credito") return "Pago a credito";
+  if (tipo === "credito") {
+    const totalAbonado = Number(invoice.totalAbonado ?? invoice.TotalAbonado ?? 0);
+    return totalAbonado > 0
+      ? `Pago a credito - cliente abono ${eur.format(totalAbonado)}`
+      : "Pago a credito";
+  }
 
   const labels = selectedPaymentMethods
     .map((method) => method.label)
@@ -722,6 +795,19 @@ function getPaymentDisplayText(invoice, selectedPaymentMethods) {
   if (tipo === "efectivo") return "Efectivo";
   if (tipo === "bizum") return "Bizum";
   return tipo === "contado" ? "Efectivo" : "Contado";
+}
+
+function getCreditPaymentLegend(invoice) {
+  const totalAbonado = Number(invoice.totalAbonado ?? invoice.TotalAbonado ?? 0);
+  const saldoPendiente = Number(invoice.saldoPendiente ?? invoice.SaldoPendiente ?? 0);
+  const fechaVencimiento = invoice.fechaVencimiento ?? invoice.FechaVencimiento;
+  const parts = ["PAGO A CREDITO"];
+
+  if (totalAbonado > 0) parts.push(`CLIENTE ABONO ${eur.format(totalAbonado)}`);
+  if (saldoPendiente > 0) parts.push(`SALDO PENDIENTE ${eur.format(saldoPendiente)}`);
+  if (fechaVencimiento) parts.push(`VENCIMIENTO ${formatDateShort(fechaVencimiento)}`);
+
+  return parts.join(". ");
 }
 
 function maskIban(iban) {

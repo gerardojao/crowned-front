@@ -167,6 +167,10 @@ export default function ReprintInvoice() {
         ivaPct,
         tipoPago: f.tipoPago ?? f.TipoPago ?? "",
         metodoPagoDetalle: f.metodoPagoDetalle ?? f.MetodoPagoDetalle ?? "",
+        totalAbonado: f.totalAbonado ?? f.TotalAbonado ?? 0,
+        saldoPendiente: f.saldoPendiente ?? f.SaldoPendiente ?? 0,
+        fechaVencimiento: f.fechaVencimiento ?? f.FechaVencimiento ?? null,
+        leyendaPago: f.leyendaPago ?? f.LeyendaPago ?? "",
         tipoFactura,
         numeroFacturaRectificada: f.numeroFacturaRectificada ?? f.NumeroFacturaRectificada ?? "",
         motivoRectificacion: f.motivoRectificacion ?? f.MotivoRectificacion ?? "",
@@ -762,7 +766,12 @@ function formatDate(value) {
 
 function getPaymentText(invoice) {
   const tipo = String(invoice.tipoPago || "").trim().toLowerCase();
-  if (tipo === "credito") return "Pago a credito";
+  if (tipo === "credito") {
+    const totalAbonado = Number(invoice.totalAbonado ?? invoice.TotalAbonado ?? 0);
+    return totalAbonado > 0
+      ? `Pago a credito - cliente abono ${formatMoney(totalAbonado)}`
+      : "Pago a credito";
+  }
 
   const detail = String(invoice.metodoPagoDetalle || "").trim();
   if (detail) return detail;

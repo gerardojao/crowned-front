@@ -47,7 +47,9 @@ const emptyWorkshop = {
   enableRapelInvoices: false,
   enableNoVatInvoices: false,
   enableReceptionPhotos: true,
+  enableDetailedRepairInvoiceLines: false,
   enableAccountsReceivable: true,
+  enableAccountsPayable: false,
   enableLedger: true,
   allowInvoiceClientEdit: false,
   operationTypes: ["Mecanica"],
@@ -102,7 +104,9 @@ export default function AdminWorkshops() {
     enableRapelInvoices: false,
     enableNoVatInvoices: false,
     enableReceptionPhotos: true,
+    enableDetailedRepairInvoiceLines: false,
     enableAccountsReceivable: true,
+    enableAccountsPayable: false,
     enableLedger: true,
     allowInvoiceClientEdit: false,
     operationTypes: ["Mecanica"],
@@ -193,7 +197,9 @@ export default function AdminWorkshops() {
         enableRapelInvoices: false,
         enableNoVatInvoices: false,
         enableReceptionPhotos: true,
+        enableDetailedRepairInvoiceLines: false,
         enableAccountsReceivable: true,
+        enableAccountsPayable: false,
         enableLedger: true,
         allowInvoiceClientEdit: false,
       });
@@ -263,10 +269,18 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableReceptionPhotos ??
         selectedWorkshop.EnableReceptionPhotos ??
         true,
+      enableDetailedRepairInvoiceLines:
+        selectedWorkshop.enableDetailedRepairInvoiceLines ??
+        selectedWorkshop.EnableDetailedRepairInvoiceLines ??
+        false,
       enableAccountsReceivable:
         selectedWorkshop.enableAccountsReceivable ??
         selectedWorkshop.EnableAccountsReceivable ??
         true,
+      enableAccountsPayable:
+        selectedWorkshop.enableAccountsPayable ??
+        selectedWorkshop.EnableAccountsPayable ??
+        false,
       enableLedger:
         selectedWorkshop.enableLedger ??
         selectedWorkshop.EnableLedger ??
@@ -339,10 +353,18 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableReceptionPhotos ??
         selectedWorkshop.EnableReceptionPhotos ??
         true,
+      enableDetailedRepairInvoiceLines:
+        selectedWorkshop.enableDetailedRepairInvoiceLines ??
+        selectedWorkshop.EnableDetailedRepairInvoiceLines ??
+        false,
       enableAccountsReceivable:
         selectedWorkshop.enableAccountsReceivable ??
         selectedWorkshop.EnableAccountsReceivable ??
         true,
+      enableAccountsPayable:
+        selectedWorkshop.enableAccountsPayable ??
+        selectedWorkshop.EnableAccountsPayable ??
+        false,
       enableLedger:
         selectedWorkshop.enableLedger ??
         selectedWorkshop.EnableLedger ??
@@ -1180,10 +1202,22 @@ function FeatureSwitches({ values, onChange }) {
           onChange={(checked) => onChange("enableReceptionPhotos", checked)}
         />
         <Switch
+          label="Lineas tecnicas"
+          description="Activa precio, tiempo, descuento e IVA por linea de reparacion."
+          checked={values.enableDetailedRepairInvoiceLines}
+          onChange={(checked) => onChange("enableDetailedRepairInvoiceLines", checked)}
+        />
+        <Switch
           label="Cuentas por cobrar"
           description="Muestra el modulo de importes pendientes de cobro."
           checked={values.enableAccountsReceivable}
           onChange={(checked) => onChange("enableAccountsReceivable", checked)}
+        />
+        <Switch
+          label="Cuentas por pagar"
+          description="Habilita pagos de stock y registro automatico en gastos."
+          checked={values.enableAccountsPayable}
+          onChange={(checked) => onChange("enableAccountsPayable", checked)}
         />
         <Switch
           label="Mayor"

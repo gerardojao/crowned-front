@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
+  CheckCircle2,
   Edit3,
   PackagePlus,
   RefreshCcw,
   Save,
   Search,
+  Trash,
   Trash2,
   X,
 } from "lucide-react";
@@ -110,7 +112,9 @@ function toPayload(form) {
 export default function StockParts() {
   const [tab, setTab] = useState("inventory");
   const [providers, setProviders] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [notice, setNotice] = useState(null);
+  const [accountsPayableEnabled, setAccountsPayableEnabled] = useState(false);
 
   const [inventoryParts, setInventoryParts] = useState([]);
   const [inventorySearch, setInventorySearch] = useState("");
@@ -122,6 +126,26 @@ export default function StockParts() {
   const [form, setForm] = useState(emptyPartForm);
   const [editingPartId, setEditingPartId] = useState(null);
   const [savingPart, setSavingPart] = useState(false);
+  const [quantityModal, setQuantityModal] = useState({
+    open: false,
+    row: null,
+    mode: "set",
+    value: "",
+    loading: false,
+  });
+  const [deleteModal, setDeleteModal] = useState({
+    open: false,
+    row: null,
+    loading: false,
+  });
+  const [paymentModal, setPaymentModal] = useState({
+    open: false,
+    row: null,
+    numeroFactura: "",
+    fecha: "",
+    bankAccountId: "",
+    loading: false,
+  });
 
   const [billedParts, setBilledParts] = useState([]);
   const [billedSearch, setBilledSearch] = useState("");
@@ -148,6 +172,31 @@ export default function StockParts() {
     } catch (err) {
       console.error(err);
       setProviders([]);
+    }
+  };
+
+  const loadBankAccounts = async () => {
+    try {
+      const res = await api.get("/WorkshopBankAccounts");
+      setBankAccounts(Array.isArray(res?.data) ? res.data : []);
+    } catch (err) {
+      console.error(err);
+      setBankAccounts([]);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+      const settings = res?.data || {};
+      setAccountsPayableEnabled(
+        settings.enableAccountsPayable ??
+          settings.EnableAccountsPayable ??
+          false,
+      );
+    } catch (err) {
+      console.error(err);
+      setAccountsPayableEnabled(false);
     }
   };
 
@@ -219,6 +268,8 @@ export default function StockParts() {
 
   useEffect(() => {
     loadProviders();
+    loadSettings();
+    loadBankAccounts();
   }, []);
 
   useEffect(() => {
@@ -242,11 +293,14 @@ export default function StockParts() {
         acc.valorCompra += compra * cantidad;
         acc.valorVenta += venta * cantidad;
         if (getValue(row, "stockBajo", false)) acc.stockBajo += 1;
+        if (accountsPayableEnabled && !getValue(row, "pagado", false)) {
+          acc.pendientesPago += 1;
+        }
         return acc;
       },
-      { unidades: 0, valorCompra: 0, valorVenta: 0, stockBajo: 0 },
+      { unidades: 0, valorCompra: 0, valorVenta: 0, stockBajo: 0, pendientesPago: 0 },
     );
-  }, [inventoryParts]);
+  }, [inventoryParts, accountsPayableEnabled]);
 
   const billedSummary = useMemo(() => {
     return billedParts.reduce(
@@ -292,6 +346,7 @@ export default function StockParts() {
 
   const inventoryTotalPages = Math.max(1, Math.ceil(inventoryTotal / pageSize));
   const billedTotalPages = Math.max(1, Math.ceil(billedTotal / pageSize));
+  const inventoryColumnCount = accountsPayableEnabled ? 13 : 12;
 
   const resetPartForm = () => {
     setEditingPartId(null);
@@ -332,13 +387,6 @@ export default function StockParts() {
       });
       return;
     }
-    if (!payload.numeroFactura) {
-      setNotice({
-        type: "error",
-        text: "El Nº Factura es requerido.",
-      });
-      return;
-    }
 
     try {
       setSavingPart(true);
@@ -375,21 +423,41 @@ export default function StockParts() {
   };
 
   const updateQuantity = async (row, mode) => {
+    const current = Number(getValue(row, "cantidad", 0));
+    setQuantityModal({
+      open: true,
+      row,
+      mode,
+      value: mode === "set" ? String(current) : "1",
+      loading: false,
+    });
+  };
+
+  const closeQuantityModal = () => {
+    if (quantityModal.loading) return;
+    setQuantityModal({
+      open: false,
+      row: null,
+      mode: "set",
+      value: "",
+      loading: false,
+    });
+  };
+
+  const confirmQuantityUpdate = async () => {
+    const row = quantityModal.row;
+    if (!row || quantityModal.loading) return;
+
     const id = getValue(row, "id");
     const current = Number(getValue(row, "cantidad", 0));
-    const raw = window.prompt(
-      mode === "set" ? "Nueva cantidad en stock" : "Cantidad a sumar o restar",
-      mode === "set" ? String(current) : "1",
-    );
-
-    if (raw == null) return;
+    const raw = String(quantityModal.value || "");
     const value = Number(raw.replace(",", "."));
     if (!Number.isFinite(value)) {
       setNotice({ type: "error", text: "Cantidad invalida." });
       return;
     }
 
-    const next = mode === "set" ? value : current + value;
+    const next = quantityModal.mode === "set" ? value : current + value;
     if (next < 0) {
       setNotice({
         type: "error",
@@ -399,9 +467,17 @@ export default function StockParts() {
     }
 
     try {
+      setQuantityModal((currentState) => ({ ...currentState, loading: true }));
       setNotice(null);
       await api.patch(`/RepuestoStock/${id}/cantidad`, next);
       await loadInventory();
+      setQuantityModal({
+        open: false,
+        row: null,
+        mode: "set",
+        value: "",
+        loading: false,
+      });
       setNotice({
         type: "success",
         text: "Cantidad actualizada correctamente.",
@@ -413,18 +489,31 @@ export default function StockParts() {
         text:
           err?.response?.data?.message || "No se pudo actualizar la cantidad.",
       });
+      setQuantityModal((currentState) => ({ ...currentState, loading: false }));
     }
   };
 
   const deletePart = async (row) => {
+    setDeleteModal({ open: true, row, loading: false });
+  };
+
+  const closeDeleteModal = () => {
+    if (deleteModal.loading) return;
+    setDeleteModal({ open: false, row: null, loading: false });
+  };
+
+  const confirmDeletePart = async () => {
+    const row = deleteModal.row;
+    if (!row || deleteModal.loading) return;
+
     const id = getValue(row, "id");
-    if (!window.confirm(`Eliminar ${getPartLabel(row)} del inventario?`))
-      return;
 
     try {
+      setDeleteModal((currentState) => ({ ...currentState, loading: true }));
       setNotice(null);
       await api.delete(`/RepuestoStock/${id}`);
       await loadInventory();
+      setDeleteModal({ open: false, row: null, loading: false });
       setNotice({ type: "success", text: "Repuesto eliminado correctamente." });
     } catch (err) {
       console.error(err);
@@ -433,6 +522,93 @@ export default function StockParts() {
         text:
           err?.response?.data?.message || "No se pudo eliminar el repuesto.",
       });
+      setDeleteModal((currentState) => ({ ...currentState, loading: false }));
+    }
+  };
+
+  const openPaymentModal = (row) => {
+    if (!accountsPayableEnabled) return;
+    const existingBankId = getValue(row, "bankAccountId", "");
+    const mainBank =
+      bankAccounts.find((bank) => bank.esPrincipal ?? bank.EsPrincipal) ||
+      bankAccounts[0];
+    const defaultBankId = existingBankId || mainBank?.id || mainBank?.Id || "";
+
+    setPaymentModal({
+      open: true,
+      row,
+      numeroFactura: String(getValue(row, "numeroFactura", "") || ""),
+      fecha: new Date().toISOString().slice(0, 10),
+      bankAccountId: String(defaultBankId || ""),
+      loading: false,
+    });
+  };
+
+  const closePaymentModal = () => {
+    if (paymentModal.loading) return;
+    setPaymentModal({
+      open: false,
+      row: null,
+      numeroFactura: "",
+      fecha: "",
+      bankAccountId: "",
+      loading: false,
+    });
+  };
+
+  const confirmPayment = async () => {
+    const row = paymentModal.row;
+    const id = getValue(row, "id");
+    const numeroFactura = paymentModal.numeroFactura.trim();
+
+    if (!row || paymentModal.loading) return;
+    if (!numeroFactura) {
+      setNotice({
+        type: "error",
+        text: "Indica factura o albaran antes de marcar como pagado.",
+      });
+      return;
+    }
+    if (!paymentModal.bankAccountId) {
+      setNotice({
+        type: "error",
+        text: "Selecciona el banco por el que se hace el pago.",
+      });
+      return;
+    }
+
+    try {
+      setPaymentModal((currentState) => ({ ...currentState, loading: true }));
+      setNotice(null);
+      await api.patch(`/RepuestoStock/${id}/pagado`, {
+        pagado: true,
+        numeroFactura,
+        fecha: paymentModal.fecha || null,
+        bankAccountId: Number(paymentModal.bankAccountId),
+      });
+      await loadInventory();
+      setPaymentModal({
+        open: false,
+        row: null,
+        numeroFactura: "",
+        fecha: "",
+        bankAccountId: "",
+        loading: false,
+      });
+      setNotice({
+        type: "success",
+        text: "Repuesto marcado como pagado y registrado en gastos.",
+      });
+    } catch (err) {
+      console.error(err);
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo marcar el repuesto como pagado.",
+      });
+      setPaymentModal((currentState) => ({ ...currentState, loading: false }));
     }
   };
 
@@ -569,7 +745,7 @@ export default function StockParts() {
 
       {tab === "inventory" ? (
         <>
-          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4">
             <MetricCard
               label="Unidades"
               value={qty.format(inventorySummary.unidades)}
@@ -583,6 +759,13 @@ export default function StockParts() {
               value={inventorySummary.stockBajo}
               danger={inventorySummary.stockBajo > 0}
             />
+            {accountsPayableEnabled && (
+              <MetricCard
+                label="Pendientes pago"
+                value={inventorySummary.pendientesPago}
+                danger={inventorySummary.pendientesPago > 0}
+              />
+            )}
           </section>
 
           <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
@@ -605,7 +788,7 @@ export default function StockParts() {
                 }
               />
               <Input
-                label="Nº Factura *"
+                label="Factura / albaran"
                 value={form.numeroFactura}
                 onChange={(v) => setForm((f) => ({ ...f, numeroFactura: v }))}
               />
@@ -727,7 +910,7 @@ export default function StockParts() {
                   />
                   <input
                     type="search"
-                    placeholder="Buscar factura, referencia, nombre, marca, categoria o proveedor..."
+                    placeholder="Buscar factura, albaran, referencia, nombre, marca, categoria o proveedor..."
                     value={inventorySearch}
                     onChange={(e) => {
                       setInventoryPage(1);
@@ -766,8 +949,9 @@ export default function StockParts() {
               <table className="w-full text-sm text-center">
                 <thead className="bg-slate-50 text-slate-600">
                   <tr>
+                    <th className="px-3 py-3">Fecha</th>
                     <th className="px-3 py-3">Referencia</th>
-                    <th className="px-3 py-3">Factura</th>
+                    <th className="px-3 py-3">Factura / Albaran</th>
                     <th className="px-3 py-3">Repuesto</th>
                     <th className="px-3 py-3">Marca</th>
                     <th className="px-3 py-3">Proveedor</th>
@@ -776,6 +960,9 @@ export default function StockParts() {
                     <th className="px-3 py-3">Compra</th>
                     <th className="px-3 py-3">Venta</th>
                     <th className="px-3 py-3">Ubicacion</th>
+                    {accountsPayableEnabled && (
+                      <th className="px-3 py-3">Pago</th>
+                    )}
                     <th className="px-3 py-3">Acciones</th>
                   </tr>
                 </thead>
@@ -785,6 +972,7 @@ export default function StockParts() {
                     const stockBajo = Boolean(
                       getValue(row, "stockBajo", false),
                     );
+                    const pagado = Boolean(getValue(row, "pagado", false));
 
                     return (
                       <tr
@@ -793,6 +981,9 @@ export default function StockParts() {
                           stockBajo ? "bg-amber-50/70" : "hover:bg-slate-50"
                         }
                       >
+                        <td className="px-3 py-3 text-slate-700">
+                          {formatDate(getValue(row, "fechaCreacion"))}
+                        </td>
                         <td className="px-3 py-3 font-semibold text-slate-800">
                           {getValue(row, "codigoReferencia", "-") || "-"}
                         </td>
@@ -825,6 +1016,24 @@ export default function StockParts() {
                         <td className="px-3 py-3">
                           {getValue(row, "ubicacion", "-") || "-"}
                         </td>
+                        {accountsPayableEnabled && (
+                          <td className="px-3 py-3">
+                            {pagado ? (
+                              <span className="inline-flex items-center justify-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
+                                Pagado
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openPaymentModal(row)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                              >
+                                <CheckCircle2 size={14} />
+                                Pagar
+                              </button>
+                            )}
+                          </td>
+                        )}
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap justify-center gap-2">
                             <button
@@ -866,7 +1075,7 @@ export default function StockParts() {
                   {!inventoryLoading && inventoryParts.length === 0 && (
                     <tr>
                       <td
-                        colSpan={11}
+                        colSpan={inventoryColumnCount}
                         className="py-8 text-center text-slate-500"
                       >
                         No hay repuestos para mostrar.
@@ -877,7 +1086,7 @@ export default function StockParts() {
                   {inventoryLoading && (
                     <tr>
                       <td
-                        colSpan={11}
+                        colSpan={inventoryColumnCount}
                         className="py-8 text-center text-slate-500"
                       >
                         Cargando inventario...
@@ -1197,7 +1406,267 @@ export default function StockParts() {
           </section>
         </>
       )}
+
+      <QuantityModal
+        open={quantityModal.open}
+        mode={quantityModal.mode}
+        value={quantityModal.value}
+        loading={quantityModal.loading}
+        partLabel={quantityModal.row ? getPartLabel(quantityModal.row) : ""}
+        onChange={(value) =>
+          setQuantityModal((current) => ({ ...current, value }))
+        }
+        onCancel={closeQuantityModal}
+        onConfirm={confirmQuantityUpdate}
+      />
+
+      <ConfirmModal
+        open={deleteModal.open}
+        title="Eliminar repuesto"
+        message={
+          deleteModal.row
+            ? `Eliminar ${getPartLabel(deleteModal.row)} del inventario?`
+            : ""
+        }
+        confirmLabel="Eliminar"
+        loading={deleteModal.loading}
+        onCancel={closeDeleteModal}
+        onConfirm={confirmDeletePart}
+      />
+
+      <PaymentModal
+        open={paymentModal.open}
+        numeroFactura={paymentModal.numeroFactura}
+        fecha={paymentModal.fecha}
+        bankAccountId={paymentModal.bankAccountId}
+        bankAccounts={bankAccounts}
+        loading={paymentModal.loading}
+        partLabel={paymentModal.row ? getPartLabel(paymentModal.row) : ""}
+        onChangeNumero={(numeroFactura) =>
+          setPaymentModal((current) => ({ ...current, numeroFactura }))
+        }
+        onChangeFecha={(fecha) =>
+          setPaymentModal((current) => ({ ...current, fecha }))
+        }
+        onChangeBank={(bankAccountId) =>
+          setPaymentModal((current) => ({ ...current, bankAccountId }))
+        }
+        onCancel={closePaymentModal}
+        onConfirm={confirmPayment}
+      />
     </>
+  );
+}
+
+function ConfirmModal({
+  open,
+  title,
+  message,
+  confirmLabel = "Confirmar",
+  loading = false,
+  onCancel,
+  onConfirm,
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-slate-900/45"
+        onClick={loading ? undefined : onCancel}
+      />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-rose-50 p-2 text-rose-600">
+            <Trash size={20} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+            <p className="mt-1 text-sm text-slate-600">{message}</p>
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onCancel}
+            className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onConfirm}
+            className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-rose-700 disabled:opacity-60"
+          >
+            {loading ? "Eliminando..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuantityModal({
+  open,
+  mode,
+  value,
+  loading,
+  partLabel,
+  onChange,
+  onCancel,
+  onConfirm,
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-slate-900/45"
+        onClick={loading ? undefined : onCancel}
+      />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
+        <h3 className="text-lg font-bold text-slate-900">
+          {mode === "set" ? "Actualizar stock" : "Aumentar inventario"}
+        </h3>
+        <p className="mt-1 text-sm text-slate-600">{partLabel}</p>
+        <label className="mt-4 flex flex-col gap-1 text-sm font-medium text-slate-700">
+          {mode === "set" ? "Nueva cantidad en stock" : "Cantidad a sumar o restar"}
+          <input
+            type="number"
+            step="0.01"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            autoFocus
+          />
+        </label>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onCancel}
+            className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onConfirm}
+            className="rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-900 disabled:opacity-60"
+          >
+            {loading ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaymentModal({
+  open,
+  numeroFactura,
+  fecha,
+  bankAccountId,
+  bankAccounts,
+  loading,
+  partLabel,
+  onChangeNumero,
+  onChangeFecha,
+  onChangeBank,
+  onCancel,
+  onConfirm,
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-slate-900/45"
+        onClick={loading ? undefined : onCancel}
+      />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-emerald-50 p-2 text-emerald-600">
+            <CheckCircle2 size={20} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Marcar como pagado</h3>
+            <p className="mt-1 text-sm text-slate-600">{partLabel}</p>
+          </div>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3">
+          <Input
+            label="Factura / albaran *"
+            value={numeroFactura}
+            onChange={onChangeNumero}
+          />
+          <Input
+            type="date"
+            label="Fecha"
+            value={fecha}
+            onChange={onChangeFecha}
+          />
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Banco *
+            <select
+              value={bankAccountId}
+              onChange={(event) => onChangeBank(event.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="">Selecciona banco</option>
+              {bankAccounts.map((bank) => {
+                const id = bank.id ?? bank.Id;
+                const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                const iban = bank.iban ?? bank.Iban ?? "";
+                return (
+                  <option key={id} value={id}>
+                    {iban ? `${name} - ${iban}` : name}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          {bankAccounts.length === 0 && (
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
+              No hay bancos activos configurados para este taller.
+            </p>
+          )}
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onCancel}
+            className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={loading || bankAccounts.length === 0}
+            onClick={onConfirm}
+            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+          >
+            {loading ? "Registrando..." : "Marcar pagado"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -28,6 +28,7 @@ const DEFAULT_TALLER = {
   enableSpecialInvoices: true,
   enableRapelInvoices: false,
   enableNoVatInvoices: false,
+  enableAccountsReceivable: false,
 };
 
 const EMPTY_ITEM = {
@@ -166,6 +167,9 @@ export default function SpecialPartsInvoice() {
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
 
   const isCredit = invoice.tipoPago === "Credito";
+  const accountsReceivableEnabled = Boolean(
+    taller.enableAccountsReceivable ?? taller.EnableAccountsReceivable ?? false,
+  );
   const moduleEnabled = invoiceMode.isRapel
     ? (taller.enableRapelInvoices ?? taller.EnableRapelInvoices ?? false)
     : invoiceMode.isNoVat
@@ -229,6 +233,10 @@ export default function SpecialPartsInvoice() {
             settings.enableRapelInvoices ?? settings.EnableRapelInvoices ?? false,
           enableNoVatInvoices:
             settings.enableNoVatInvoices ?? settings.EnableNoVatInvoices ?? false,
+          enableAccountsReceivable:
+            settings.enableAccountsReceivable ??
+            settings.EnableAccountsReceivable ??
+            DEFAULT_TALLER.enableAccountsReceivable,
         };
 
         const banksRes = await api.get("/WorkshopBankAccounts");
@@ -269,6 +277,11 @@ export default function SpecialPartsInvoice() {
       alive = false;
     };
   }, [invoiceMode.key]);
+
+  useEffect(() => {
+    if (accountsReceivableEnabled || !isCredit) return;
+    setInvoice((prev) => ({ ...prev, tipoPago: "Efectivo" }));
+  }, [accountsReceivableEnabled, isCredit]);
 
   useEffect(() => {
     const search = clientSearch.trim();
@@ -435,6 +448,9 @@ export default function SpecialPartsInvoice() {
     if (!isCredit && bankAccounts.length > 1 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
+    if (isCredit && !accountsReceivableEnabled) {
+      throw new Error("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+    }
     if (franchiseAmount > total) {
       throw new Error("La franquicia no puede superar el total de la factura.");
     }
@@ -460,7 +476,7 @@ export default function SpecialPartsInvoice() {
       observaciones: invoice.observaciones || null,
       tipoOperacion: invoiceMode.operationType,
       ivaPct: Number(invoice.ivaPct || 0),
-      tipoPago: invoice.tipoPago,
+      tipoPago: accountsReceivableEnabled ? invoice.tipoPago : "Efectivo",
       metodoPagoDetalle: isCredit ? "Pago a credito" : invoice.tipoPago,
       totalAbonado: isCredit || invoiceMode.isRapel ? 0 : companyPayable,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
@@ -744,7 +760,7 @@ export default function SpecialPartsInvoice() {
               onChange={(event) => setInvoiceField("tipoPago", event.target.value)}
               className={`${inputCls} mt-1 w-full`}
             >
-              {PAYMENT_OPTIONS.map((option) => (
+              {PAYMENT_OPTIONS.filter((option) => accountsReceivableEnabled || option.value !== "Credito").map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -833,6 +849,8 @@ export default function SpecialPartsInvoice() {
             tipoOperacion: invoiceMode.operationType,
             franquiciaImporte: franchiseAmount,
             clasificacionCliente: invoice.clasificacion,
+            totalAbonado: 0,
+            saldoPendiente: isCredit ? companyPayable : 0,
           }}
           items={printableItems}
           totals={totals}
@@ -847,6 +865,8 @@ export default function SpecialPartsInvoice() {
             tipoOperacion: invoiceMode.operationType,
             franquiciaImporte: franchiseAmount,
             clasificacionCliente: invoice.clasificacion,
+            totalAbonado: 0,
+            saldoPendiente: isCredit ? companyPayable : 0,
           }}
           items={printableItems}
           totals={totals}

@@ -18,8 +18,14 @@ import PartPicker, {
 import { amountInput } from "../utils/currency";
 
 const EMPTY_ITEM = {
+  codigo: "",
+  section: "ManoObra",
   descripcion: "",
   cantidad: 1,
+  tiempo: 1,
+  precioUnitario: 0,
+  descuentoPct: 0,
+  ivaPct: 21,
   importe: 0,
 };
 
@@ -51,6 +57,8 @@ const DEFAULT_TALLER = {
   logoUrl: "",
   documentTemplateKey: "",
   allowInvoiceClientEdit: false,
+  enableDetailedRepairInvoiceLines: false,
+  enableAccountsReceivable: false,
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -260,6 +268,14 @@ export default function WorkshopInvoice() {
           data.allowInvoiceClientEdit ??
           data.AllowInvoiceClientEdit ??
           DEFAULT_TALLER.allowInvoiceClientEdit,
+        enableDetailedRepairInvoiceLines:
+          data.enableDetailedRepairInvoiceLines ??
+          data.EnableDetailedRepairInvoiceLines ??
+          DEFAULT_TALLER.enableDetailedRepairInvoiceLines,
+        enableAccountsReceivable:
+          data.enableAccountsReceivable ??
+          data.EnableAccountsReceivable ??
+          DEFAULT_TALLER.enableAccountsReceivable,
       };
       setTaller(next);
       return next;
@@ -405,6 +421,7 @@ export default function WorkshopInvoice() {
   const companyPayable = useMemo(() => {
     return round2(Math.max(0, totalFinal - franchiseAmount));
   }, [totalFinal, franchiseAmount]);
+  const useDetailedRepairLines = Boolean(taller.enableDetailedRepairInvoiceLines);
 
   const selectedPaymentMethods = useMemo(
     () =>
@@ -435,6 +452,7 @@ export default function WorkshopInvoice() {
 
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
   const isCredit = invoice.tipoPago === "Credito";
+  const accountsReceivableEnabled = Boolean(taller.enableAccountsReceivable);
   const paymentDetailText = useMemo(() => {
     if (isCredit) return "Pago a credito";
     const selectedLabels = selectedPaymentMethods.map((method) => method.label).join(" / ");
@@ -464,6 +482,12 @@ export default function WorkshopInvoice() {
       fechaVencimiento: due.toISOString().slice(0, 10),
     }));
   }, [isCredit, invoice.fecha, invoice.plazoCreditoDias]);
+
+  useEffect(() => {
+    if (accountsReceivableEnabled || !isCredit) return;
+    setTipoPago("Efectivo");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountsReceivableEnabled, isCredit]);
 
   const setInvoiceField = (name, value) => {
     setInvoice((prev) => ({
@@ -518,6 +542,11 @@ export default function WorkshopInvoice() {
   };
 
   const setTipoPago = (tipoPago) => {
+    if (tipoPago === "Credito" && !accountsReceivableEnabled) {
+      setError("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+      return;
+    }
+
     setInvoice((prev) => ({
       ...prev,
       tipoPago,
@@ -546,17 +575,32 @@ export default function WorkshopInvoice() {
     setItems((prev) =>
       prev.map((item, i) =>
         i === index
-          ? {
-              ...item,
-              [name]: value,
-            }
+          ? normalizeInvoiceLineForTotals(
+              {
+                ...item,
+                [name]: value,
+              },
+              invoice.ivaPct,
+              useDetailedRepairLines,
+            )
           : item,
       ),
     );
   };
 
   const addItem = () => {
-    setItems((prev) => [...prev, { ...EMPTY_ITEM }]);
+    setItems((prev) => [
+      ...prev,
+      normalizeInvoiceLineForTotals(
+        {
+          ...EMPTY_ITEM,
+          section: invoice.tipoOperacion === "Chapa y pintura" ? "ManoObra" : "ManoObra",
+          ivaPct: invoice.ivaPct,
+        },
+        invoice.ivaPct,
+        useDetailedRepairLines,
+      ),
+    ]);
   };
 
   const addFrequentService = (descripcion) => {
@@ -566,6 +610,11 @@ export default function WorkshopInvoice() {
       {
         descripcion,
         cantidad: 1,
+        tiempo: 1,
+        precioUnitario: 0,
+        descuentoPct: 0,
+        ivaPct: invoice.ivaPct,
+        section: "ManoObra",
         importe: 0,
       },
     ]);
@@ -580,6 +629,11 @@ export default function WorkshopInvoice() {
       {
         descripcion,
         cantidad: 1,
+        tiempo: 1,
+        precioUnitario: getPartSalePrice(part).toFixed(2),
+        descuentoPct: 0,
+        ivaPct: invoice.ivaPct,
+        section: "Piezas",
         importe: getPartSalePrice(part).toFixed(2),
         kind: "repuesto",
         repuestoStockId: getPartId(part),
@@ -624,11 +678,19 @@ export default function WorkshopInvoice() {
   };
 
 const saveIssuedInvoice = async () => {
-  const billableItems = items.filter(
-    (item) =>
-      String(item.descripcion || "").trim() &&
-      round2(Number(item.cantidad || 0) * Number(item.importe || 0)) > 0,
-  );
+  const billableItems = items
+    .map((item) =>
+      normalizeInvoiceLineForTotals(
+        item,
+        invoice.ivaPct,
+        useDetailedRepairLines,
+      ),
+    )
+    .filter(
+      (item) =>
+        String(item.descripcion || item.codigo || "").trim() &&
+        round2(Number(item.cantidad || 0) * Number(item.importe || 0)) > 0,
+    );
 
   if (billableItems.length === 0) {
     throw new Error("La factura debe tener al menos una linea con importe mayor que 0.");
@@ -654,7 +716,7 @@ const saveIssuedInvoice = async () => {
     serie: taller.serieFactura || "A",
     observaciones: invoice.observaciones || null,
     tipoOperacion: invoice.tipoOperacion || "Mecanica",
-    tipoPago: invoice.tipoPago,
+    tipoPago: accountsReceivableEnabled ? invoice.tipoPago : "Efectivo",
     metodoPagoDetalle: paymentDetailText || null,
     totalAbonado: isCredit ? paymentTotal : companyPayable,
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
@@ -668,6 +730,10 @@ const saveIssuedInvoice = async () => {
 
 const printInvoice = async () => {
   try {
+    if (isCredit && !accountsReceivableEnabled) {
+      throw new Error("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+    }
+
     if (!isCredit && !hasPaymentMethods) {
       throw new Error("Selecciona al menos un metodo de pago.");
     }
@@ -751,6 +817,18 @@ const printInvoice = async () => {
         emittedInvoice.franquiciaImporte ??
         emittedInvoice.FranquiciaImporte ??
         prev.franquiciaImporte,
+      totalAbonado:
+        emittedInvoice.totalAbonado ??
+        emittedInvoice.TotalAbonado ??
+        (isCredit ? paymentTotal : companyPayable),
+      saldoPendiente:
+        emittedInvoice.saldoPendiente ??
+        emittedInvoice.SaldoPendiente ??
+        Math.max(0, paymentDifference),
+      leyendaPago:
+        emittedInvoice.leyendaPago ??
+        emittedInvoice.LeyendaPago ??
+        prev.leyendaPago,
       clasificacionCliente:
         emittedInvoice.clasificacionCliente ??
         emittedInvoice.ClasificacionCliente ??
@@ -1054,6 +1132,7 @@ const printInvoice = async () => {
               onBlur={(e) => setInvoiceField("otros", amountInput(e.target.value))}
             />
 
+
             <label className="block text-sm font-semibold text-slate-700">
               Tipo de pago
               <select
@@ -1061,8 +1140,10 @@ const printInvoice = async () => {
                 value={invoice.tipoPago}
                 onChange={(e) => setTipoPago(e.target.value)}
               >
-                <option value="Efectivo">Efectivo</option>
-                <option value="Credito">Credito</option>
+                <option value="Efectivo">Contado</option>
+                {accountsReceivableEnabled && (
+                  <option value="Credito">Credito</option>
+                )}
               </select>
             </label>
 
@@ -1116,6 +1197,12 @@ const printInvoice = async () => {
                 )}
               </div>
             </div>
+
+            {!isCredit && !hasPaymentMethods && (
+              <div className="mt-3 text-sm text-slate-500">
+                Por favor, selecciona un método de pago.
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {PAYMENT_METHODS.map((method) => {
@@ -1253,50 +1340,123 @@ const printInvoice = async () => {
         </div>
 
         <div className="space-y-3">
-          {items.map((item, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 md:grid-cols-[1fr_120px_160px_40px] gap-3"
-            >
-              <input
-                list="frequent-services"
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Descripcion"
-                value={item.descripcion}
-                onChange={(e) =>
-                  setItemField(index, "descripcion", e.target.value)
+          {items.map((item, index) => {
+            const lineTotal = getInvoiceLineTotal(item);
+            const qtyLabel = item.section === "Piezas" ? "Cantidad" : "Tiempo";
+
+            return (
+              <div
+                key={index}
+                className={
+                  useDetailedRepairLines
+                    ? "grid grid-cols-1 gap-3 xl:grid-cols-[90px_135px_1fr_110px_95px_80px_75px_105px_40px]"
+                    : "grid grid-cols-1 gap-3 md:grid-cols-[1fr_120px_160px_40px]"
                 }
-              />
-
-              <input
-                type="number"
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Cantidad"
-                value={item.cantidad}
-                onChange={(e) =>
-                  setItemField(index, "cantidad", e.target.value)
-                }
-              />
-
-              <input
-                type="number"
-                step="0.01"
-                className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Precio unitario"
-                value={item.importe}
-                onChange={(e) => setItemField(index, "importe", e.target.value)}
-                onBlur={(e) => setItemField(index, "importe", amountInput(e.target.value))}
-              />
-
-              <button
-                type="button"
-                onClick={() => removeItem(index)}
-                className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
               >
-                <Trash2 size={17} />
-              </button>
-            </div>
-          ))}
+                {useDetailedRepairLines && (
+                  <>
+                    <input
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="Codigo"
+                      value={item.codigo || ""}
+                      onChange={(e) => setItemField(index, "codigo", e.target.value)}
+                    />
+                    <select
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                      value={item.section || "ManoObra"}
+                      onChange={(e) => setItemField(index, "section", e.target.value)}
+                    >
+                      <option value="ManoObra">Mano obra</option>
+                      <option value="Piezas">
+                        {invoice.tipoOperacion === "Chapa y pintura" ? "Materiales" : "Piezas"}
+                      </option>
+                      {invoice.tipoOperacion === "Chapa y pintura" && (
+                        <option value="Pintura">Pintura</option>
+                      )}
+                    </select>
+                  </>
+                )}
+
+                <input
+                  list="frequent-services"
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Descripcion"
+                  value={item.descripcion}
+                  onChange={(e) =>
+                    setItemField(index, "descripcion", e.target.value)
+                  }
+                />
+
+                <input
+                  type="number"
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  placeholder={qtyLabel}
+                  value={useDetailedRepairLines ? getInvoiceLineQuantity(item) : item.cantidad}
+                  onChange={(e) =>
+                    setItemField(
+                      index,
+                      useDetailedRepairLines && item.section !== "Piezas" ? "tiempo" : "cantidad",
+                      e.target.value,
+                    )
+                  }
+                />
+
+                <input
+                  type="number"
+                  step="0.01"
+                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  placeholder={useDetailedRepairLines ? "Precio" : "Precio unitario"}
+                  value={useDetailedRepairLines ? item.precioUnitario ?? item.importe : item.importe}
+                  onChange={(e) =>
+                    setItemField(
+                      index,
+                      useDetailedRepairLines ? "precioUnitario" : "importe",
+                      e.target.value,
+                    )
+                  }
+                  onBlur={(e) =>
+                    setItemField(
+                      index,
+                      useDetailedRepairLines ? "precioUnitario" : "importe",
+                      amountInput(e.target.value),
+                    )
+                  }
+                />
+
+                {useDetailedRepairLines && (
+                  <>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="%DTO"
+                      value={item.descuentoPct ?? 0}
+                      onChange={(e) => setItemField(index, "descuentoPct", e.target.value)}
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="%IVA"
+                      value={item.ivaPct ?? invoice.ivaPct}
+                      onChange={(e) => setItemField(index, "ivaPct", e.target.value)}
+                    />
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-bold text-slate-700">
+                      {formatMoney(lineTotal)}
+                    </div>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => removeItem(index)}
+                  className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
+                >
+                  <Trash2 size={17} />
+                </button>
+              </div>
+            );
+          })}
         </div>
         <datalist id="frequent-services">
           {frequentServices.map((service) => (
@@ -1313,6 +1473,8 @@ const printInvoice = async () => {
             idOrdenTrabajo: id || "",
             marcaModelo: [order?.marca, order?.modelo].filter(Boolean).join(" "),
             franquiciaImporte: franchiseAmount,
+            totalAbonado: isCredit ? paymentTotal : companyPayable,
+            saldoPendiente: Math.max(0, paymentDifference),
             metodoPagoDetalle: paymentDetailText,
             bankAccountName: selectedBank?.nombre ?? selectedBank?.Nombre ?? "",
             bankAccountIban: selectedBank?.iban ?? selectedBank?.Iban ?? taller.iban,
@@ -1364,6 +1526,13 @@ const printInvoice = async () => {
 
                   <p className="font-bold">TIPO PAGO:</p>
                   <p>{isCredit ? "Pago a credito" : paymentDetailText || invoice.tipoPago}</p>
+
+                  {isCredit && paymentTotal > 0 && (
+                    <>
+                      <p className="font-bold">ABONO:</p>
+                      <p>Cliente abono {formatMoney(paymentTotal)}</p>
+                    </>
+                  )}
 
                   {isCredit && (
                     <>
@@ -1575,6 +1744,62 @@ function formatCustomerAddress(invoice) {
     .join(", ");
 }
 
+function getInvoiceLineSection(item) {
+  const raw = String(item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "")
+    .trim()
+    .toLowerCase();
+  if (raw.includes("pintura")) return "Pintura";
+  if (
+    raw.includes("pieza") ||
+    raw.includes("recambio") ||
+    raw.includes("repuesto") ||
+    raw.includes("material")
+  )
+    return "Piezas";
+  return "ManoObra";
+}
+
+function getInvoiceLineQuantity(item) {
+  const section = getInvoiceLineSection(item);
+  const value =
+    section === "Piezas"
+      ? item.cantidad ?? item.Cantidad
+      : item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad;
+  const number = Number(value || 0);
+  return number > 0 ? number : 1;
+}
+
+function getInvoiceLineTotal(item) {
+  return round2(Number(item.cantidad || 0) * Number(item.importe || 0));
+}
+
+function normalizeInvoiceLineForTotals(item, invoiceIvaPct = 21, detailed = false) {
+  if (!detailed) return item;
+
+  const section = getInvoiceLineSection(item);
+  const quantity = getInvoiceLineQuantity({ ...item, section });
+  const price = Number(
+    item.precioUnitario ?? item.PrecioUnitario ?? item.importe ?? item.Importe ?? 0,
+  );
+  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
+  const netTotal = round2(quantity * price * (1 - discount / 100));
+  const unitNet = quantity > 0 ? round2(netTotal / quantity) : 0;
+  const kind = section === "Piezas" ? "repuesto" : "labor";
+
+  return {
+    ...item,
+    codigo: item.codigo ?? item.Codigo ?? "",
+    section,
+    cantidad: quantity,
+    tiempo: section === "Piezas" ? item.tiempo ?? item.Tiempo ?? "" : quantity,
+    precioUnitario: round2(price),
+    descuentoPct: discount,
+    ivaPct: Number(item.ivaPct ?? item.IvaPct ?? invoiceIvaPct ?? 21),
+    importe: unitNet,
+    kind,
+  };
+}
+
 function parseOrderItems(itemsJson) {
   if (!itemsJson) return [];
 
@@ -1584,13 +1809,27 @@ function parseOrderItems(itemsJson) {
 
     return parsed
       .map((item) => ({
+        codigo: item.codigo ?? item.Codigo ?? "",
+        section: getInvoiceLineSection(item),
         descripcion: item.descripcion || item.Descripcion || "",
         cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
-        importe: Number(
+        tiempo: item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
+        precioUnitario: Number(
           item.precioUnitario ??
             item.PrecioUnitario ??
+            item.precio ??
+            item.Precio ??
             item.importe ??
             item.Importe ??
+            0,
+        ),
+        descuentoPct: Number(item.descuentoPct ?? item.DescuentoPct ?? 0),
+        ivaPct: Number(item.ivaPct ?? item.IvaPct ?? 21),
+        importe: Number(
+          item.importe ??
+            item.Importe ??
+            item.precioUnitario ??
+            item.PrecioUnitario ??
             0,
         ),
         kind: item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? null,
