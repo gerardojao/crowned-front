@@ -104,6 +104,14 @@ export default function PrintBudget() {
         manoObra: Number(p.manoObra ?? p.ManoObra ?? 0),
         estado: p.estado ?? p.Estado ?? "",
         observaciones: p.observaciones ?? p.Observaciones ?? "",
+        acceptanceSignatureBase64:
+        p.acceptanceSignatureBase64 ?? p.AcceptanceSignatureBase64 ?? "",
+
+        acceptanceSignatureDate:
+          p.acceptanceSignatureDate ?? p.AcceptanceSignatureDate ?? null,
+
+        isAccepted:
+          p.isAccepted ?? p.IsAccepted ?? false,
       });
     } catch (err) {
       console.error(err);
@@ -176,6 +184,10 @@ export default function PrintBudget() {
   const operationType = String(
     budget.tipoOperacion || "Mecanica",
   ).toUpperCase();
+
+  const acceptanceSignatureSrc = getSignatureSrc(
+  budget.acceptanceSignatureBase64,
+  );
 
   if (useMasterTouchTemplate) {
     return (
@@ -641,7 +653,15 @@ export default function PrintBudget() {
             <div className="budget-mt-sign">
               Acepto presupuesto con fecha {formatDateShort(budget.fecha)}
               <br />
-              Firma cliente
+              {acceptanceSignatureSrc ? (
+              <img
+                src={acceptanceSignatureSrc}
+                alt="Firma cliente"
+                className="mx-auto mt-1 h-8 max-w-[120px] object-contain"
+              />
+            ) : (
+              "Firma cliente"
+            )}
             </div>
           </section>
           <section className="budget-mt-tax">
@@ -832,9 +852,32 @@ export default function PrintBudget() {
               Firma {labels.businessSingular}
             </div>
 
-            <div className="border-t border-black pt-2 text-center">
+            {/* <div className="border-t border-black pt-2 text-center">
               Firma cliente / aceptacion
-            </div>
+            </div> */}
+            <div className="pt-2 text-center">
+              {acceptanceSignatureSrc ? (
+                <>
+                  <img
+                    src={acceptanceSignatureSrc}
+                    alt="Firma cliente"
+                    className="mx-auto h-20 max-w-xs object-contain"
+                  />
+                  <div className="mt-1 border-t border-black pt-2">
+                    Firma cliente / aceptación
+                  </div>
+                  {budget.acceptanceSignatureDate && (
+                    <p className="mt-1 text-xs">
+                      Firmado el {formatDateShort(budget.acceptanceSignatureDate)}
+                    </p>
+                  )}
+                    </>
+                  ) : (
+                    <div className="border-t border-black pt-2">
+                      Firma cliente / aceptación
+                    </div>
+                  )}
+                </div>
           </div>
 
           <div className="mt-8 border-t border-black pt-2 text-xs">
@@ -1027,4 +1070,15 @@ function formatDate(value) {
     month: "long",
     year: "numeric",
   });
+}
+
+function getSignatureSrc(value) {
+  if (!value) return "";
+  const signature = String(value).trim();
+
+  if (signature.startsWith("data:image")) {
+    return signature;
+  }
+
+  return `data:image/png;base64,${signature}`;
 }

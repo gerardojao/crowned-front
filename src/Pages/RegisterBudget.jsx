@@ -1,8 +1,17 @@
 ﻿import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
+import {
+  ArrowLeft,
+  FileSignature,
+  Search,
+  Trash2,
+  UserPlus,
+  Wrench,
+  X,
+} from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import SignatureModal from "../Components/SignatureModal";
 import PartPicker, {
   getPartDisplayName,
   getPartId,
@@ -123,6 +132,13 @@ export default function RegisterBudget() {
   const [budgetTotal, setBudgetTotal] = useState(0);
   const [frequentServices, setFrequentServices] = useState([]);
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
+  const [digitalSignaturesEnabled, setDigitalSignaturesEnabled] =
+    useState(false);
+  const [signatureModal, setSignatureModal] = useState({
+    open: false,
+    budget: null,
+    saving: false,
+  });
   const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
   const budgetPageSize = 10;
@@ -184,8 +200,12 @@ export default function RegisterBudget() {
       setOperationTypes(
         normalizeOperationTypes(data.operationTypes ?? data.OperationTypes),
       );
+      setDigitalSignaturesEnabled(
+        data.enableDigitalSignatures ?? data.EnableDigitalSignatures ?? false,
+      );
     } catch {
       setOperationTypes(["Mecanica"]);
+      setDigitalSignaturesEnabled(false);
     }
   };
 
@@ -370,6 +390,11 @@ export default function RegisterBudget() {
     Observaciones: x.observaciones ?? x.Observaciones ?? "",
     ConvertidoEnOrden: x.convertidoEnOrden ?? x.ConvertidoEnOrden ?? false,
     IdOrdenTrabajo: x.idOrdenTrabajo ?? x.IdOrdenTrabajo ?? null,
+    AcceptanceSignatureBase64:
+      x.acceptanceSignatureBase64 ?? x.AcceptanceSignatureBase64 ?? "",
+    AcceptanceSignatureDate:
+      x.acceptanceSignatureDate ?? x.AcceptanceSignatureDate ?? null,
+    IsAccepted: x.isAccepted ?? x.IsAccepted ?? false,
   });
 
   const parseDetailItems = (itemsJson) => {
@@ -1090,6 +1115,44 @@ export default function RegisterBudget() {
           err?.message ||
           "No se pudo convertir el presupuesto en orden.",
       );
+    }
+  };
+
+  const openSignatureModal = (p) => {
+    setError("");
+    setNotice("");
+    setSignatureModal({ open: true, budget: p, saving: false });
+  };
+
+  const closeSignatureModal = () => {
+    if (signatureModal.saving) return;
+    setSignatureModal({ open: false, budget: null, saving: false });
+  };
+
+  const saveAcceptanceSignature = async (signatureBase64) => {
+    const target = signatureModal.budget;
+    if (!target?.Id) return;
+
+    try {
+      setSignatureModal((current) => ({ ...current, saving: true }));
+      setError("");
+      setNotice("");
+
+      await api.put(`/Presupuesto/${target.Id}/acceptance-signature`, {
+        signatureBase64,
+      });
+
+      setNotice("Firma de aceptacion guardada correctamente.");
+      setSignatureModal({ open: false, budget: null, saving: false });
+      await loadBudgets();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo guardar la firma.",
+      );
+      setSignatureModal((current) => ({ ...current, saving: false }));
     }
   };
 
@@ -1858,6 +1921,18 @@ export default function RegisterBudget() {
             Cancelar
           </button>
         </div>
+
+        {/* //ojooooooooo
+        <SignatureModal
+            open={signatureModal.open}
+            title="Firma de aceptación del presupuesto"
+            description={`Firma la aceptación del presupuesto ${
+              signatureModal.budget?.NumeroPresupuesto || ""
+            }.`}
+            saving={signatureModal.saving}
+            onClose={closeSignatureModal}
+            onSave={saveAcceptanceSignature}
+          /> */}
           </>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center">
@@ -1997,6 +2072,23 @@ export default function RegisterBudget() {
                   </Link>
                 )}
 
+                {digitalSignaturesEnabled &&
+                  (p.AcceptanceSignatureBase64 || p.IsAccepted ? (
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+                      <FileSignature size={16} />
+                      Firmado
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => openSignatureModal(p)}
+                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-slate-700 text-white hover:bg-slate-800"
+                    >
+                      <FileSignature size={16} />
+                      Firmar aceptacion
+                    </button>
+                  ))}
+
                 <Link
                   to={`/print-budget/${p.Id}`}
                   // target="_blank"
@@ -2052,6 +2144,17 @@ export default function RegisterBudget() {
         </div>
         </section>
       )}
+    {/* ojoooo */}
+      <SignatureModal
+        open={signatureModal.open}
+        title="Firma de aceptación del presupuesto"
+        description={`Firma la aceptación del presupuesto ${
+          signatureModal.budget?.NumeroPresupuesto || ""
+        }.`}
+        saving={signatureModal.saving}
+        onClose={closeSignatureModal}
+        onSave={saveAcceptanceSignature}
+      />
     </>
   );
 }

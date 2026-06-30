@@ -8,10 +8,13 @@ import {
   Search,
   Trash2,
   X,
+  CheckCircle,
+  PenLine,
 } from "lucide-react";
 import api from "../Components/api";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
+import SignatureModal from "../Components/SignatureModal";
 
 const EMPTY_PRE_ORDER = {
   ClienteId: "",
@@ -108,6 +111,11 @@ function normalizePreOrder(row) {
     Estado: row.estado ?? row.Estado ?? "Pendiente",
     ConvertidaEnOrden: row.convertidaEnOrden ?? row.ConvertidaEnOrden ?? false,
     IdOrdenTrabajo: row.idOrdenTrabajo ?? row.IdOrdenTrabajo ?? null,
+    ClientSignatureBase64:
+      row.clientSignatureBase64 ?? row.ClientSignatureBase64 ?? "",
+
+    ClientSignatureDate:
+      row.clientSignatureDate ?? row.ClientSignatureDate ?? null,
   };
 }
 
@@ -220,6 +228,15 @@ export default function RegisterPreOrder() {
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [photoTarget, setPhotoTarget] = useState(null);
 
+  const [digitalSignaturesEnabled, setDigitalSignaturesEnabled] =
+    useState(false);
+
+  const [signatureModal, setSignatureModal] = useState({
+    open: false,
+    preOrder: null,
+    saving: false,
+  });
+
   const hasSelectedClient = Boolean(form.Cliente);
   const hasSelectedVehicle = Boolean(
     form.Matricula || form.Modelo || form.VehiculoId,
@@ -248,6 +265,11 @@ export default function RegisterPreOrder() {
           settings.enableReceptionPhotos ??
             settings.EnableReceptionPhotos ??
             true,
+        );
+        setDigitalSignaturesEnabled(
+          settings.enableDigitalSignatures ??
+            settings.EnableDigitalSignatures ??
+            false,
         );
         setOperationTypes(
           normalizeOperationTypes(
@@ -827,6 +849,59 @@ export default function RegisterPreOrder() {
     }
   };
 
+  const openSignatureModal = (preOrder) => {
+    setError("");
+    setNotice("");
+
+    setSignatureModal({
+      open: true,
+      preOrder,
+      saving: false,
+    });
+  };
+
+  const closeSignatureModal = () => {
+    if (signatureModal.saving) return;
+
+    setSignatureModal({
+      open: false,
+      preOrder: null,
+      saving: false,
+    });
+  };
+
+  const saveReceptionSignature = async (signatureBase64) => {
+    const target = signatureModal.preOrder;
+
+    if (!target?.Id) return;
+
+    try {
+      setSignatureModal((c) => ({ ...c, saving: true }));
+
+      ensureOk(
+        await api.put(`/PreOrdenTrabajo/${target.Id}/client-signature`, {
+          signatureBase64,
+        }),
+      );
+
+      setNotice("Recepción firmada correctamente.");
+
+      closeSignatureModal();
+
+      await loadPreOrders();
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo guardar la firma.",
+      );
+
+      setSignatureModal((c) => ({ ...c, saving: false }));
+    }
+  };
+
   return (
     <>
       {allowed === false ? (
@@ -1326,7 +1401,8 @@ export default function RegisterPreOrder() {
                         {[item.Marca, item.Modelo].filter(Boolean).join(" ")}
                       </p>
                     </div>
-                    <span
+
+                    {/* <span
                       className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${
                         item.ConvertidaEnOrden
                           ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
@@ -1334,7 +1410,36 @@ export default function RegisterPreOrder() {
                       }`}
                     >
                       {item.ConvertidaEnOrden ? "Convertida" : item.Estado}
-                    </span>
+                    </span> */}
+
+                    <div className="flex flex-col items-end gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-bold ring-1 ${
+                          item.ConvertidaEnOrden
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                            : "bg-amber-50 text-amber-700 ring-amber-200"
+                        }`}
+                      >
+                        {item.ConvertidaEnOrden ? "Convertida" : item.Estado}
+                      </span>
+
+                      {digitalSignaturesEnabled &&
+                        (item.ClientSignatureBase64 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                            <CheckCircle size={14} />
+                            Recepción firmada
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openSignatureModal(item)}
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100"
+                          >
+                            <PenLine size={14} />
+                            Firmar recepción
+                          </button>
+                        ))}
+                    </div>
                   </div>
 
                   <p className="mt-4 text-sm text-slate-700">
@@ -1453,6 +1558,15 @@ export default function RegisterPreOrder() {
           }}
         />
       )}
+
+      <SignatureModal
+        open={signatureModal.open}
+        title="Firma de recepción"
+        description="Solicite al cliente que firme la recepción del vehículo."
+        saving={signatureModal.saving}
+        onClose={closeSignatureModal}
+        onSave={saveReceptionSignature}
+      />
     </>
   );
 }
@@ -1521,4 +1635,3 @@ function Field({ label, children }) {
     </div>
   );
 }
-

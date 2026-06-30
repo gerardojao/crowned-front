@@ -62,12 +62,16 @@ function parseItems(itemsJson) {
           item.Nombre ||
           "",
         cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
-        tiempo: Number(item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1),
+        tiempo: Number(
+          item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
+        ),
         kind: String(
           item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "",
         ).toLowerCase(),
       }))
-      .filter((item) => normalizeText(item.descripcion) || normalizeText(item.codigo));
+      .filter(
+        (item) => normalizeText(item.descripcion) || normalizeText(item.codigo),
+      );
   } catch {
     return [];
   }
@@ -93,7 +97,15 @@ function buildFallbackItems(order) {
 }
 
 function normalizeLineSection(item) {
-  const raw = String(item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "")
+  const raw = String(
+    item.section ??
+      item.Section ??
+      item.kind ??
+      item.Kind ??
+      item.tipo ??
+      item.Tipo ??
+      "",
+  )
     .trim()
     .toLowerCase();
   if (raw.includes("pintura")) return "Pintura";
@@ -119,7 +131,10 @@ function isMaterial(item) {
 }
 
 function isLabor(item) {
-  if (normalizeLineSection(item) === "ManoObra" || normalizeLineSection(item) === "Pintura")
+  if (
+    normalizeLineSection(item) === "ManoObra" ||
+    normalizeLineSection(item) === "Pintura"
+  )
     return true;
   const kind = item.kind.toLowerCase();
   return kind.includes("labor") || kind.includes("mano");
@@ -217,7 +232,11 @@ export default function PrintWorkOrder() {
         observaciones: valueOf(data, "observaciones"),
         codigoPostal: valueOf(data, "codigoPostal"),
         poblacion: valueOf(data, "poblacion"),
-        provincia: valueOf(data, "provincia")
+        provincia: valueOf(data, "provincia"),
+        clientSignatureBase64: valueOf(data, "clientSignatureBase64"),
+        clientSignatureDate: valueOf(data, "clientSignatureDate"),
+        workshopSignatureBase64: valueOf(data, "workshopSignatureBase64"),
+        workshopSignatureDate: valueOf(data, "workshopSignatureDate"),
       });
     } catch (err) {
       console.error(err);
@@ -264,23 +283,25 @@ export default function PrintWorkOrder() {
   }
 
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
-  const title = isCustody
-      ? "RESGUARDO DE DEPOSITO"
-      : "ORDEN DE TRABAJO";
+  const title = isCustody ? "RESGUARDO DE DEPOSITO" : "ORDEN DE TRABAJO";
   const baseDocumentNumber = String(order.id || "").padStart(9, "0");
-  const documentNumber = isCustody ? `R-${baseDocumentNumber}` : baseDocumentNumber;
+  const documentNumber = isCustody
+    ? `R-${baseDocumentNumber}`
+    : baseDocumentNumber;
   const customerNumber = order.numeroCliente || order.idCliente || "-";
   const pageLabel = "Pag. 1";
   const operationType = String(order.tipoOperacion || "Mecanica").toUpperCase();
-  const isBodyPaintOperation = operationType.includes("CHAPA") || operationType.includes("PINTURA");
+  const isBodyPaintOperation =
+    operationType.includes("CHAPA") || operationType.includes("PINTURA");
   const materialGroupTitle = isBodyPaintOperation ? "Materiales" : "Piezas";
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
-  const actionTitle = isCustody
-      ? "Resguardo de deposito"
-      : "Orden de trabajo";
+  const actionTitle = isCustody ? "Resguardo de deposito" : "Orden de trabajo";
   const actionSubtitle = isCustody
-      ? "Emite el resguardo de depósito del vehículo recibido."
-      : "Registra trabajos, vehículo, estado y costes del servicio.";
+    ? "Emite el resguardo de depósito del vehículo recibido."
+    : "Registra trabajos, vehículo, estado y costes del servicio.";
+
+  const clientSignatureSrc = getSignatureSrc(order.clientSignatureBase64);
+  const workshopSignatureSrc = getSignatureSrc(order.workshopSignatureBase64);
 
   if (!useZagaTemplate) {
     return (
@@ -290,6 +311,7 @@ export default function PrintWorkOrder() {
       />
     );
   }
+
   return (
     <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <PrintActions
@@ -677,36 +699,34 @@ export default function PrintWorkOrder() {
           </div>
 
           <div>
-          
             <div className="wo-client-box text-left">
               <div className="wo-client-corners" />
-                  <strong>{order.cliente || "-"}</strong>
+              <strong>{order.cliente || "-"}</strong>
+              <br />
+              {order.direccion && (
+                <>
+                  {order.direccion}
                   <br />
-                  {order.direccion && (
-                    <>
-                      {order.direccion}
-                      <br />
-                    </>
-                  )}
-                  {order.codigoPostal && (
-                    <>
-                      {order.codigoPostal}-{order.poblacion}
-                      <br />
-                    </>
-                  )}
-                  {order.provincia && (
-                    <>
-                      {order.provincia}
-                      <br />
-                    </>
-                  )}
-                  {order.telefono && (
-                    <>
-                      {order.telefono}
-                      <br />
-                    </>
-                  )}
-           
+                </>
+              )}
+              {order.codigoPostal && (
+                <>
+                  {order.codigoPostal}-{order.poblacion}
+                  <br />
+                </>
+              )}
+              {order.provincia && (
+                <>
+                  {order.provincia}
+                  <br />
+                </>
+              )}
+              {order.telefono && (
+                <>
+                  {order.telefono}
+                  <br />
+                </>
+              )}
             </div>
 
             <div className="wo-page-label">{pageLabel}</div>
@@ -854,25 +874,87 @@ export default function PrintWorkOrder() {
         </section>
 
         <footer className="wo-footer">
+          {/* Recepción del vehículo */}
           <div className="wo-footer-cell">
-            <div>PENDIENTE CONFIGURAR</div>
-            <div className="wo-sign">Firma cliente</div>
-          </div>
-          <div className="wo-footer-cell">
-            <div>
-              AUTORIZO REPARACION DESCRITA. DESEO RECOGER PIEZAS SUSTITUIDAS: SI
-              NO
+            <div className="font-bold uppercase text-center">
+              RECEPCIÓN DEL VEHÍCULO
             </div>
-            <div className="wo-sign">Firma cliente</div>
+
+            <div className="wo-sign">
+              {clientSignatureSrc ? (
+                <>
+                  <img
+                    src={clientSignatureSrc}
+                    alt="Firma recepción cliente"
+                    className="mx-auto h-10 max-w-[120px] object-contain"
+                  />
+
+                  <div className="mt-1">Firma recepción cliente</div>
+
+                  {order.clientSignatureDate && (
+                    <div className="mt-1 text-[6px] normal-case">
+                      {formatDateTime(order.clientSignatureDate)}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="h-10" />
+                  <div className="mt-1">Pendiente de firma</div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Autorización */}
+          <div className="wo-footer-cell">
+            <div className="text-center">
+              AUTORIZO LA REPARACIÓN DESCRITA.
+              <br />
+              DESEO RECOGER PIEZAS SUSTITUIDAS: ☐ SÍ &nbsp;&nbsp; ☐ NO
+            </div>
+
+            <div className="wo-sign">
+              {clientSignatureSrc ? (
+                <>
+                  <img
+                    src={clientSignatureSrc}
+                    alt="Firma autorización cliente"
+                    className="mx-auto h-10 max-w-[120px] object-contain"
+                  />
+                  <div className="mt-1">Conformidad del cliente</div>
+                </>
+              ) : (
+                "Firma cliente"
+              )}
+            </div>
+
             <div className="wo-footer-head" style={{ marginTop: "9mm" }}>
               {isCustody
-                ? "Resguardo de deposito"
-                : "Acepto renuncia presupuesto"}
+                ? "RESGUARDO DE DEPÓSITO"
+                : "ACEPTO RENUNCIA PRESUPUESTO"}
             </div>
-            <div className="wo-sign">Firma taller</div>
+
+            <div className="wo-sign">
+              {workshopSignatureSrc ? (
+                <>
+                  <img
+                    src={workshopSignatureSrc}
+                    alt="Firma taller"
+                    className="mx-auto h-10 max-w-[120px] object-contain"
+                  />
+                  <div className="mt-1">Firma taller</div>
+                </>
+              ) : (
+                "Firma taller"
+              )}
+            </div>
           </div>
+
+          {/* Daños */}
           <div className="wo-footer-cell">
             <div>DAÑOS OBSERVADOS EN LA CARROCERÍA</div>
+
             <div className="wo-car-box">
               <img
                 src={vehicleDamageDiagram}
@@ -940,4 +1022,18 @@ function CrowerWorkOrderDocument({ order, workshopName }) {
       </div>
     </div>
   );
+}
+
+function getSignatureSrc(value) {
+  if (!value) return "";
+
+  const signature = String(value).trim();
+
+  if (!signature) return "";
+
+  if (signature.startsWith("data:image")) {
+    return signature;
+  }
+
+  return `data:image/png;base64,${signature}`;
 }
