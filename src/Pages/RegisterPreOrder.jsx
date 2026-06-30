@@ -1573,7 +1573,7 @@ export default function RegisterPreOrder() {
                   <div className="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                     <a
                       href={`/print-pre-order/${item.Id}`}
-                      target="_blank"
+                      // target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                     >
@@ -1618,7 +1618,7 @@ export default function RegisterPreOrder() {
                     {item.ConvertidaEnOrden && item.IdOrdenTrabajo && (
                       <Link
                         to={`/print-order/${item.IdOrdenTrabajo}`}
-                        target="_blank"
+                        //target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex justify-center rounded-xl bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
                       >

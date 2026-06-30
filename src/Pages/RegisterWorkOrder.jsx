@@ -2744,7 +2744,7 @@ export default function RegisterWorkOrder() {
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
                     <a
                       href={`/print-order/${o.Id}`}
-                      target="_blank"
+                      //target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
                     >
@@ -2760,7 +2760,7 @@ export default function RegisterWorkOrder() {
                                 ? `/print-pre-order/${o.PreOrdenId}`
                                 : "#"
                             }
-                            target="_blank"
+                            //target="_blank"
                             rel="noopener noreferrer"
                             onClick={(event) => {
                               if (!o.PreOrdenId) {
@@ -2778,7 +2778,7 @@ export default function RegisterWorkOrder() {
 
                         <a
                           href={`/print-order/${o.Id}?type=resguardo`}
-                          target="_blank"
+                          //target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-700 hover:bg-slate-800 text-sm font-medium text-white transition"
                         >
@@ -2811,7 +2811,7 @@ export default function RegisterWorkOrder() {
                     {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
                       <Link
                         to={`/workshop-invoice/${o.Id}`}
-                        target="_blank"
+                        //target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex justify-center rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
                       >
@@ -2825,7 +2825,7 @@ export default function RegisterWorkOrder() {
                       // </span>
                       <Link
                         to={`/reprint-invoice/order/${o.Id}`}
-                        target="_blank"
+                        //target="_blank"
                         rel="noopener noreferrer"
                         className="col-span-2 inline-flex justify-center rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition sm:col-span-1"
                       >

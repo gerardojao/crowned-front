@@ -95,6 +95,8 @@ export default function RegisterCustomer() {
   const labels = useBusinessTerminology();
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [customers, setCustomers] = useState([]);
+  const [viewMode, setViewMode] = useState("search");
+  const [includeVehicle, setIncludeVehicle] = useState(false);
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -207,6 +209,16 @@ export default function RegisterCustomer() {
     try {
       setSubmitting(true);
 
+      if (!editingId && includeVehicle) {
+        if (!String(customer.Matricula || "").trim() || !String(customer.Modelo || "").trim()) {
+          setNotice({
+            type: "error",
+            text: "Para registrar el coche indica matricula y modelo.",
+          });
+          return;
+        }
+      }
+
       const payload = {
         nombre: customer.Nombre,
         dni: customer.Dni || null,
@@ -217,17 +229,6 @@ export default function RegisterCustomer() {
         poblacion: customer.Poblacion || null,
         provincia: customer.Provincia || null,
         clasificacion: customer.Clasificacion || "Particular",
-        matricula: customer.Matricula,
-        bastidor: customer.Bastidor || null,
-        marca: customer.Marca || null,
-        modelo: customer.Modelo,
-        anio: customer.Anio ? Number(customer.Anio) : null,
-        fechaMatriculacion: customer.FechaMatriculacion || null,
-        motor: customer.Motor || null,
-        kw: customer.Kw ? Number(customer.Kw) : null,
-        cv: customer.Cv ? Number(customer.Cv) : null,
-        combustible: customer.Combustible || null,
-        kilometraje: customer.Kilometraje ? Number(customer.Kilometraje) : null,
         observaciones: customer.Observaciones || null,
       };
 
@@ -239,16 +240,34 @@ export default function RegisterCustomer() {
           text: "Cliente actualizado correctamente.",
         });
       } else {
+        if (includeVehicle) {
+          payload.matricula = customer.Matricula;
+          payload.bastidor = customer.Bastidor || null;
+          payload.marca = customer.Marca || null;
+          payload.modelo = customer.Modelo;
+          payload.anio = customer.Anio ? Number(customer.Anio) : null;
+          payload.fechaMatriculacion = customer.FechaMatriculacion || null;
+          payload.motor = customer.Motor || null;
+          payload.kw = customer.Kw ? Number(customer.Kw) : null;
+          payload.cv = customer.Cv ? Number(customer.Cv) : null;
+          payload.combustible = customer.Combustible || null;
+          payload.kilometraje = customer.Kilometraje ? Number(customer.Kilometraje) : null;
+        }
+
         await api.post("/Cliente", payload);
 
         setNotice({
           type: "success",
-          text: "Cliente registrado correctamente.",
+          text: includeVehicle
+            ? "Cliente registrado con coche correctamente."
+            : "Cliente registrado correctamente.",
         });
       }
       setCustomer(EMPTY_CUSTOMER);
       setEditingId(null);
       setVehicles([]);
+      setIncludeVehicle(false);
+      setViewMode("search");
       await loadCustomers();
     } catch (err) {
       console.error(err);
@@ -304,6 +323,8 @@ export default function RegisterCustomer() {
   const startEditCustomer = (c) => {
     const id = c.id ?? c.Id;
     setEditingId(id);
+    setViewMode("edit");
+    setIncludeVehicle(false);
     setCustomer({
       Id: id,
       Nombre: c.nombre ?? c.Nombre ?? "",
@@ -338,6 +359,26 @@ export default function RegisterCustomer() {
       top: 0,
       behavior: "smooth",
     });
+  };
+
+  const startCreateCustomer = () => {
+    setCustomer(EMPTY_CUSTOMER);
+    setEditingId(null);
+    setVehicles([]);
+    setIncludeVehicle(false);
+    setViewMode("create");
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
+
+  const startSearchCustomers = () => {
+    setViewMode("search");
+    setCustomer(EMPTY_CUSTOMER);
+    setEditingId(null);
+    setVehicles([]);
+    setIncludeVehicle(false);
   };
 
   const openVehicleCreate = () => {
@@ -496,6 +537,42 @@ export default function RegisterCustomer() {
         onClose={() => setNotice(null)}
       />
 
+      <div className="mb-5 inline-flex rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
+        <button
+          type="button"
+          onClick={startCreateCustomer}
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            viewMode === "create" || viewMode === "edit"
+              ? "bg-slate-800 text-white"
+              : "text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Registrar nuevo cliente
+        </button>
+        <button
+          type="button"
+          onClick={startSearchCustomers}
+          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            viewMode === "search"
+              ? "bg-slate-800 text-white"
+              : "text-slate-700 hover:bg-slate-50"
+          }`}
+        >
+          Buscar cliente
+        </button>
+      </div>
+
+       <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                <p className="text-sm font-semibold text-slate-700">
+                  Registra un nuevo cliente o selecciona uno ya registrado.
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Puedes agregarle un coche al cliente.
+                </p>
+              </div>
+
+      {(viewMode === "create" || viewMode === "edit") && (
+      <>
       {/* FORMULARIO */}
       <form
         onSubmit={onSubmit}
@@ -638,7 +715,30 @@ export default function RegisterCustomer() {
           </div>
         </div>
 
+        {!editingId && (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                {includeVehicle ? "Coche incluido en el registro" : "Registrar coche ahora"}
+              </p>
+              <p className="text-xs text-slate-500">
+                Puedes guardar solo el cliente y agregar coches despues.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIncludeVehicle((value) => !value)}
+              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              {includeVehicle
+                ? "Quitar coche del registro"
+                : "Agregar coche al cliente"}
+            </button>
+          </div>
+        )}
+
         {/* coche */}
+        {!editingId && includeVehicle && (
         <div>
           <h3 className="text-lg font-semibold text-slate-800 mb-4">
             {labels.assetHeader}
@@ -797,6 +897,7 @@ export default function RegisterCustomer() {
             </div>
           </div>
         </div>
+        )}
 
         {/* BOTONES */}
         <div className="flex items-center gap-3 pt-2">
@@ -805,7 +906,9 @@ export default function RegisterCustomer() {
               ? "Guardando..."
               : editingId
                 ? "Actualizar cliente"
-                : "Registrar cliente"}
+                : includeVehicle
+                  ? "Registrar cliente con coche"
+                  : "Registrar solo cliente"}
           </button>
 
           <button
@@ -814,10 +917,12 @@ export default function RegisterCustomer() {
               setCustomer(EMPTY_CUSTOMER);
               setEditingId(null);
               setVehicles([]);
+              setIncludeVehicle(false);
+              setViewMode("search");
             }}
             className="inline-flex items-center rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
           >
-            Limpiar
+            Cancelar
           </button>
         </div>
       </form>
@@ -902,8 +1007,11 @@ export default function RegisterCustomer() {
           )}
         </section>
       )}
+      </>
+      )}
 
       {/* LISTADO */}
+      {viewMode === "search" && (
       <div className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
           <h3 className="text-lg font-semibold text-slate-800">
@@ -926,10 +1034,9 @@ export default function RegisterCustomer() {
                 <th className="text-left py-3">Cliente</th>
                 <th className="text-left py-3">DNI/NIE</th>
                 <th className="text-left py-3">Teléfono</th>
-                <th className="text-left py-3">{labels.referenceLabel}</th>
-                <th className="text-left py-3">{labels.modelLabel}</th>
-                <th className="text-left py-3">{labels.metricLabel}</th>
-                <th className="text-left py-3"></th>
+                <th className="text-left py-3">Clasificacion</th>
+                <th className="text-left py-3">Coches registrados</th>
+                <th className="text-left py-3">Acciones</th>
               </tr>
             </thead>
 
@@ -939,9 +1046,16 @@ export default function RegisterCustomer() {
                 const nombre = c.nombre ?? c.Nombre;
                 const dni = c.dni ?? c.Dni;
                 const telefono = c.telefono ?? c.Telefono;
-                const matricula = c.matricula ?? c.Matricula;
-                const modelo = c.modelo ?? c.Modelo;
-                const kilometraje = c.kilometraje ?? c.Kilometraje;
+                const clasificacion =
+                  c.clasificacion ?? c.Clasificacion ?? "Particular";
+                const cochesRegistrados =
+                  c.vehiculosCount ??
+                  c.VehiculosCount ??
+                  c.cochesRegistrados ??
+                  c.CochesRegistrados ??
+                  c.vehiculos?.length ??
+                  c.Vehiculos?.length ??
+                  0;
 
                 return (
                   <tr
@@ -949,11 +1063,10 @@ export default function RegisterCustomer() {
                     className="border-b border-slate-100 hover:bg-slate-50"
                   >
                     <td className="py-3">{nombre}</td>
-                    <td className="py-3">{dni}</td>
-                    <td className="py-3">{telefono}</td>
-                    <td className="py-3">{matricula}</td>
-                    <td className="py-3">{modelo}</td>
-                    <td className="py-3">{kilometraje}</td>
+                    <td className="py-3">{dni || "-"}</td>
+                    <td className="py-3">{telefono || "-"}</td>
+                    <td className="py-3">{clasificacion}</td>
+                    <td className="py-3">{cochesRegistrados}</td>
 
                     <td className="py-3">
                       <div className="flex items-center gap-3">
@@ -1004,6 +1117,7 @@ export default function RegisterCustomer() {
           </button>
         </div>
       </div>
+      )}
       {deleteModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
