@@ -9,11 +9,22 @@ const MOVEMENT_TYPES = ["Ingreso", "Egreso"];
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// const pickPack = (res) => {
+//   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? {};
+//   return {
+//     items: Array.isArray(pack.items) ? pack.items : pack.Items || [],
+//     resumen: Array.isArray(pack.resumen) ? pack.resumen : pack.Resumen || [],
+//   };
+// };
 const pickPack = (res) => {
   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? {};
   return {
     items: Array.isArray(pack.items) ? pack.items : pack.Items || [],
     resumen: Array.isArray(pack.resumen) ? pack.resumen : pack.Resumen || [],
+    page: pack.page ?? pack.Page ?? 1,
+    pageSize: pack.pageSize ?? pack.PageSize ?? 20,
+    totalItems: pack.totalItems ?? pack.TotalItems ?? 0,
+    totalPages: pack.totalPages ?? pack.TotalPages ?? 1,
   };
 };
 
@@ -22,13 +33,18 @@ const dateOnly = (value) => {
   return new Date(value).toLocaleDateString("es-ES");
 };
 
-const defaultTypeForAccount = (account) => (account === "Proveedor" ? "Egreso" : "Ingreso");
+const defaultTypeForAccount = (account) =>
+  account === "Proveedor" ? "Egreso" : "Ingreso";
 
 export default function Ledger() {
   const [moduleEnabled, setModuleEnabled] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -47,18 +63,30 @@ export default function Ledger() {
     importe: "",
   });
 
+  const [searchFilter, setSearchFilter] = useState("");
+
   const load = async (filters = {}) => {
     try {
       setLoading(true);
       setError("");
-      const nextAccountFilter = Object.prototype.hasOwnProperty.call(filters, "accountFilter")
+      const nextAccountFilter = Object.prototype.hasOwnProperty.call(
+        filters,
+        "accountFilter",
+      )
         ? filters.accountFilter
         : accountFilter;
-      const nextBankFilter = Object.prototype.hasOwnProperty.call(filters, "bankFilter")
+      const nextBankFilter = Object.prototype.hasOwnProperty.call(
+        filters,
+        "bankFilter",
+      )
         ? filters.bankFilter
         : bankFilter;
-      const nextFrom = Object.prototype.hasOwnProperty.call(filters, "from") ? filters.from : from;
-      const nextTo = Object.prototype.hasOwnProperty.call(filters, "to") ? filters.to : to;
+      const nextFrom = Object.prototype.hasOwnProperty.call(filters, "from")
+        ? filters.from
+        : from;
+      const nextTo = Object.prototype.hasOwnProperty.call(filters, "to")
+        ? filters.to
+        : to;
 
       const settingsRes = await api.get("/WorkshopSettings");
       const settings = settingsRes?.data || {};
@@ -66,13 +94,22 @@ export default function Ledger() {
       setModuleEnabled(enabled);
       setSettingsLoaded(true);
 
+      const nextSearchFilter = Object.prototype.hasOwnProperty.call(filters, "searchFilter")
+      ? filters.searchFilter
+      : searchFilter;
+
+      const nextPage = filters.page ?? page;
+
       if (!enabled) {
         setItems([]);
         setSummary([]);
         return;
       }
 
-      const bankParam = nextAccountFilter === "Banco" && nextBankFilter ? Number(nextBankFilter) : null;
+      const bankParam =
+        nextAccountFilter === "Banco" && nextBankFilter
+          ? Number(nextBankFilter)
+          : null;
       const [itemsRes, summaryRes, banksRes] = await Promise.all([
         api.get("/Mayor", {
           params: {
@@ -80,6 +117,9 @@ export default function Ledger() {
             bankAccountId: bankParam,
             fechaInicio: nextFrom || null,
             fechaFin: nextTo || null,
+            busqueda: nextSearchFilter || null,
+            page: nextPage,
+            pageSize,
           },
         }),
         api.get("/Mayor", {
@@ -87,6 +127,7 @@ export default function Ledger() {
             bankAccountId: bankParam,
             fechaInicio: nextFrom || null,
             fechaFin: nextTo || null,
+            busqueda: nextSearchFilter || null,
           },
         }),
         api.get("/WorkshopBankAccounts"),
@@ -95,6 +136,9 @@ export default function Ledger() {
       const summaryPack = pickPack(summaryRes);
       setItems(itemsPack.items);
       setSummary(summaryPack.resumen);
+      setPage(itemsPack.page);
+      setTotalItems(itemsPack.totalItems);
+      setTotalPages(itemsPack.totalPages);
       setBankAccounts(Array.isArray(banksRes?.data) ? banksRes.data : []);
     } catch (err) {
       console.error(err);
@@ -186,7 +230,15 @@ export default function Ledger() {
     setBankFilter("");
     setFrom("");
     setTo("");
-    load({ accountFilter: "", bankFilter: "", from: "", to: "" });
+    setPage(1);
+    setSearchFilter("");
+    load({ 
+    accountFilter: "",
+    bankFilter: "",
+    from: "",
+    to: "",
+    searchFilter: "",
+    page: 1, });
   };
 
   return (
@@ -215,7 +267,7 @@ export default function Ledger() {
             </Link>
             <button
               type="button"
-              onClick={load}
+              onClick={() => load({ page: 1 })}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white hover:bg-slate-800"
             >
               <RefreshCw size={17} />
@@ -239,7 +291,9 @@ export default function Ledger() {
       {settingsLoaded && !moduleEnabled && (
         <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-amber-800">
           <p className="font-bold">Modulo desactivado</p>
-          <p className="mt-1 text-sm">Mayor no esta activo para el taller seleccionado.</p>
+          <p className="mt-1 text-sm">
+            Mayor no esta activo para el taller seleccionado.
+          </p>
         </div>
       )}
 
@@ -369,7 +423,8 @@ export default function Ledger() {
                         <option value="">Todos</option>
                         {bankAccounts.map((bank) => {
                           const id = bank.id ?? bank.Id;
-                          const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                          const name =
+                            bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
                           return (
                             <option key={id} value={id}>
                               {name}
@@ -397,6 +452,16 @@ export default function Ledger() {
                       className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                     />
                   </label>
+                  <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                      Buscar
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    placeholder="Factura, proveedor, cliente, ING-..., EGR-..."
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                  />
+                </label>
                   <button
                     type="button"
                     onClick={load}
@@ -415,14 +480,23 @@ export default function Ledger() {
               </section>
 
               <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">Resumen por cuenta</h3>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Resumen por cuenta
+                </h3>
                 <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
                   {ACCOUNTS.map((account) => {
-                    const row = summary.find((item) => (item.cuenta ?? item.Cuenta) === account);
+                    const row = summary.find(
+                      (item) => (item.cuenta ?? item.Cuenta) === account,
+                    );
                     return (
-                      <div key={account} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div
+                        key={account}
+                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                      >
                         <p className="font-bold text-slate-900">{account}</p>
-                        <p className="mt-2 text-xs font-bold uppercase text-slate-400">Saldo</p>
+                        <p className="mt-2 text-xs font-bold uppercase text-slate-400">
+                          Saldo
+                        </p>
                         <p className="text-xl font-extrabold text-slate-900">
                           {currency(row?.saldo ?? row?.Saldo)}
                         </p>
@@ -441,7 +515,9 @@ export default function Ledger() {
               </section>
 
               <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
-                <h3 className="text-lg font-bold text-slate-900">Movimientos</h3>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Movimientos
+                </h3>
 
                 {loading && (
                   <div className="mt-4 rounded-2xl border border-slate-200 p-6 text-center text-sm text-slate-500">
@@ -466,13 +542,19 @@ export default function Ledger() {
                         <th className="px-3 py-3 font-bold">Banco</th>
                         <th className="px-3 py-3 font-bold">Referencia</th>
                         <th className="px-3 py-3 font-bold">Descripcion</th>
-                        <th className="px-3 py-3 text-right font-bold">Importe</th>
+                        <th className="px-3 py-3 text-right font-bold">
+                          Importe
+                        </th>
                         <th className="px-3 py-3" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {items.map((item) => (
-                        <LedgerRow key={item.id ?? item.Id} item={item} onRemove={remove} />
+                        <LedgerRow
+                          key={item.id ?? item.Id}
+                          item={item}
+                          onRemove={remove}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -480,9 +562,41 @@ export default function Ledger() {
 
                 <div className="mt-4 space-y-3 md:hidden">
                   {items.map((item) => (
-                    <MobileMovement key={item.id ?? item.Id} item={item} onRemove={remove} />
+                    <MobileMovement
+                      key={item.id ?? item.Id}
+                      item={item}
+                      onRemove={remove}
+                    />
                   ))}
                 </div>
+                {!loading && totalItems > 0 && (
+                  <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-500">
+                      Mostrando {items.length} de {totalItems} movimientos.
+                      Página {page} de {totalPages}.
+                    </p>
+
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={page <= 1}
+                        onClick={() => load({ page: page - 1 })}
+                        className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Anterior
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={page >= totalPages}
+                        onClick={() => load({ page: page + 1 })}
+                        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           </section>
@@ -517,18 +631,28 @@ function LedgerRow({ item, onRemove }) {
   const canDelete = source === "Mayor";
   return (
     <tr className="hover:bg-slate-50">
-      <td className="px-3 py-3 text-slate-600">{dateOnly(item.fecha ?? item.Fecha)}</td>
+      <td className="px-3 py-3 text-slate-600">
+        {dateOnly(item.fecha ?? item.Fecha)}
+      </td>
       <td className="px-3 py-3 font-bold text-slate-900">{account}</td>
-      <td className="px-3 py-3"><TypeBadge type={type} /></td>
+      <td className="px-3 py-3">
+        <TypeBadge type={type} />
+      </td>
       <td className="px-3 py-3">
         <SourceBadge source={source} />
       </td>
       <td className="px-3 py-3 text-slate-600">
         {account === "Banco" ? bankName || "Sin banco asignado" : "-"}
       </td>
-      <td className="px-3 py-3 text-slate-700">{item.referencia ?? item.Referencia}</td>
-      <td className="px-3 py-3 text-slate-600">{item.descripcion ?? item.Descripcion ?? "-"}</td>
-      <td className={`px-3 py-3 text-right font-bold ${type === "Ingreso" ? "text-emerald-700" : "text-rose-700"}`}>
+      <td className="px-3 py-3 text-slate-700">
+        {item.referencia ?? item.Referencia}
+      </td>
+      <td className="px-3 py-3 text-slate-600">
+        {item.descripcion ?? item.Descripcion ?? "-"}
+      </td>
+      <td
+        className={`px-3 py-3 text-right font-bold ${type === "Ingreso" ? "text-emerald-700" : "text-rose-700"}`}
+      >
         {currency(item.importe ?? item.Importe)}
       </td>
       <td className="px-3 py-3 text-right">
@@ -562,7 +686,9 @@ function MobileMovement({ item, onRemove }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-bold text-slate-900">{account}</p>
-          <p className="text-sm text-slate-500">{dateOnly(item.fecha ?? item.Fecha)}</p>
+          <p className="text-sm text-slate-500">
+            {dateOnly(item.fecha ?? item.Fecha)}
+          </p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <TypeBadge type={type} />
@@ -570,14 +696,20 @@ function MobileMovement({ item, onRemove }) {
         </div>
       </div>
       <div className="mt-3 grid gap-2 text-sm">
-        <p className="font-semibold text-slate-800">{item.referencia ?? item.Referencia}</p>
+        <p className="font-semibold text-slate-800">
+          {item.referencia ?? item.Referencia}
+        </p>
         {account === "Banco" && (
           <p className="text-xs font-semibold text-slate-500">
             Banco: {bankName || "Sin banco asignado"}
           </p>
         )}
-        <p className="text-slate-600">{item.descripcion ?? item.Descripcion ?? "-"}</p>
-        <p className={`text-lg font-extrabold ${type === "Ingreso" ? "text-emerald-700" : "text-rose-700"}`}>
+        <p className="text-slate-600">
+          {item.descripcion ?? item.Descripcion ?? "-"}
+        </p>
+        <p
+          className={`text-lg font-extrabold ${type === "Ingreso" ? "text-emerald-700" : "text-rose-700"}`}
+        >
           {currency(item.importe ?? item.Importe)}
         </p>
       </div>
@@ -603,7 +735,9 @@ function SourceBadge({ source }) {
         ? "bg-amber-50 text-amber-700 ring-amber-200"
         : "bg-slate-100 text-slate-700 ring-slate-200";
   return (
-    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${classes}`}>
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${classes}`}
+    >
       {source}
     </span>
   );

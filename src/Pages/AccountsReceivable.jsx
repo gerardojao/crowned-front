@@ -126,15 +126,22 @@ export default function AccountsReceivable() {
   }, [estado]);
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const fecha = isoDate(item.fecha ?? item.Fecha);
-      if (from && (!fecha || fecha < from)) return false;
-      if (to && (!fecha || fecha > to)) return false;
-      if (!includesText(item.cliente ?? item.Cliente, clienteFilter)) return false;
-      if (!includesText(item.matricula ?? item.Matricula, matriculaFilter)) return false;
-      if (!includesText(item.numeroFactura ?? item.NumeroFactura, facturaFilter)) return false;
-      return true;
-    });
+    return items
+      .filter((item) => {
+        const fecha = isoDate(item.fecha ?? item.Fecha);
+        if (from && (!fecha || fecha < from)) return false;
+        if (to && (!fecha || fecha > to)) return false;
+        if (!includesText(item.cliente ?? item.Cliente, clienteFilter)) return false;
+        if (!includesText(item.matricula ?? item.Matricula, matriculaFilter)) return false;
+        if (!includesText(item.numeroFactura ?? item.NumeroFactura, facturaFilter)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const fechaA = new Date(a.fecha ?? a.Fecha ?? 0).getTime();
+        const fechaB = new Date(b.fecha ?? b.Fecha ?? 0).getTime();
+        if (fechaA !== fechaB) return fechaB - fechaA;
+        return Number(b.id ?? b.Id ?? 0) - Number(a.id ?? a.Id ?? 0);
+      });
   }, [items, from, to, clienteFilter, matriculaFilter, facturaFilter]);
 
   const summary = useMemo(() => {

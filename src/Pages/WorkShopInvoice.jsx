@@ -142,10 +142,16 @@ export default function WorkshopInvoice() {
 
   const normalizeOrder = (o) => ({
     id: o.id ?? o.Id,
+    idCliente: o.idCliente ?? o.IdCliente ?? o.numeroCliente ?? o.NumeroCliente ?? "",
+    numeroCliente: o.numeroCliente ?? o.NumeroCliente ?? o.idCliente ?? o.IdCliente ?? "",
     cliente: o.cliente ?? o.Cliente ?? "",
     dni: o.dni ?? o.Dni ?? "",
     telefono: o.telefono ?? o.Telefono ?? "",
-    direccionCliente: o.direccionCliente ?? o.DireccionCliente ?? "",
+    direccionCliente:
+      o.direccionCliente ?? o.DireccionCliente ?? o.direccion ?? o.Direccion ?? "",
+    codigoPostal: o.codigoPostal ?? o.CodigoPostal ?? "",
+    poblacion: o.poblacion ?? o.Poblacion ?? "",
+    provincia: o.provincia ?? o.Provincia ?? "",
     matricula: o.matricula ?? o.Matricula ?? "",
     marca: o.marca ?? o.Marca ?? "",
     modelo: o.modelo ?? o.Modelo ?? "",
@@ -184,9 +190,11 @@ export default function WorkshopInvoice() {
           ? { matricula, page: 1, pageSize: 10 }
           : { search: cliente, page: 1, pageSize: 10 },
       });
-      const pack = res?.data?.data?.[0];
+      const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0];
       const customers = Array.isArray(pack?.items)
         ? pack.items.map(normalizeCustomer)
+        : Array.isArray(pack?.Items)
+          ? pack.Items.map(normalizeCustomer)
         : [];
 
       const exactMatch =
@@ -334,13 +342,14 @@ export default function WorkshopInvoice() {
       setInvoice((prev) => ({
         ...prev,
         numero: numeroFacturaPrev,
-        idCliente: customerForOrder?.id || "",
+        idCliente: o.idCliente || customerForOrder?.id || "",
+        numeroCliente: o.numeroCliente || o.idCliente || customerForOrder?.id || "",
         cliente: o.cliente,
         dni: o.dni,
         direccionCliente,
-        codigoPostalCliente: customerForOrder?.codigoPostal || "",
-        poblacionCliente: customerForOrder?.poblacion || "",
-        provinciaCliente: customerForOrder?.provincia || "",
+        codigoPostalCliente: o.codigoPostal || customerForOrder?.codigoPostal || "",
+        poblacionCliente: o.poblacion || customerForOrder?.poblacion || "",
+        provinciaCliente: o.provincia || customerForOrder?.provincia || "",
         clasificacionCliente: customerForOrder?.clasificacion || "Particular",
         franquiciaImporte: "",
         telefonoCliente: o.telefono,
@@ -1042,7 +1051,7 @@ const printInvoice = async () => {
                 setInvoiceField("direccionCliente", e.target.value)
               }
             />
-              <input
+            <input
               className={clientFieldsLocked ? lockedInputCls : inputCls}
               placeholder="Codigo postal"
               value={invoice.codigoPostalCliente}
@@ -1052,13 +1061,23 @@ const printInvoice = async () => {
               }
             />
 
-              <input
+            <input
               className={clientFieldsLocked ? lockedInputCls : inputCls}
-              placeholder="Codigo postal"
+              placeholder="Poblacion"
               value={invoice.poblacionCliente}
               readOnly={clientFieldsLocked}
               onChange={(e) =>
                 setInvoiceField("poblacionCliente", e.target.value)
+              }
+            />
+
+            <input
+              className={clientFieldsLocked ? lockedInputCls : inputCls}
+              placeholder="Provincia"
+              value={invoice.provinciaCliente}
+              readOnly={clientFieldsLocked}
+              onChange={(e) =>
+                setInvoiceField("provinciaCliente", e.target.value)
               }
             />
 

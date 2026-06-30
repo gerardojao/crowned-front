@@ -848,7 +848,7 @@ function downloadProfitAndLossExcel(report, filename) {
           </tr>
           <tr>
             <td className="net-label" colSpan="5">
-                {report.netResult > 0
+                ${report.netResult > 0
                     ? "Beneficio neto"
                     : report.netResult < 0
                         ? "Pérdida neta"
