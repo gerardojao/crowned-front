@@ -1214,8 +1214,8 @@ function FeatureSwitches({ values, onChange }) {
           onChange={(checked) => onChange("enableAccountsReceivable", checked)}
         />
         <Switch
-          label="Cuentas por pagar"
-          description="Habilita pagos de stock y registro automatico en gastos."
+          label="Stock / Inventario"
+          description="Activa inventario, pagos de stock y gastos automaticos. Si esta apagado, proveedores muestra solo Repuestos facturados."
           checked={values.enableAccountsPayable}
           onChange={(checked) => onChange("enableAccountsPayable", checked)}
         />

@@ -106,6 +106,7 @@ export default function Home() {
     enableDashboardBilling: false,
     enablePreOrders: false,
     enableAccountsReceivable: false,
+    enableAccountsPayable: false,
     enableLedger: false,
   });
   const [dashboardTotals, setDashboardTotals] = useState({
@@ -138,6 +139,7 @@ export default function Home() {
         enableDashboardBilling: false,
         enablePreOrders: false,
         enableAccountsReceivable: false,
+        enableAccountsPayable: false,
         enableLedger: false,
       });
       setDashboardTotals({ ingresos: 0, gastos: 0 });
@@ -237,6 +239,10 @@ export default function Home() {
             settings.EnablePreOrders ??
             true,
           enableAccountsReceivable,
+          enableAccountsPayable:
+            settings.enableAccountsPayable ??
+            settings.EnableAccountsPayable ??
+            false,
           enableLedger:
             settings.enableLedger ??
             settings.EnableLedger ??
@@ -267,6 +273,9 @@ export default function Home() {
     dashboardFeatures.enableDashboardBilling ||
     dashboardFeatures.enableAccountsReceivable;
   const preOrdersEnabled = useZagaDocuments && dashboardFeatures.enablePreOrders;
+  const stockAccessLabel = dashboardFeatures.enableAccountsPayable
+    ? labels.stockTitle
+    : "Repuestos facturados";
 
   return (
     <>
@@ -505,7 +514,7 @@ export default function Home() {
                       Ver proveedores <ArrowRight size={15} />
                     </Link>
                     <Link to="/stock-parts" className={actionLink}>
-                      {labels.stockTitle} <ArrowRight size={15} />
+                      {stockAccessLabel} <ArrowRight size={15} />
                     </Link>
                   </div>
                 </div>

@@ -115,6 +115,7 @@ export default function StockParts() {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [notice, setNotice] = useState(null);
   const [accountsPayableEnabled, setAccountsPayableEnabled] = useState(false);
+  const [stockModuleEnabled, setStockModuleEnabled] = useState(null);
 
   const [inventoryParts, setInventoryParts] = useState([]);
   const [inventorySearch, setInventorySearch] = useState("");
@@ -190,14 +191,18 @@ export default function StockParts() {
     try {
       const res = await api.get("/WorkshopSettings");
       const settings = res?.data || {};
-      setAccountsPayableEnabled(
+      const enabled =
         settings.enableAccountsPayable ??
           settings.EnableAccountsPayable ??
-          false,
-      );
+          false;
+      setAccountsPayableEnabled(enabled);
+      setStockModuleEnabled(enabled);
+      if (!enabled) setTab("billed");
     } catch (err) {
       console.error(err);
       setAccountsPayableEnabled(false);
+      setStockModuleEnabled(false);
+      setTab("billed");
     }
   };
 
@@ -274,15 +279,17 @@ export default function StockParts() {
   }, []);
 
   useEffect(() => {
+    if (stockModuleEnabled !== true) return;
     loadInventory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventorySearch, inventoryPage, showLowOnly]);
+  }, [stockModuleEnabled, inventorySearch, inventoryPage, showLowOnly]);
 
   useEffect(() => {
-    if (tab !== "billed") return;
+    if (stockModuleEnabled == null) return;
+    if (stockModuleEnabled && tab !== "billed") return;
     loadBilled();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, billedSearch, dateFrom, dateTo, billedPage]);
+  }, [stockModuleEnabled, tab, billedSearch, dateFrom, dateTo, billedPage]);
 
   const inventorySummary = useMemo(() => {
     return inventoryParts.reduce(
@@ -348,6 +355,7 @@ export default function StockParts() {
   const inventoryTotalPages = Math.max(1, Math.ceil(inventoryTotal / pageSize));
   const billedTotalPages = Math.max(1, Math.ceil(billedTotal / pageSize));
   const inventoryColumnCount = accountsPayableEnabled ? 13 : 12;
+  const isInventoryView = stockModuleEnabled === true && tab === "inventory";
 
   const resetPartForm = () => {
     setEditingPartId(null);
@@ -690,13 +698,13 @@ export default function StockParts() {
       <div className="mt-2 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            {tab === "billed"
+            {!isInventoryView
               ? "Ganancias por reparación"
               : "Stock de repuestos"}
           </h2>
 
           <p className="mt-1 text-sm text-slate-500">
-            {tab === "billed"
+            {!isInventoryView
               ? "Margen real por concepto vendido desde facturas emitidas."
               : "Inventario, stock mínimo y rentabilidad de repuestos facturados."}
           </p>
@@ -723,32 +731,34 @@ export default function StockParts() {
         </div>
       )}
 
-      <div className="mb-5 inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200">
-        <button
-          type="button"
-          onClick={() => setTab("inventory")}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-            tab === "inventory"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-600"
-          }`}
-        >
-          Inventario
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("billed")}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-            tab === "billed"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-600"
-          }`}
-        >
-          Facturados
-        </button>
-      </div>
+      {stockModuleEnabled && (
+        <div className="mb-5 inline-flex rounded-xl bg-slate-100 p-1 ring-1 ring-slate-200">
+          <button
+            type="button"
+            onClick={() => setTab("inventory")}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+              tab === "inventory"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600"
+            }`}
+          >
+            Inventario
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("billed")}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+              tab === "billed"
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-600"
+            }`}
+          >
+            Facturados
+          </button>
+        </div>
+      )}
 
-      {tab === "inventory" ? (
+      {isInventoryView ? (
         <>
           <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4">
             <MetricCard

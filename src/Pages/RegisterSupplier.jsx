@@ -600,8 +600,7 @@ export default function RegisterSupplier() {
             </p>
 
             <p className="mt-2 text-xs text-slate-500">
-              Esta acción ocultará el proveedor del sistema, pero no borrará
-              físicamente el registro de la base de datos.
+              Esta acción borrará el proveedor del sistema.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">

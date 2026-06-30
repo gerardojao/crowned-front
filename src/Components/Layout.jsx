@@ -181,6 +181,13 @@ export default function Layout({ children }) {
     activeWorkshop?.enableNoVatInvoices ??
     activeWorkshop?.EnableNoVatInvoices ??
     false;
+  const stockModuleEnabled =
+    activeWorkshop?.enableAccountsPayable ??
+    activeWorkshop?.EnableAccountsPayable ??
+    false;
+  const stockAccessLabel = stockModuleEnabled
+    ? labels.stockTitle
+    : "Repuestos facturados";
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
   };
@@ -683,7 +690,7 @@ export default function Layout({ children }) {
                         </span>
 
                         <span className="block text-xs text-white/90">
-                          {labels.stockTitle}
+                          {stockAccessLabel}
                         </span>
                       </span>
 
