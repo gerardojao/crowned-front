@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -59,7 +59,7 @@ const EMPTY_ORDER = {
 
 const states = [
   "Recibido",
-  "Diagnóstico",
+  "DiagnÃ³stico",
   "Reparando",
   "Esperando repuesto",
   "Listo",
@@ -87,7 +87,7 @@ const getStateStyles = (estado) => {
     case "Recibido":
       return "border-sky-300 bg-sky-50/40";
 
-    case "Diagnóstico":
+    case "DiagnÃ³stico":
       return "border-violet-300 bg-violet-50/40";
 
     case "Reparando":
@@ -111,7 +111,7 @@ const ensureOk = (res) => {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
     throw new Error(
-      data?.message || data?.Message || "La operación no se pudo completar.",
+      data?.message || data?.Message || "La operaciÃ³n no se pudo completar.",
     );
   }
   return data;
@@ -143,7 +143,7 @@ function openWhatsAppVehicleReady(order, businessName = "nuestro taller") {
   const phone = normalizeWhatsAppPhone(order.Telefono);
 
   if (!phone) {
-    alert("Este cliente no tiene teléfono registrado.");
+    alert("Este cliente no tiene telÃ©fono registrado.");
     return false;
   }
 
@@ -152,9 +152,9 @@ function openWhatsAppVehicleReady(order, businessName = "nuestro taller") {
   const marca = order.Marca || "";
   const modelo = order.Modelo || "";
 
-  const message = `Hola ${cliente}, le informamos desde ${businessName} que su vehículo${
-    matricula ? ` matrícula ${matricula}` : ""
-  }${marca || modelo ? ` (${marca} ${modelo})` : ""} ya está listo para retirar. Puede pasar por nuestras instalaciones cuando le resulte conveniente. ¡Gracias por confiar en nosotros!
+  const message = `Hola ${cliente}, le informamos desde ${businessName} que su vehÃ­culo${
+    matricula ? ` matrÃ­cula ${matricula}` : ""
+  }${marca || modelo ? ` (${marca} ${modelo})` : ""} ya estÃ¡ listo para retirar. Puede pasar por nuestras instalaciones cuando le resulte conveniente. Â¡Gracias por confiar en nosotros!
 
   ${businessName}`;
 
@@ -184,9 +184,9 @@ function buildReadyOrderAlertMessage(order, businessName = "nuestro taller") {
   const marca = order.Marca || "";
   const modelo = order.Modelo || "";
 
-  return `Hola ${cliente}, le informamos desde ${businessName} que su vehículo${
-    matricula ? ` matrícula ${matricula}` : ""
-  }${marca || modelo ? ` (${marca} ${modelo})` : ""} ya está listo para retirar. Puede pasar por nuestras instalaciones cuando le resulte conveniente. ¡Gracias por confiar en nosotros!
+  return `Hola ${cliente}, le informamos desde ${businessName} que su vehÃ­culo${
+    matricula ? ` matrÃ­cula ${matricula}` : ""
+  }${marca || modelo ? ` (${marca} ${modelo})` : ""} ya estÃ¡ listo para retirar. Puede pasar por nuestras instalaciones cuando le resulte conveniente. Â¡Gracias por confiar en nosotros!
 
   ${businessName}`;
 }
@@ -199,7 +199,7 @@ function saveReadyOrderAlert(order, businessName = "nuestro taller") {
     kind: "vehicle-ready",
     cliente: order.Cliente || "",
     telefono: order.Telefono || "",
-    mensaje: `Orden lista para retirar. Notifica a ${order.Cliente || "cliente"} que ya puede retirar su vehículo.`,
+    mensaje: `Orden lista para retirar. Notifica a ${order.Cliente || "cliente"} que ya puede retirar su vehÃ­culo.`,
     whatsappText: buildReadyOrderAlertMessage(order, businessName),
     fechaAviso: new Date().toISOString(),
   };
@@ -760,7 +760,7 @@ export default function RegisterWorkOrder() {
     if (order.ClienteId) {
       clearVehicleForQuickCreate();
       setQuickCreateNotice(
-        "Cliente seleccionado. Completa los datos del nuevo vehículo.",
+        "Cliente seleccionado. Completa los datos del nuevo vehÃ­culo.",
       );
     }
 
@@ -945,7 +945,7 @@ export default function RegisterWorkOrder() {
       return;
     }
     if (!payload.telefono?.trim()) {
-      setError("Indica el teléfono del cliente para registrarlo.");
+      setError("Indica el telÃ©fono del cliente para registrarlo.");
       return;
     }
     if (!payload.matricula?.trim()) {
@@ -1073,7 +1073,7 @@ export default function RegisterWorkOrder() {
       setError(
         err?.response?.data?.message ||
           err?.message ||
-          "No se pudieron cargar las órdenes.",
+          "No se pudieron cargar las Ã³rdenes.",
       );
     } finally {
       setLoadingOrders(false);
@@ -1145,7 +1145,7 @@ export default function RegisterWorkOrder() {
             tiempoEstimadoNumero > 0
               ? [
                   createDetailItem(
-                    diagnostico || motivo || "Trabajo mecánico",
+                    diagnostico || motivo || "Trabajo mecÃ¡nico",
                     tiempoEstimadoNumero,
                     0,
                     {
@@ -1511,7 +1511,7 @@ export default function RegisterWorkOrder() {
 
           <p className="mt-1 text-sm">
             Notificale a {readyWhatsappOrder.Cliente} que ya puede retirar su
-            vehículo.
+            vehÃ­culo.
           </p>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -1531,7 +1531,7 @@ export default function RegisterWorkOrder() {
               onClick={() => {
                 saveReadyOrderAlert(readyWhatsappOrder, workshopName);
                 setReadyWhatsappOrder(null);
-                setNotice("Notificación guardada en la campanita.");
+                setNotice("NotificaciÃ³n guardada en la campanita.");
               }}
               className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-green-700 ring-1 ring-green-200 hover:bg-green-100"
             >
@@ -1553,10 +1553,10 @@ export default function RegisterWorkOrder() {
           value={loadingOrders ? "..." : receivedOrdersCount}
         />
         <Metric
-          label="Órdenes totales"
+          label="Ã“rdenes totales"
           value={loadingOrders ? "..." : orderTotal}
         />
-        <Metric label="Página" value={`${orderPage}/${orderTotalPages}`} />
+        <Metric label="PÃ¡gina" value={`${orderPage}/${orderTotalPages}`} />
       </section>
 
       <form
@@ -1582,7 +1582,7 @@ export default function RegisterWorkOrder() {
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
                 className={`${cls} pl-10`}
-                placeholder="Nombre, teléfono, matrícula o modelo"
+                placeholder="Nombre, telÃ©fono, matrÃ­cula o modelo"
               />
 
               <Search
@@ -1634,12 +1634,12 @@ export default function RegisterWorkOrder() {
                     </span>
 
                     <span className="mt-1 block text-slate-600">
-                      {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
+                      {customer.Matricula || "Sin matrÃ­cula"} Â· {customer.Marca}{" "}
                       {customer.Modelo}
                     </span>
 
                     <span className="mt-1 block text-xs text-slate-500">
-                      {customer.Telefono || "Sin teléfono"}
+                      {customer.Telefono || "Sin telÃ©fono"}
                     </span>
                   </button>
                 ))}
@@ -1680,7 +1680,7 @@ export default function RegisterWorkOrder() {
                         {vehicle.Bastidor
                           ? `Bastidor ${vehicle.Bastidor}`
                           : "Sin bastidor"}{" "}
-                        ·{" "}
+                        Â·{" "}
                         {vehicle.Kilometraje
                           ? `${vehicle.Kilometraje} ${labels.metricLabel}`
                           : "Sin kilometraje"}
@@ -1748,213 +1748,6 @@ export default function RegisterWorkOrder() {
               )}
             </div>
           </div>
-
-          {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <input
-              name="Cliente"
-              value={order.Cliente}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Cliente *"
-              required
-            />
-
-            <input
-              name="Dni"
-              value={order.Dni}
-              onChange={handleChange}
-              className={cls}
-              placeholder="DNI/NIE"
-            />
-
-            <input
-              name="Telefono"
-              value={order.Telefono}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Teléfono"
-            />
-
-            <input
-              name="Direccion"
-              value={order.Direccion}
-              onChange={handleChange}
-              className={`${cls} md:col-span-2`}
-              placeholder="Dirección del cliente"
-            />
-            <input
-              name="CodigoPostal"
-              value={order.CodigoPostal}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Codigo postal"
-            />
-            <input
-              name="Poblacion"
-              value={order.Poblacion}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Poblacion"
-            />
-            <input
-              name="Provincia"
-              value={order.Provincia}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Provincia"
-            />
-            <select
-              name="Clasificacion"
-              value={order.Clasificacion}
-              onChange={handleChange}
-              className={cls}
-            >
-              <option value="Particular">Particular</option>
-              <option value="Empresa">Empresa</option>
-              <option value="Compania de seguro">Compania de seguro</option>
-            </select>
-
-            <input
-              name="Matricula"
-              value={order.Matricula}
-              onChange={handleChange}
-              className={cls}
-              placeholder={labels.referencePlaceholder}
-              required
-            />
-
-            <input
-              name="Kilometraje"
-              type="number"
-              value={order.Kilometraje}
-              onChange={handleChange}
-              className={cls}
-              placeholder={labels.metricPlaceholder}
-            />
-
-            <input
-              name="Marca"
-              value={order.Marca}
-              onChange={handleChange}
-              className={cls}
-              placeholder={labels.makeLabel}
-            />
-
-            <input
-              name="Bastidor"
-              value={order.Bastidor}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Bastidor"
-            />
-
-            <input
-              name="Modelo"
-              value={order.Modelo}
-              onChange={handleChange}
-              className={cls}
-              placeholder={`${labels.modelLabel} *`}
-              required
-            />
-
-            <input
-              name="FechaMatriculacion"
-              type="date"
-              value={order.FechaMatriculacion}
-              onChange={handleChange}
-              className={cls}
-              title="Fecha matriculación"
-            />
-            <input
-              name="Motor"
-              value={order.Motor}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Motor"
-            />
-            <input
-              name="Kw"
-              type="number"
-              step="0.01"
-              value={order.Kw}
-              onChange={handleChange}
-              className={cls}
-              placeholder="KW"
-            />
-            <input
-              name="Cv"
-              type="number"
-              step="0.01"
-              value={order.Cv}
-              onChange={handleChange}
-              className={cls}
-              placeholder="CV"
-            />
-            <input
-              name="Combustible"
-              value={order.Combustible}
-              onChange={handleChange}
-              className={cls}
-              placeholder="Combustible"
-            />
-
-            <input
-              name="Fecha"
-              type="date"
-              value={order.Fecha}
-              onChange={handleChange}
-              className={cls}
-            />
-
-            <input
-              name="FechaPrevistaEntrega"
-              type="date"
-              value={order.FechaPrevistaEntrega}
-              onChange={handleChange}
-              className={cls}
-              aria-label="Fecha prevista de entrega"
-              title="Fecha prevista de entrega"
-            />
-
-            <input
-              name="TiempoEstimadoHoras"
-              type="number"
-              min="0"
-              step="0.25"
-              value={order.TiempoEstimadoHoras}
-              onChange={handleChange}
-              className={cls}
-              aria-label="Tiempo estimado en horas"
-              placeholder="Tiempo estimado horas"
-            />
-
-            <select
-              name="TipoOperacion"
-              value={order.TipoOperacion}
-              onChange={handleChange}
-              className={cls}
-            >
-              {operationTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
-
-            <select
-              name="Estado"
-              value={order.Estado}
-              onChange={handleChange}
-              className={cls}
-            >
-              {states.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </div> */}
-
           {shouldShowOrderForm ? (
             <div className="space-y-5">
               <FormSection title="Cliente">
@@ -1980,7 +1773,7 @@ export default function RegisterWorkOrder() {
                   value={order.Telefono}
                   onChange={handleChange}
                   className={cls}
-                  placeholder="Teléfono"
+                  placeholder="TelÃ©fono"
                 />
 
                 <select
@@ -1991,7 +1784,7 @@ export default function RegisterWorkOrder() {
                 >
                   <option value="Particular">Particular</option>
                   <option value="Empresa">Empresa</option>
-                  <option value="Compania de seguro">Compañía de seguro</option>
+                  <option value="Compania de seguro">CompaÃ±Ã­a de seguro</option>
                 </select>
 
                 <input
@@ -1999,7 +1792,7 @@ export default function RegisterWorkOrder() {
                   value={order.Direccion}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm md:col-span-2"
-                  placeholder="Dirección del cliente"
+                  placeholder="DirecciÃ³n del cliente"
                 />
 
                 <input
@@ -2007,7 +1800,7 @@ export default function RegisterWorkOrder() {
                   value={order.CodigoPostal}
                   onChange={handleChange}
                   className={cls}
-                  placeholder="Código postal"
+                  placeholder="CÃ³digo postal"
                 />
 
                 <input
@@ -2015,7 +1808,7 @@ export default function RegisterWorkOrder() {
                   value={order.Poblacion}
                   onChange={handleChange}
                   className={cls}
-                  placeholder="Población"
+                  placeholder="PoblaciÃ³n"
                 />
 
                 <input
@@ -2027,7 +1820,7 @@ export default function RegisterWorkOrder() {
                 />
               </FormSection>
 
-              <FormSection title="Vehículo">
+              <FormSection title="VehÃ­culo">
                 <input
                   name="Matricula"
                   value={order.Matricula}
@@ -2062,7 +1855,7 @@ export default function RegisterWorkOrder() {
                   placeholder="Bastidor"
                 />
 
-                <Field label="Fecha matriculación">
+                <Field label="Fecha matriculaciÃ³n">
                   <input
                     name="FechaMatriculacion"
                     type="date"
@@ -2118,8 +1911,8 @@ export default function RegisterWorkOrder() {
                 />
               </FormSection>
 
-              <FormSection title="Recepción">
-                <Field label="Fecha recepción">
+              <FormSection title="RecepciÃ³n">
+                <Field label="Fecha recepciÃ³n">
                   <input
                     name="Fecha"
                     type="date"
@@ -2184,7 +1977,7 @@ export default function RegisterWorkOrder() {
                 orden.
               </p>
               <p className="mt-1 text-sm text-slate-500">
-                Cuando selecciones el vehículo, aparecerán los datos necesarios
+                Cuando selecciones el vehÃ­culo, aparecerÃ¡n los datos necesarios
                 para completar el trabajo y los costes.
               </p>
             </div>
@@ -2497,7 +2290,7 @@ export default function RegisterWorkOrder() {
                           type="button"
                           onClick={() => removeDetailItem(item.id)}
                           className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
-                          aria-label="Eliminar línea"
+                          aria-label="Eliminar lÃ­nea"
                         >
                           <Trash2 size={16} />
                         </button>
@@ -2555,7 +2348,7 @@ export default function RegisterWorkOrder() {
           }}
           className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
         >
-          {showOrders ? "Ocultar órdenes" : "Ver órdenes"}
+          {showOrders ? "Ocultar Ã³rdenes" : "Ver Ã³rdenes"}
         </button>
       </div>
 
@@ -2567,11 +2360,11 @@ export default function RegisterWorkOrder() {
           <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,320px)_auto_auto_auto] md:items-end">
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-slate-800">
-                Órdenes recientes
+                Ã“rdenes recientes
               </h3>
 
               <p className="text-sm text-slate-500 mt-1">
-                Busca rápidamente una orden por matrícula.
+                Busca rÃ¡pidamente una orden por matrÃ­cula.
               </p>
             </div>
 
@@ -2614,7 +2407,7 @@ export default function RegisterWorkOrder() {
           <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
             {loadingOrders && (
               <div className="rounded-2xl border border-slate-200 bg-white p-4 text-center text-sm text-slate-500">
-                Cargando órdenes...
+                Cargando Ã³rdenes...
               </div>
             )}
 
@@ -2655,10 +2448,6 @@ export default function RegisterWorkOrder() {
                             item.Id === o.Id ? updatedOrder : item,
                           ),
                         );
-
-                        console.log("whatsappEnabled:", whatsappEnabled);
-                        console.log("estadoAnterior:", estadoAnterior);
-                        console.log("nuevoEstado:", nuevoEstado);
 
                         if (
                           whatsappEnabled &&
@@ -2743,8 +2532,7 @@ export default function RegisterWorkOrder() {
 
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-end">
                     <a
-                      href={`/print-order/${o.Id}`}
-                      //target="_blank"
+                      href={`/print-order/${o.Id}?print=1`}
                       rel="noopener noreferrer"
                       className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
                     >
@@ -2760,7 +2548,6 @@ export default function RegisterWorkOrder() {
                                 ? `/print-pre-order/${o.PreOrdenId}`
                                 : "#"
                             }
-                            //target="_blank"
                             rel="noopener noreferrer"
                             onClick={(event) => {
                               if (!o.PreOrdenId) {
@@ -2777,8 +2564,7 @@ export default function RegisterWorkOrder() {
                         )}
 
                         <a
-                          href={`/print-order/${o.Id}?type=resguardo`}
-                          //target="_blank"
+                          href={`/print-order/${o.Id}?type=resguardo&print=1`}
                           rel="noopener noreferrer"
                           className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-700 hover:bg-slate-800 text-sm font-medium text-white transition"
                         >
@@ -2811,7 +2597,6 @@ export default function RegisterWorkOrder() {
                     {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
                       <Link
                         to={`/workshop-invoice/${o.Id}`}
-                        //target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex justify-center rounded-xl px-3 py-2 bg-orange-600 hover:bg-orange-700 text-sm font-medium text-white transition"
                       >
@@ -2820,12 +2605,8 @@ export default function RegisterWorkOrder() {
                     )}
 
                     {(o.Facturada || o.facturada) && (
-                      // <span className="rounded-xl px-3 py-2 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium">
-                      //   Orden facturada
-                      // </span>
                       <Link
                         to={`/reprint-invoice/order/${o.Id}`}
-                        //target="_blank"
                         rel="noopener noreferrer"
                         className="col-span-2 inline-flex justify-center rounded-xl px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white transition sm:col-span-1"
                       >
@@ -2845,14 +2626,14 @@ export default function RegisterWorkOrder() {
 
                 <h4 className="mt-4 text-lg font-semibold text-slate-800">
                   {plateSearch || dateFrom || dateTo
-                    ? "No se encontraron órdenes"
-                    : "No hay órdenes registradas"}
+                    ? "No se encontraron Ã³rdenes"
+                    : "No hay Ã³rdenes registradas"}
                 </h4>
 
                 <p className="mt-2 text-sm text-slate-500">
                   {plateSearch
-                    ? "Prueba buscando otra matrícula."
-                    : "Las nuevas órdenes aparecerán aquí automáticamente."}
+                    ? "Prueba buscando otra matrÃ­cula."
+                    : "Las nuevas Ã³rdenes aparecerÃ¡n aquÃ­ automÃ¡ticamente."}
                 </p>
               </div>
             )}
@@ -2868,7 +2649,7 @@ export default function RegisterWorkOrder() {
               Anterior
             </button>
             <span className="text-center text-slate-600">
-              Página {orderPage} de {orderTotalPages} · {orderTotal} órdenes
+              PÃ¡gina {orderPage} de {orderTotalPages} Â· {orderTotal} Ã³rdenes
             </span>
             <button
               type="button"
@@ -2887,7 +2668,7 @@ export default function RegisterWorkOrder() {
           open={!!photoTarget}
           onClose={() => setPhotoTarget(null)}
           orderId={photoTarget.Id}
-          title="Fotos de recepción"
+          title="Fotos de recepciÃ³n"
           subtitle={`${photoTarget.Matricula || ""} - ${photoTarget.Cliente || ""}`}
           canUpload={false}
           context={{
@@ -3030,3 +2811,4 @@ function Field({ label, children }) {
     </div>
   );
 }
+

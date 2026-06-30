@@ -68,6 +68,8 @@ export default function AccountsReceivable() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [abonos, setAbonos] = useState({});
+  const [abonoBanks, setAbonoBanks] = useState({});
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [moduleEnabled, setModuleEnabled] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [from, setFrom] = useState("");
@@ -91,13 +93,18 @@ export default function AccountsReceivable() {
 
       if (!enabled) {
         setItems([]);
+        setBankAccounts([]);
         return;
       }
 
-      const res = await api.get("/FacturaEmitida/cxc", {
-        params: estado === "Todas" ? {} : { estado },
-      });
+      const [res, banksRes] = await Promise.all([
+        api.get("/FacturaEmitida/cxc", {
+          params: estado === "Todas" ? {} : { estado },
+        }),
+        api.get("/WorkshopBankAccounts"),
+      ]);
       setItems(pickItems(res));
+      setBankAccounts(Array.isArray(banksRes?.data) ? banksRes.data : []);
     } catch (err) {
       console.error(err);
       setError(
@@ -168,6 +175,10 @@ export default function AccountsReceivable() {
     setAbonos((prev) => ({ ...prev, [id]: value }));
   };
 
+  const setAbonoBank = (id, value) => {
+    setAbonoBanks((prev) => ({ ...prev, [id]: value }));
+  };
+
   const registrarAbono = async (factura) => {
     const id = factura.id ?? factura.Id;
     const importe = Number(abonos[id] || 0);
@@ -176,15 +187,26 @@ export default function AccountsReceivable() {
       return;
     }
 
+    const bankAccountId = abonoBanks[id];
+    if (!bankAccountId) {
+      setError("Selecciona el banco donde entra el abono.");
+      return;
+    }
+
     try {
       setError("");
       setNotice("");
-      const res = await api.put(`/FacturaEmitida/${id}/abono`, { importe });
+      const res = await api.put(`/FacturaEmitida/${id}/abono`, {
+        importe,
+        metodoPago: "Transferencia",
+        bankAccountId: Number(bankAccountId),
+      });
       if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
         throw new Error(res?.data?.message || res?.data?.Message);
       }
       setNotice("Abono registrado correctamente.");
       setAbonos((prev) => ({ ...prev, [id]: "" }));
+      setAbonoBanks((prev) => ({ ...prev, [id]: "" }));
       await load();
     } catch (err) {
       console.error(err);
@@ -374,7 +396,7 @@ export default function AccountsReceivable() {
 
         <div className="hidden overflow-hidden rounded-2xl border border-slate-200 md:block">
           <table className="min-w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
+            <thead className="bg-slate-50 text-center  text-slate-600">
               <tr>
                 <th className="px-3 py-3 font-bold">Factura</th>
                 <th className="px-3 py-3 font-bold">Cliente</th>
@@ -386,7 +408,7 @@ export default function AccountsReceivable() {
                 <th className="px-3 py-3 text-right font-bold">Abonado</th>
                 <th className="px-3 py-3 text-right font-bold">Saldo</th>
                 <th className="px-3 py-3 font-bold">Estado</th>
-                <th className="px-3 py-3 font-bold">Abono</th>
+              <th className="px-3 py-3 font-bold">Abono</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -395,7 +417,10 @@ export default function AccountsReceivable() {
                   key={factura.id ?? factura.Id}
                   factura={factura}
                   abonos={abonos}
+                  abonoBanks={abonoBanks}
+                  bankAccounts={bankAccounts}
                   setAbono={setAbono}
+                  setAbonoBank={setAbonoBank}
                   registrarAbono={registrarAbono}
                 />
               ))}
@@ -451,7 +476,7 @@ export default function AccountsReceivable() {
                   />
                 </div>
                 {estadoCxC !== "Pagada" && (
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 grid gap-2">
                     <input
                       type="number"
                       min="0"
@@ -462,10 +487,16 @@ export default function AccountsReceivable() {
                       className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Abono"
                     />
+                    <BankSelect
+                      value={abonoBanks[id] || ""}
+                      bankAccounts={bankAccounts}
+                      onChange={(value) => setAbonoBank(id, value)}
+                    />
                     <button
                       type="button"
                       onClick={() => registrarAbono(factura)}
-                      className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white"
+                      disabled={bankAccounts.length === 0}
+                      className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
                     >
                       Aplicar
                     </button>
@@ -502,7 +533,15 @@ function SummaryCard({ label, value, detail = "", tone = "slate" }) {
   );
 }
 
-function FacturaRow({ factura, abonos, setAbono, registrarAbono }) {
+function FacturaRow({
+  factura,
+  abonos,
+  abonoBanks,
+  bankAccounts,
+  setAbono,
+  setAbonoBank,
+  registrarAbono,
+}) {
   const id = factura.id ?? factura.Id;
   const estado = factura.estadoCxC ?? factura.EstadoCxC;
   const atraso = daysOverdue(factura.fechaVencimiento ?? factura.FechaVencimiento, estado);
@@ -548,32 +587,70 @@ function FacturaRow({ factura, abonos, setAbono, registrarAbono }) {
           {estado}
         </span>
       </td>
-      <td className="px-3 py-3">
-        {estado === "Pagada" ? (
-          <span className="text-xs font-bold text-emerald-700">Completa</span>
-        ) : (
-          <div className="flex min-w-[190px] gap-2">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={abonos[id] || ""}
-              onChange={(e) => setAbono(id, e.target.value)}
-              onBlur={(e) => setAbono(id, amountInput(e.target.value))}
-              className="w-24 rounded-xl border border-slate-300 px-3 py-2 text-sm"
-              placeholder="0.00"
-            />
-            <button
-              type="button"
-              onClick={() => registrarAbono(factura)}
-              className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700"
-            >
-              Aplicar
-            </button>
-          </div>
-        )}
-      </td>
+<td className="px-3 py-3">
+  {estado === "Pagada" ? (
+    <span className="text-xs font-bold text-emerald-700">Completa</span>
+  ) : (
+    <div className="flex items-center justify-center gap-2">
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={abonos[id] || ""}
+        onChange={(e) => setAbono(id, e.target.value)}
+        onBlur={(e) => setAbono(id, amountInput(e.target.value))}
+        className="w-24 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        placeholder="0.00"
+      />
+
+      <BankSelect
+        value={abonoBanks[id] || ""}
+        bankAccounts={bankAccounts}
+        onChange={(value) => setAbonoBank(id, value)}
+      />
+
+      <button
+        type="button"
+        onClick={() => registrarAbono(factura)}
+        disabled={bankAccounts.length === 0}
+        className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-60"
+      >
+        Aplicar
+      </button>
+    </div>
+  )}
+</td>
     </tr>
+  );
+}
+
+function BankSelect({ value, bankAccounts, onChange }) {
+  if (bankAccounts.length === 0) {
+    return (
+      <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
+        Sin bancos activos
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+    >
+      <option value="">Banco del abono</option>
+      {bankAccounts.map((bank) => {
+        const id = bank.id ?? bank.Id;
+        const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+        const iban = bank.iban ?? bank.Iban ?? "";
+        return (
+          <option key={id} value={id}>
+            {iban ? `${name} - ${iban}` : name}
+          </option>
+        );
+      })}
+    </select>
   );
 }
 

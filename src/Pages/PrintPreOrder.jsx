@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer } from "lucide-react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
+import PrintActions from "../Components/PrintActions";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+import useAutoPrint from "../hooks/useAutoPrint";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -47,23 +48,23 @@ function lines(value) {
 
 export default function PrintPreOrder() {
   const { id } = useParams();
+  const [params] = useSearchParams();
   const [taller, setTaller] = useState(DEFAULT_TALLER);
   const [preOrder, setPreOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [printed, setPrinted] = useState(false);
+  const shouldAutoPrint = params.get("print") === "1";
 
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  useEffect(() => {
-    if (loading || error || !preOrder || printed) return;
-    setPrinted(true);
-    const timer = setTimeout(() => window.print(), 500);
-    return () => clearTimeout(timer);
-  }, [loading, error, preOrder, printed]);
+  useAutoPrint({
+    enabled: shouldAutoPrint,
+    ready: !loading && !error && Boolean(preOrder),
+    resetKey: id,
+  });
 
   const loadData = async () => {
     try {
@@ -168,7 +169,6 @@ export default function PrintPreOrder() {
           to="/pre-ordenes"
           className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
         >
-          <ArrowLeft size={16} />
           Volver
         </Link>
       </div>
@@ -178,7 +178,11 @@ export default function PrintPreOrder() {
   if (!useZaga) {
     return (
       <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <PrintActions title={actionTitle} subtitle={actionSubtitle} />
+        <PrintActions
+          title={actionTitle}
+          subtitle={actionSubtitle}
+          backTo="/pre-ordenes"
+        />
         <section className="mx-auto max-w-2xl border border-black p-8">
           <div className="mb-8 flex items-start justify-between gap-6">
             <div>
@@ -240,7 +244,11 @@ export default function PrintPreOrder() {
 
   return (
     <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-      <PrintActions title={actionTitle} subtitle={actionSubtitle} />
+      <PrintActions
+        title={actionTitle}
+        subtitle={actionSubtitle}
+        backTo="/pre-ordenes"
+      />
       <style>{`
         .preorder-sheet {
          width: 190mm;
@@ -386,7 +394,6 @@ export default function PrintPreOrder() {
           height: auto;
           object-fit: contain;
         }
-          /* footer */
       .po-section-head {
           display: grid;
           grid-template-columns: 26mm 1fr 20mm 26mm 16mm;
@@ -710,35 +717,6 @@ export default function PrintPreOrder() {
         </footer>
       </section>
     </main>
-  );
-}
-
-function PrintActions({ title, subtitle }) {
-  return (
-    <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3 text-slate-900">
-      <div>
-        <h2 className="text-2xl font-semibold text-slate-900">{title}</h2>
-        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-white transition hover:bg-orange-700"          
-        >
-          <Printer size={18} />
-          Emitir e Imprimir
-        </button>
-        <Link
-          to="/pre-ordenes"
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-700 px-4 py-2.5 text-white transition hover:bg-slate-800"
-        >
-          <ArrowLeft size={18} />
-          Volver
-        </Link>
-      </div>
-    </div>
   );
 }
 
