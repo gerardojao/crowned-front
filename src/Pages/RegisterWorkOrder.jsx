@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowLeft, Images, Search, Trash2, UserPlus, Wrench, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Images,
+  Search,
+  Trash2,
+  UserPlus,
+  Wrench,
+  X,
+} from "lucide-react";
 import api, { getCurrentWorkshopId } from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import PartPicker, {
@@ -16,6 +24,7 @@ import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import { amountInput } from "../utils/currency";
 
 const EMPTY_ORDER = {
+  ClienteId: "",
   Cliente: "",
   Dni: "",
   Telefono: "",
@@ -24,6 +33,7 @@ const EMPTY_ORDER = {
   Poblacion: "",
   Provincia: "",
   Clasificacion: "Particular",
+  VehiculoId: "",
   Matricula: "",
   Bastidor: "",
   Marca: "",
@@ -217,6 +227,10 @@ export default function RegisterWorkOrder() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [customerVehicles, setCustomerVehicles] = useState([]);
+  const [selectedCustomerForVehicles, setSelectedCustomerForVehicles] =
+    useState(null);
+  const [loadingCustomerVehicles, setLoadingCustomerVehicles] = useState(false);
   const [showNewCustomer, setShowNewCustomer] = useState(false);
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [showOrders, setShowOrders] = useState(false);
@@ -231,12 +245,26 @@ export default function RegisterWorkOrder() {
   const [useZagaDocuments, setUseZagaDocuments] = useState(false);
   const [preOrdersEnabled, setPreOrdersEnabled] = useState(false);
   const [receptionPhotosEnabled, setReceptionPhotosEnabled] = useState(true);
-  const [detailedRepairLinesEnabled, setDetailedRepairLinesEnabled] = useState(false);
+  const [detailedRepairLinesEnabled, setDetailedRepairLinesEnabled] =
+    useState(false);
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [photoTarget, setPhotoTarget] = useState(null);
   const [preOrderSourceId, setPreOrderSourceId] = useState(null);
   const orderPageSize = 10;
   const detailItems = Array.isArray(order.Items) ? order.Items : [];
+
+  const hasSelectedClient = Boolean(order.Cliente);
+  const hasSelectedVehicle = Boolean(
+    order.Matricula || order.Modelo || order.VehiculoId,
+  );
+  const shouldShowOrderForm =
+    showNewCustomer ||
+    editingId ||
+    preOrderSourceId ||
+    (hasSelectedClient && hasSelectedVehicle);
+
+  const [quickCreateNotice, setQuickCreateNotice] = useState("");
+
   const detailTotal = detailItems.reduce(
     (sum, item) => sum + getRepairLineTotal(item),
     0,
@@ -257,16 +285,16 @@ export default function RegisterWorkOrder() {
       setUseZagaDocuments(zagaDocuments);
       setPreOrdersEnabled(zagaDocuments && preOrderModuleEnabled);
       setReceptionPhotosEnabled(
-        data.enableReceptionPhotos ??
-          data.EnableReceptionPhotos ??
-          true,
+        data.enableReceptionPhotos ?? data.EnableReceptionPhotos ?? true,
       );
       setDetailedRepairLinesEnabled(
         data.enableDetailedRepairInvoiceLines ??
           data.EnableDetailedRepairInvoiceLines ??
           false,
       );
-      setOperationTypes(normalizeOperationTypes(data.operationTypes ?? data.OperationTypes));
+      setOperationTypes(
+        normalizeOperationTypes(data.operationTypes ?? data.OperationTypes),
+      );
 
       const name =
         data.nombre ??
@@ -347,7 +375,10 @@ export default function RegisterWorkOrder() {
       ...prev,
       Items: (Array.isArray(prev.Items) ? prev.Items : []).map((item) =>
         item.id === id
-          ? normalizeRepairLine({ ...item, [field]: value }, detailedRepairLinesEnabled)
+          ? normalizeRepairLine(
+              { ...item, [field]: value },
+              detailedRepairLinesEnabled,
+            )
           : item,
       ),
     }));
@@ -473,11 +504,14 @@ export default function RegisterWorkOrder() {
     Poblacion: o.poblacion ?? o.Poblacion ?? "",
     Provincia: o.provincia ?? o.Provincia ?? "",
     Clasificacion: o.clasificacion ?? o.Clasificacion ?? "Particular",
+    VehiculoId: o.vehiculoId ?? o.VehiculoId ?? "",
     Matricula: o.matricula ?? o.Matricula,
     Bastidor: o.bastidor ?? o.Bastidor ?? "",
     Marca: o.marca ?? o.Marca,
     Modelo: o.modelo ?? o.Modelo,
-    FechaMatriculacion: String(o.fechaMatriculacion ?? o.FechaMatriculacion ?? "").slice(0, 10),
+    FechaMatriculacion: String(
+      o.fechaMatriculacion ?? o.FechaMatriculacion ?? "",
+    ).slice(0, 10),
     Motor: o.motor ?? o.Motor ?? "",
     Kw: o.kw ?? o.Kw ?? "",
     Cv: o.cv ?? o.Cv ?? "",
@@ -515,7 +549,8 @@ export default function RegisterWorkOrder() {
             section: getRepairLineSection(item),
             descripcion: item.descripcion || item.Descripcion || "",
             cantidad: item.cantidad ?? item.Cantidad ?? 1,
-            tiempo: item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
+            tiempo:
+              item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
             descuentoPct: item.descuentoPct ?? item.DescuentoPct ?? 0,
             ivaPct: item.ivaPct ?? item.IvaPct ?? 21,
             precioUnitario:
@@ -574,34 +609,203 @@ export default function RegisterWorkOrder() {
     Observaciones: c.observaciones ?? c.Observaciones ?? "",
   });
 
-  const fillOrderFromCustomer = (customer) => {
+  const normalizeVehicle = (v) => ({
+    Id: v.id ?? v.Id,
+    ClienteId: v.clienteId ?? v.ClienteId,
+    Matricula: v.matricula ?? v.Matricula ?? "",
+    Bastidor: v.bastidor ?? v.Bastidor ?? "",
+    Marca: v.marca ?? v.Marca ?? "",
+    Modelo: v.modelo ?? v.Modelo ?? "",
+    FechaMatriculacion: String(
+      v.fechaMatriculacion ?? v.FechaMatriculacion ?? "",
+    ).slice(0, 10),
+    Motor: v.motor ?? v.Motor ?? "",
+    Kw: v.kw ?? v.Kw ?? "",
+    Cv: v.cv ?? v.Cv ?? "",
+    Combustible: v.combustible ?? v.Combustible ?? "",
+    Kilometraje: v.kilometraje ?? v.Kilometraje ?? "",
+    UltimaVisita: String(v.ultimaVisita ?? v.UltimaVisita ?? "").slice(0, 10),
+    ProximaItv: String(v.proximaItv ?? v.ProximaItv ?? "").slice(0, 10),
+  });
+
+  const firstResponseItem = (data) =>
+    data?.data?.[0] ?? data?.Data?.[0] ?? null;
+
+  const normalizeLookup = (value) =>
+    String(value || "")
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ");
+
+  const normalizePhone = (value) => String(value || "").replace(/\D/g, "");
+
+  const normalizePlate = (value) =>
+    String(value || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+
+  const loadCustomerDetail = async (customer) => {
+    const id = customer?.Id;
+    if (!id) return customer;
+
+    try {
+      const res = await api.get(`/Cliente/${id}`);
+      const data = res?.data?.data?.[0] ?? res?.data?.Data?.[0];
+      return data ? normalizeCustomer(data) : customer;
+    } catch (err) {
+      console.error(err);
+      return customer;
+    }
+  };
+
+  const loadVehiclesForCustomer = async (customerId) => {
+    if (!customerId) return [];
+    const res = await api.get(`/Vehiculo/cliente/${customerId}`);
+    return (res?.data?.data?.[0] || []).map(normalizeVehicle);
+  };
+
+  const fillOrderFromCustomer = async (customer, vehicle = null) => {
+    const fullCustomer = await loadCustomerDetail(customer);
     setOrder((prev) => ({
       ...prev,
-      Cliente: customer.Nombre || prev.Cliente,
-      Dni: customer.Dni || prev.Dni,
-      Telefono: customer.Telefono || prev.Telefono,
-      Direccion: customer.Direccion || prev.Direccion,
-      CodigoPostal: customer.CodigoPostal || prev.CodigoPostal,
-      Poblacion: customer.Poblacion || prev.Poblacion,
-      Provincia: customer.Provincia || prev.Provincia,
-      Clasificacion: customer.Clasificacion || prev.Clasificacion,
-      Matricula: customer.Matricula || prev.Matricula,
-      Bastidor: customer.Bastidor || prev.Bastidor,
-      Marca: customer.Marca || prev.Marca,
-      Modelo: customer.Modelo || prev.Modelo,
+      ClienteId: fullCustomer.Id || prev.ClienteId,
+      Cliente: fullCustomer.Nombre || prev.Cliente,
+      Dni: fullCustomer.Dni || prev.Dni,
+      Telefono: fullCustomer.Telefono || prev.Telefono,
+      Direccion: fullCustomer.Direccion || prev.Direccion,
+      CodigoPostal: fullCustomer.CodigoPostal || prev.CodigoPostal,
+      Poblacion: fullCustomer.Poblacion || prev.Poblacion,
+      Provincia: fullCustomer.Provincia || prev.Provincia,
+      Clasificacion: fullCustomer.Clasificacion || prev.Clasificacion,
+      VehiculoId: vehicle?.Id || prev.VehiculoId,
+      Matricula: vehicle?.Matricula || fullCustomer.Matricula || prev.Matricula,
+      Bastidor: vehicle?.Bastidor || fullCustomer.Bastidor || prev.Bastidor,
+      Marca: vehicle?.Marca || fullCustomer.Marca || prev.Marca,
+      Modelo: vehicle?.Modelo || fullCustomer.Modelo || prev.Modelo,
       FechaMatriculacion:
-        customer.FechaMatriculacion || prev.FechaMatriculacion,
-      Motor: customer.Motor || prev.Motor,
-      Kw: customer.Kw || prev.Kw,
-      Cv: customer.Cv || prev.Cv,
-      Combustible: customer.Combustible || prev.Combustible,
-      Kilometraje: customer.Kilometraje
-        ? String(customer.Kilometraje)
-        : prev.Kilometraje,
+        vehicle?.FechaMatriculacion ||
+        fullCustomer.FechaMatriculacion ||
+        prev.FechaMatriculacion,
+      Motor: vehicle?.Motor || fullCustomer.Motor || prev.Motor,
+      Kw: vehicle?.Kw || fullCustomer.Kw || prev.Kw,
+      Cv: vehicle?.Cv || fullCustomer.Cv || prev.Cv,
+      Combustible:
+        vehicle?.Combustible || fullCustomer.Combustible || prev.Combustible,
+      Kilometraje:
+        (vehicle?.Kilometraje ?? fullCustomer.Kilometraje)
+          ? String(vehicle?.Kilometraje ?? fullCustomer.Kilometraje)
+          : prev.Kilometraje,
     }));
     setCustomerSearch("");
     setCustomerMatches([]);
+    setCustomerVehicles([]);
+    setSelectedCustomerForVehicles(null);
     setShowNewCustomer(false);
+    setQuickCreateNotice("");
+  };
+
+  const fillCustomerOnlyForNewVehicle = async (customer) => {
+    const fullCustomer = await loadCustomerDetail(customer);
+    setOrder((prev) => ({
+      ...prev,
+      ClienteId: fullCustomer.Id || prev.ClienteId,
+      Cliente: fullCustomer.Nombre || prev.Cliente,
+      Dni: fullCustomer.Dni || prev.Dni,
+      Telefono: fullCustomer.Telefono || prev.Telefono,
+      Direccion: fullCustomer.Direccion || prev.Direccion,
+      CodigoPostal: fullCustomer.CodigoPostal || prev.CodigoPostal,
+      Poblacion: fullCustomer.Poblacion || prev.Poblacion,
+      Provincia: fullCustomer.Provincia || prev.Provincia,
+      Clasificacion: fullCustomer.Clasificacion || prev.Clasificacion,
+      VehiculoId: "",
+      Matricula: "",
+      Bastidor: "",
+      Marca: "",
+      Modelo: "",
+      FechaMatriculacion: "",
+      Motor: "",
+      Kw: "",
+      Cv: "",
+      Combustible: "",
+      Kilometraje: "",
+    }));
+  };
+
+  const clearVehicleForQuickCreate = () => {
+    setOrder((prev) => ({
+      ...prev,
+      VehiculoId: "",
+      Matricula: "",
+      Bastidor: "",
+      Marca: "",
+      Modelo: "",
+      FechaMatriculacion: "",
+      Motor: "",
+      Kw: "",
+      Cv: "",
+      Combustible: "",
+      Kilometraje: "",
+    }));
+  };
+
+  const toggleQuickCreate = () => {
+    if (showNewCustomer) {
+      setShowNewCustomer(false);
+      setQuickCreateNotice("");
+      return;
+    }
+
+    if (order.ClienteId) {
+      clearVehicleForQuickCreate();
+      setQuickCreateNotice(
+        "Cliente seleccionado. Completa los datos del nuevo vehículo.",
+      );
+    }
+
+    setShowNewCustomer(true);
+  };
+
+  const selectCustomerMatch = async (customer) => {
+    const fallbackVehicle = {
+      Id: "",
+      Matricula: customer.Matricula,
+      Bastidor: customer.Bastidor,
+      Marca: customer.Marca,
+      Modelo: customer.Modelo,
+      FechaMatriculacion: customer.FechaMatriculacion,
+      Motor: customer.Motor,
+      Kw: customer.Kw,
+      Cv: customer.Cv,
+      Combustible: customer.Combustible,
+      Kilometraje: customer.Kilometraje,
+    };
+
+    try {
+      setLoadingCustomerVehicles(true);
+      setSelectedCustomerForVehicles(customer);
+      const res = await api.get(`/Vehiculo/cliente/${customer.Id}`);
+      const list = (res?.data?.data?.[0] || []).map(normalizeVehicle);
+
+      if (list.length === 0) {
+        await fillOrderFromCustomer(customer, fallbackVehicle);
+        return;
+      }
+
+      if (list.length === 1) {
+        await fillOrderFromCustomer(customer, list[0]);
+        return;
+      }
+
+      await fillCustomerOnlyForNewVehicle(customer);
+      setCustomerVehicles(list);
+    } catch (err) {
+      console.error(err);
+      await fillOrderFromCustomer(customer, fallbackVehicle);
+    } finally {
+      setLoadingCustomerVehicles(false);
+    }
   };
 
   const loadCustomers = async (searchText) => {
@@ -631,26 +835,83 @@ export default function RegisterWorkOrder() {
     }
   };
 
-  const findExistingCustomerByPlate = async (plate) => {
-    const matricula = plate?.trim();
-    if (!matricula) return null;
-
+  const searchQuickCustomers = async (term) => {
+    const search = String(term || "").trim();
+    if (search.length < 2) return [];
     const res = await api.get("/Cliente", {
       params: {
-        matricula,
+        search,
         page: 1,
-        pageSize: 5,
+        pageSize: 10,
       },
     });
     const pack = res?.data?.data?.[0];
-    const items = Array.isArray(pack?.items)
-      ? pack.items.map(normalizeCustomer)
+    const items = Array.isArray(pack?.items ?? pack?.Items)
+      ? (pack.items ?? pack.Items)
       : [];
-    return (
-      items.find(
-        (item) => item.Matricula?.toUpperCase() === matricula.toUpperCase(),
-      ) || null
-    );
+    return items.map(normalizeCustomer);
+  };
+
+  const findExistingCustomerForQuickCreate = async (payload) => {
+    const dniKey = normalizeLookup(payload.dni);
+    const phoneKey = normalizePhone(payload.telefono);
+    const nameKey = normalizeLookup(payload.nombre);
+
+    if (dniKey) {
+      const matches = await searchQuickCustomers(payload.dni);
+      const exact = matches.find(
+        (item) => normalizeLookup(item.Dni) === dniKey,
+      );
+      if (exact) return exact;
+    }
+
+    if (phoneKey) {
+      const matches = await searchQuickCustomers(payload.telefono);
+      const exact = matches.find(
+        (item) => normalizePhone(item.Telefono) === phoneKey,
+      );
+      if (exact) return exact;
+    }
+
+    if (!dniKey && !phoneKey && nameKey) {
+      const matches = await searchQuickCustomers(payload.nombre);
+      const exact = matches.filter(
+        (item) => normalizeLookup(item.Nombre) === nameKey,
+      );
+      if (exact.length > 1) {
+        throw new Error(
+          "Hay varios clientes con ese nombre. Selecciona el cliente desde el buscador antes de guardar el vehiculo.",
+        );
+      }
+      if (exact.length === 1) return exact[0];
+    }
+
+    return null;
+  };
+
+  const vehiclePayloadFromQuickCreate = (payload) => ({
+    matricula: payload.matricula,
+    bastidor: payload.bastidor || null,
+    marca: payload.marca || null,
+    modelo: payload.modelo,
+    fechaMatriculacion: payload.fechaMatriculacion || null,
+    motor: payload.motor || null,
+    kw: payload.kw,
+    cv: payload.cv,
+    combustible: payload.combustible || null,
+    kilometraje: payload.kilometraje,
+    observaciones: payload.observaciones || null,
+  });
+
+  const loadCreatedCustomerAndVehicle = async (customerId, matricula) => {
+    const customer = await loadCustomerDetail({ Id: customerId });
+    const vehicles = await loadVehiclesForCustomer(customerId);
+    const vehicle =
+      vehicles.find(
+        (item) => normalizePlate(item.Matricula) === normalizePlate(matricula),
+      ) || vehicles[0];
+
+    await fillOrderFromCustomer(customer, vehicle || null);
   };
 
   const createCustomerFromOrder = async () => {
@@ -699,20 +960,56 @@ export default function RegisterWorkOrder() {
     try {
       setSavingCustomer(true);
       setError("");
-      const existing = await findExistingCustomerByPlate(payload.matricula);
-      if (existing) {
-        setNotice("");
-        setError(
-          `La matrícula ${payload.matricula.trim().toUpperCase()} ya está registrada para ${existing.Nombre}. No se registró un cliente nuevo para evitar duplicar el vehículo. Selecciona ese cliente en el buscador o usa otra matrícula.`,
+      const existingCustomer =
+        await findExistingCustomerForQuickCreate(payload);
+
+      if (existingCustomer?.Id) {
+        const vehicles = await loadVehiclesForCustomer(existingCustomer.Id);
+        let vehicle = vehicles.find(
+          (item) =>
+            normalizePlate(item.Matricula) ===
+            normalizePlate(payload.matricula),
         );
+
+        if (!vehicle) {
+          const createdVehicle = ensureOk(
+            await api.post(
+              `/Vehiculo/cliente/${existingCustomer.Id}`,
+              vehiclePayloadFromQuickCreate(payload),
+            ),
+          );
+          vehicle = normalizeVehicle(firstResponseItem(createdVehicle) || {});
+          setNotice(
+            "Cliente existente cargado y vehiculo agregado a la orden.",
+          );
+        } else {
+          setNotice("Cliente y vehiculo existentes cargados en la orden.");
+        }
+
+        await fillOrderFromCustomer(existingCustomer, vehicle);
+        setShowNewCustomer(false);
+        setQuickCreateNotice("");
         return;
       }
 
-      ensureOk(await api.post("/Cliente", payload));
+      const createdCustomer = ensureOk(await api.post("/Cliente", payload));
+      const createdCustomerId =
+        firstResponseItem(createdCustomer)?.id ??
+        firstResponseItem(createdCustomer)?.Id;
+
+      if (createdCustomerId) {
+        await loadCreatedCustomerAndVehicle(
+          createdCustomerId,
+          payload.matricula,
+        );
+      }
+
       setNotice("Cliente registrado y cargado en la orden.");
       setShowNewCustomer(false);
+      setQuickCreateNotice("");
       setCustomerSearch("");
       setCustomerMatches([]);
+      return;
     } catch (err) {
       console.error(err);
       setError(
@@ -827,6 +1124,8 @@ export default function RegisterWorkOrder() {
         setEditingId(null);
         setOrder({
           ...EMPTY_ORDER,
+          ClienteId: data.clienteId ?? data.ClienteId ?? "",
+          VehiculoId: data.vehiculoId ?? data.VehiculoId ?? "",
           Cliente: data.cliente ?? data.Cliente ?? "",
           Dni: data.dni ?? data.Dni ?? "",
           Telefono: data.telefono ?? data.Telefono ?? "",
@@ -860,16 +1159,16 @@ export default function RegisterWorkOrder() {
           CodigoPostal: data.codigoPostal ?? data.CodigoPostal ?? "",
           Poblacion: data.poblacion ?? data.Poblacion ?? "",
           Provincia: data.provincia ?? data.Provincia ?? "",
-          Clasificacion: data.clasificacion ?? data.Clasificacion ?? "Particular",
+          Clasificacion:
+            data.clasificacion ?? data.Clasificacion ?? "Particular",
           Bastidor: data.bastidor ?? data.Bastidor ?? "",
           FechaMatriculacion: String(
-            data.fechaMatriculacion ?? data.FechaMatriculacion ?? ""
+            data.fechaMatriculacion ?? data.FechaMatriculacion ?? "",
           ).slice(0, 10),
           Motor: data.motor ?? data.Motor ?? "",
           Kw: data.kw ?? data.Kw ?? "",
           Cv: data.cv ?? data.Cv ?? "",
           Combustible: data.combustible ?? data.Combustible ?? "",
-
         });
         setNotice("Pre-orden cargada. Completa la orden y guardala.");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -971,6 +1270,8 @@ export default function RegisterWorkOrder() {
     setEditingId(o.Id);
 
     setOrder({
+      ClienteId: o.ClienteId || "",
+      VehiculoId: o.VehiculoId || "",
       Cliente: o.Cliente || "",
       Dni: o.Dni || "",
       Telefono: o.Telefono || "",
@@ -1026,14 +1327,21 @@ export default function RegisterWorkOrder() {
 
       const normalizedItems = detailItems
         .filter((item) => {
-          const normalized = normalizeRepairLine(item, detailedRepairLinesEnabled);
+          const normalized = normalizeRepairLine(
+            item,
+            detailedRepairLinesEnabled,
+          );
           return (
             String(normalized.descripcion || normalized.codigo || "").trim() ||
-            Number(normalized.cantidad || 0) * Number(normalized.importe || 0) > 0
+            Number(normalized.cantidad || 0) * Number(normalized.importe || 0) >
+              0
           );
         })
         .map((item) => {
-          const normalized = normalizeRepairLine(item, detailedRepairLinesEnabled);
+          const normalized = normalizeRepairLine(
+            item,
+            detailedRepairLinesEnabled,
+          );
           return {
             codigo: normalized.codigo || null,
             section: normalized.section || "ManoObra",
@@ -1043,24 +1351,24 @@ export default function RegisterWorkOrder() {
             precioUnitario: Number(normalized.precioUnitario || 0),
             descuentoPct: Number(normalized.descuentoPct || 0),
             ivaPct: Number(normalized.ivaPct || 21),
-            importe: Number(normalized.importe ?? normalized.precioUnitario ?? 0),
+            importe: Number(
+              normalized.importe ?? normalized.precioUnitario ?? 0,
+            ),
             kind: normalized.kind || null,
             repuestoStockId: normalized.repuestoStockId || null,
             idProveedor: normalized.idProveedor || null,
             nombreProveedor: normalized.nombreProveedor || null,
             precioCompra:
-              normalized.precioCompra != null ? Number(normalized.precioCompra || 0) : null,
+              normalized.precioCompra != null
+                ? Number(normalized.precioCompra || 0)
+                : null,
           };
         });
       const laborTotal = normalizedItems
-        .filter(
-          (item) => item.kind === "labor",
-        )
+        .filter((item) => item.kind === "labor")
         .reduce((sum, item) => sum + item.cantidad * item.importe, 0);
       const partsTotal = normalizedItems
-        .filter(
-          (item) => item.kind !== "labor",
-        )
+        .filter((item) => item.kind !== "labor")
         .reduce((sum, item) => sum + item.cantidad * item.importe, 0);
 
       const payload = {
@@ -1072,6 +1380,7 @@ export default function RegisterWorkOrder() {
         poblacion: order.Poblacion || null,
         provincia: order.Provincia || null,
         clasificacion: order.Clasificacion || "Particular",
+        vehiculoId: order.VehiculoId ? Number(order.VehiculoId) : null,
         matricula: order.Matricula,
         bastidor: order.Bastidor || null,
         marca: order.Marca || null,
@@ -1132,6 +1441,7 @@ export default function RegisterWorkOrder() {
       setCustomerSearch("");
       setCustomerMatches([]);
       setShowNewCustomer(false);
+      setQuickCreateNotice("");
 
       await loadOrders(showOrders ? orderPage : 1);
     } catch (err) {
@@ -1237,26 +1547,30 @@ export default function RegisterWorkOrder() {
         </div>
       )}
 
-          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Metric
-              label="Recibidas en pantalla"
-              value={loadingOrders ? "..." : receivedOrdersCount}
-            />
-            <Metric
-              label="Órdenes totales"
-              value={loadingOrders ? "..." : orderTotal}
-            />
-            <Metric label="Página" value={`${orderPage}/${orderTotalPages}`} />
-          </section>
+      <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Metric
+          label="Recibidas en pantalla"
+          value={loadingOrders ? "..." : receivedOrdersCount}
+        />
+        <Metric
+          label="Órdenes totales"
+          value={loadingOrders ? "..." : orderTotal}
+        />
+        <Metric label="Página" value={`${orderPage}/${orderTotalPages}`} />
+      </section>
 
       <form
         onSubmit={onSubmit}
         className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 space-y-5"
       >
         <div>
+          <div className="mb-4 flex items-center gap-2">
+            <Wrench size={18} className="text-slate-500" />
+            <h3 className="text-lg font-semibold text-slate-800">
+              {editingId ? "Editar orden" : "Nueva orden"}
+            </h3>
+          </div>
 
-
-          
           <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Buscar cliente registrado
@@ -1282,6 +1596,8 @@ export default function RegisterWorkOrder() {
                   onClick={() => {
                     setCustomerSearch("");
                     setCustomerMatches([]);
+                    setCustomerVehicles([]);
+                    setSelectedCustomerForVehicles(null);
                   }}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 >
@@ -1310,7 +1626,7 @@ export default function RegisterWorkOrder() {
                   <button
                     key={customer.Id}
                     type="button"
-                    onClick={() => fillOrderFromCustomer(customer)}
+                    onClick={() => selectCustomerMatch(customer)}
                     className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
                   >
                     <span className="block font-semibold text-slate-900">
@@ -1330,35 +1646,110 @@ export default function RegisterWorkOrder() {
               </div>
             )}
 
+            {loadingCustomerVehicles && (
+              <p className="mt-3 text-sm text-slate-500">
+                Cargando vehiculos del cliente...
+              </p>
+            )}
+
+            {selectedCustomerForVehicles && customerVehicles.length > 1 && (
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
+                <p className="mb-2 text-sm font-semibold text-emerald-900">
+                  Selecciona el vehiculo de {selectedCustomerForVehicles.Nombre}
+                </p>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {customerVehicles.map((vehicle) => (
+                    <button
+                      key={vehicle.Id}
+                      type="button"
+                      onClick={() =>
+                        fillOrderFromCustomer(
+                          selectedCustomerForVehicles,
+                          vehicle,
+                        )
+                      }
+                      className="rounded-xl border border-emerald-200 bg-white p-3 text-left text-sm hover:border-emerald-400 hover:bg-emerald-50"
+                    >
+                      <span className="block font-semibold text-slate-900">
+                        {vehicle.Matricula || "Sin matricula"}
+                      </span>
+                      <span className="mt-1 block text-slate-600">
+                        {vehicle.Marca || "-"} {vehicle.Modelo || ""}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-500">
+                        {vehicle.Bastidor
+                          ? `Bastidor ${vehicle.Bastidor}`
+                          : "Sin bastidor"}{" "}
+                        ·{" "}
+                        {vehicle.Kilometraje
+                          ? `${vehicle.Kilometraje} ${labels.metricLabel}`
+                          : "Sin kilometraje"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mt-3">
               <button
                 type="button"
-                onClick={() => setShowNewCustomer((v) => !v)}
+                onClick={toggleQuickCreate}
                 className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
               >
                 <UserPlus size={17} />
 
-                {showNewCustomer ? "Ocultar alta rápida" : "Registrar nuevo"}
+                {showNewCustomer
+                  ? "Ocultar alta rapida"
+                  : order.ClienteId
+                    ? "Agregar otro vehiculo"
+                    : "Registrar nuevo"}
               </button>
+              {showNewCustomer && order.ClienteId && (
+                <p className="mt-2 text-xs font-medium text-emerald-700 ">
+                  Se guardara como nuevo vehiculo de {order.Cliente}.
+                </p>
+              )}
 
               {showNewCustomer && (
                 <button
                   type="button"
                   onClick={createCustomerFromOrder}
                   disabled={savingCustomer}
-                  className="ml-2 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                 >
                   <UserPlus size={17} />
 
                   {savingCustomer
-                    ? "Guardando cliente..."
-                    : "Guardar cliente nuevo"}
+                    ? "Guardando..."
+                    : order.ClienteId
+                      ? "Guardar vehiculo en cliente"
+                      : "Guardar cliente nuevo"}
                 </button>
+              )}
+
+              {quickCreateNotice && (
+                <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-emerald-800">
+                      {quickCreateNotice}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setQuickCreateNotice("")}
+                    className="rounded-lg p-1 text-emerald-700 hover:bg-emerald-100"
+                    aria-label="Cerrar aviso"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               )}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <input
               name="Cliente"
               value={order.Cliente}
@@ -1562,7 +1953,242 @@ export default function RegisterWorkOrder() {
                 </option>
               ))}
             </select>
-          </div>
+          </div> */}
+
+          {shouldShowOrderForm ? (
+            <div className="space-y-5">
+              <FormSection title="Cliente">
+                <input
+                  name="Cliente"
+                  value={order.Cliente}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Cliente *"
+                  required
+                />
+
+                <input
+                  name="Dni"
+                  value={order.Dni}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="DNI/NIE"
+                />
+
+                <input
+                  name="Telefono"
+                  value={order.Telefono}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Teléfono"
+                />
+
+                <select
+                  name="Clasificacion"
+                  value={order.Clasificacion}
+                  onChange={handleChange}
+                  className={cls}
+                >
+                  <option value="Particular">Particular</option>
+                  <option value="Empresa">Empresa</option>
+                  <option value="Compania de seguro">Compañía de seguro</option>
+                </select>
+
+                <input
+                  name="Direccion"
+                  value={order.Direccion}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm md:col-span-2"
+                  placeholder="Dirección del cliente"
+                />
+
+                <input
+                  name="CodigoPostal"
+                  value={order.CodigoPostal}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Código postal"
+                />
+
+                <input
+                  name="Poblacion"
+                  value={order.Poblacion}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Población"
+                />
+
+                <input
+                  name="Provincia"
+                  value={order.Provincia}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Provincia"
+                />
+              </FormSection>
+
+              <FormSection title="Vehículo">
+                <input
+                  name="Matricula"
+                  value={order.Matricula}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={labels.referencePlaceholder}
+                  required
+                />
+
+                <input
+                  name="Marca"
+                  value={order.Marca}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={labels.makeLabel}
+                />
+
+                <input
+                  name="Modelo"
+                  value={order.Modelo}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={`${labels.modelLabel} *`}
+                  required
+                />
+
+                <input
+                  name="Bastidor"
+                  value={order.Bastidor}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Bastidor"
+                />
+
+                <Field label="Fecha matriculación">
+                  <input
+                    name="FechaMatriculacion"
+                    type="date"
+                    value={order.FechaMatriculacion}
+                    onChange={handleChange}
+                    className={cls}
+                  />
+                </Field>
+
+                <input
+                  name="Kilometraje"
+                  type="number"
+                  value={order.Kilometraje}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={labels.metricPlaceholder}
+                />
+
+                <input
+                  name="Combustible"
+                  value={order.Combustible}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Combustible"
+                />
+
+                <input
+                  name="Motor"
+                  value={order.Motor}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Motor"
+                />
+
+                <input
+                  name="Cv"
+                  type="number"
+                  step="0.01"
+                  value={order.Cv}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="CV"
+                />
+
+                <input
+                  name="Kw"
+                  type="number"
+                  step="0.01"
+                  value={order.Kw}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="KW"
+                />
+              </FormSection>
+
+              <FormSection title="Recepción">
+                <Field label="Fecha recepción">
+                  <input
+                    name="Fecha"
+                    type="date"
+                    value={order.Fecha}
+                    onChange={handleChange}
+                    className={cls}
+                  />
+                </Field>
+
+                <Field label="Fecha prevista de entrega">
+                  <input
+                    name="FechaPrevistaEntrega"
+                    type="date"
+                    value={order.FechaPrevistaEntrega}
+                    onChange={handleChange}
+                    className={cls}
+                  />
+                </Field>
+
+                <input
+                  name="TiempoEstimadoHoras"
+                  type="number"
+                  min="0"
+                  step="0.25"
+                  value={order.TiempoEstimadoHoras}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Tiempo estimado horas"
+                />
+
+                <select
+                  name="TipoOperacion"
+                  value={order.TipoOperacion}
+                  onChange={handleChange}
+                  className={cls}
+                >
+                  {operationTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  name="Estado"
+                  value={order.Estado}
+                  onChange={handleChange}
+                  className={cls}
+                >
+                  {states.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </FormSection>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+              <p className="text-sm font-semibold text-slate-700">
+                Busca un cliente registrado o crea uno nuevo para iniciar la
+                orden.
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Cuando selecciones el vehículo, aparecerán los datos necesarios
+                para completar el trabajo y los costes.
+              </p>
+            </div>
+          )}
         </div>
 
         <div>
@@ -1741,7 +2367,11 @@ export default function RegisterWorkOrder() {
                             <input
                               value={item.codigo || ""}
                               onChange={(e) =>
-                                setDetailItemField(item.id, "codigo", e.target.value)
+                                setDetailItemField(
+                                  item.id,
+                                  "codigo",
+                                  e.target.value,
+                                )
                               }
                               className={cls}
                               placeholder="Codigo"
@@ -1749,13 +2379,19 @@ export default function RegisterWorkOrder() {
                             <select
                               value={section}
                               onChange={(e) =>
-                                setDetailItemField(item.id, "section", e.target.value)
+                                setDetailItemField(
+                                  item.id,
+                                  "section",
+                                  e.target.value,
+                                )
                               }
                               className={cls}
                             >
                               <option value="ManoObra">Mano obra</option>
                               <option value="Piezas">
-                                {order.TipoOperacion === "Chapa y pintura" ? "Materiales" : "Piezas"}
+                                {order.TipoOperacion === "Chapa y pintura"
+                                  ? "Materiales"
+                                  : "Piezas"}
                               </option>
                               {order.TipoOperacion === "Chapa y pintura" && (
                                 <option value="Pintura">Pintura</option>
@@ -1779,16 +2415,24 @@ export default function RegisterWorkOrder() {
                           type="number"
                           min="0.01"
                           step="0.01"
-                          value={detailedRepairLinesEnabled ? getRepairLineQuantity(item) : item.cantidad}
+                          value={
+                            detailedRepairLinesEnabled
+                              ? getRepairLineQuantity(item)
+                              : item.cantidad
+                          }
                           onChange={(e) =>
                             setDetailItemField(
                               item.id,
-                              detailedRepairLinesEnabled && section !== "Piezas" ? "tiempo" : "cantidad",
+                              detailedRepairLinesEnabled && section !== "Piezas"
+                                ? "tiempo"
+                                : "cantidad",
                               e.target.value,
                             )
                           }
                           className={cls}
-                          placeholder={section === "Piezas" ? "Cantidad" : "Tiempo"}
+                          placeholder={
+                            section === "Piezas" ? "Cantidad" : "Tiempo"
+                          }
                         />
                         <input
                           type="number"
@@ -1818,7 +2462,11 @@ export default function RegisterWorkOrder() {
                               step="0.01"
                               value={item.descuentoPct ?? 0}
                               onChange={(e) =>
-                                setDetailItemField(item.id, "descuentoPct", e.target.value)
+                                setDetailItemField(
+                                  item.id,
+                                  "descuentoPct",
+                                  e.target.value,
+                                )
                               }
                               className={cls}
                               placeholder="%DTO"
@@ -1828,7 +2476,11 @@ export default function RegisterWorkOrder() {
                               step="0.01"
                               value={item.ivaPct ?? 21}
                               onChange={(e) =>
-                                setDetailItemField(item.id, "ivaPct", e.target.value)
+                                setDetailItemField(
+                                  item.id,
+                                  "ivaPct",
+                                  e.target.value,
+                                )
                               }
                               className={cls}
                               placeholder="%IVA"
@@ -1881,6 +2533,7 @@ export default function RegisterWorkOrder() {
               setCustomerSearch("");
               setCustomerMatches([]);
               setShowNewCustomer(false);
+              setQuickCreateNotice("");
             }}
             className="inline-flex items-center rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
           >
@@ -2102,18 +2755,24 @@ export default function RegisterWorkOrder() {
                       <>
                         {preOrdersEnabled && (
                           <a
-                            href={o.PreOrdenId ? `/print-pre-order/${o.PreOrdenId}` : "#"}
+                            href={
+                              o.PreOrdenId
+                                ? `/print-pre-order/${o.PreOrdenId}`
+                                : "#"
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(event) => {
                               if (!o.PreOrdenId) {
                                 event.preventDefault();
-                                setError("Esta orden no tiene una pre-orden asociada.");
+                                setError(
+                                  "Esta orden no tiene una pre-orden asociada.",
+                                );
                               }
                             }}
                             className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
                           >
-                           ver Pre-orden
+                            ver Pre-orden
                           </a>
                         )}
 
@@ -2249,7 +2908,15 @@ function normalizeOperationTypes(types) {
 }
 
 function getRepairLineSection(item) {
-  const raw = String(item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "")
+  const raw = String(
+    item.section ??
+      item.Section ??
+      item.kind ??
+      item.Kind ??
+      item.tipo ??
+      item.Tipo ??
+      "",
+  )
     .trim()
     .toLowerCase();
   if (raw.includes("pintura")) return "Pintura";
@@ -2267,16 +2934,25 @@ function getRepairLineQuantity(item) {
   const section = getRepairLineSection(item);
   const value =
     section === "Piezas"
-      ? item.cantidad ?? item.Cantidad
-      : item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad;
+      ? (item.cantidad ?? item.Cantidad)
+      : (item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad);
   const number = Number(value || 0);
   return number > 0 ? number : 1;
 }
 
 function getRepairLineTotal(item) {
   const quantity = getRepairLineQuantity(item);
-  const price = Number(item.precioUnitario ?? item.PrecioUnitario ?? item.importe ?? item.Importe ?? 0);
-  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
+  const price = Number(
+    item.precioUnitario ??
+      item.PrecioUnitario ??
+      item.importe ??
+      item.Importe ??
+      0,
+  );
+  const discount = Math.min(
+    100,
+    Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)),
+  );
   return quantity * price * (1 - discount / 100);
 }
 
@@ -2285,16 +2961,34 @@ function normalizeRepairLine(item, detailed = false) {
 
   const section = getRepairLineSection(item);
   const quantity = getRepairLineQuantity({ ...item, section });
-  const price = Number(item.precioUnitario ?? item.PrecioUnitario ?? item.importe ?? item.Importe ?? 0);
-  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
-  const netTotal = getRepairLineTotal({ ...item, section, precioUnitario: price, descuentoPct: discount });
-  const unitNet = quantity > 0 ? Math.round((netTotal / quantity + Number.EPSILON) * 100) / 100 : 0;
+  const price = Number(
+    item.precioUnitario ??
+      item.PrecioUnitario ??
+      item.importe ??
+      item.Importe ??
+      0,
+  );
+  const discount = Math.min(
+    100,
+    Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)),
+  );
+  const netTotal = getRepairLineTotal({
+    ...item,
+    section,
+    precioUnitario: price,
+    descuentoPct: discount,
+  });
+  const unitNet =
+    quantity > 0
+      ? Math.round((netTotal / quantity + Number.EPSILON) * 100) / 100
+      : 0;
 
   return {
     ...item,
     section,
     cantidad: quantity,
-    tiempo: section === "Piezas" ? item.tiempo ?? item.Tiempo ?? "" : quantity,
+    tiempo:
+      section === "Piezas" ? (item.tiempo ?? item.Tiempo ?? "") : quantity,
     precioUnitario: price,
     descuentoPct: discount,
     ivaPct: Number(item.ivaPct ?? item.IvaPct ?? 21),
@@ -2306,9 +3000,33 @@ function normalizeRepairLine(item, detailed = false) {
 function Metric({ label, value }) {
   return (
     <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
       <p className="mt-2 text-xl font-bold text-slate-900">{value}</p>
     </div>
   );
 }
 
+function FormSection({ title, children }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-600">
+        {title}
+      </h4>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-semibold text-slate-600">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
