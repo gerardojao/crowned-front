@@ -428,6 +428,7 @@ export default function ZagaInvoiceDocument({
             <LineItems
               items={items}
               ivaPct={ivaPct}
+              invoiceType={invoice.tipoFactura || invoice.TipoFactura}
               operationType={invoice.tipoOperacion || invoice.TipoOperacion}
             />
 
@@ -547,10 +548,11 @@ function VehicleTable({ invoice, paymentText }) {
   );
 }
 
-function LineItems({ items, ivaPct, operationType }) {
+function LineItems({ items, ivaPct, invoiceType, operationType }) {
   const isBodyPaint = String(operationType || "")
     .toLowerCase()
     .includes("chapa");
+  const specialInvoice = getSpecialInvoiceOperation(invoiceType);
   const groupDefinitions = isBodyPaint
     ? [
         { key: "ManoObra", title: "Mano obra", codePrefix: "MO" },
@@ -577,7 +579,7 @@ function LineItems({ items, ivaPct, operationType }) {
       {groups.map((group) => (
         <div key={group.title} className="mb-2">
           <div className="grid grid-cols-[90px_1fr_70px_45px_45px_45px_70px] font-bold uppercase">
-            <div>{group.title}</div>
+            <div>{specialInvoice.hideGroupTitle ? "" : group.title}</div>
             <div />
             <div className="text-right">Precio</div>
             <div className="text-right">Tiem</div>
@@ -608,6 +610,7 @@ function LineItems({ items, ivaPct, operationType }) {
                 <div>
                   {item.codigo ||
                     item.Codigo ||
+                    specialInvoice.code ||
                     (section === "Piezas" && group.includeMaterials
                       ? "MAT."
                       : `${group.codePrefix}${String(index + 1).padStart(2, "0")}`)}
@@ -625,6 +628,15 @@ function LineItems({ items, ivaPct, operationType }) {
       ))}
     </div>
   );
+}
+
+function getSpecialInvoiceOperation(invoiceType) {
+  const value = String(invoiceType || "").trim().toLowerCase();
+  if (value === "rapel") return { hideGroupTitle: true, code: "RAPPEL" };
+  if (value === "siniva" || value === "sin iva" || value === "novat") {
+    return { hideGroupTitle: true, code: "S-IVA" };
+  }
+  return { hideGroupTitle: false, code: "" };
 }
 
 function InfoLabel({ children }) {

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Printer, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Printer, Search, Trash2, UserPlus } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
 import PartPicker, {
@@ -134,6 +134,7 @@ export default function SpecialPartsInvoice() {
   const [selectedBankId, setSelectedBankId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [clientResults, setClientResults] = useState([]);
+  const [showClientForm, setShowClientForm] = useState(false);
   const [invoice, setInvoice] = useState({
     numero: "",
     idCliente: "",
@@ -189,7 +190,18 @@ export default function SpecialPartsInvoice() {
   );
   const iva = round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
   const total = round2(subtotal + iva);
-  const isInsuranceCustomer = String(invoice.clasificacion || "").toLowerCase().includes("seguro");
+  const selectedBank = useMemo(
+    () =>
+      bankAccounts.find(
+        (bank) => String(bank.id ?? bank.Id) === String(selectedBankId),
+      ) || null,
+    [bankAccounts, selectedBankId],
+  );
+  const selectedBankIban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
+  const selectedBankName = selectedBank?.nombre ?? selectedBank?.Nombre ?? "";
+  const isInsuranceCustomer =
+    !invoiceMode.isRapel &&
+    String(invoice.clasificacion || "").toLowerCase().includes("seguro");
   const franchiseAmount = isInsuranceCustomer ? round2(Math.max(0, Number(invoice.franquiciaImporte || 0))) : 0;
   const companyPayable = round2(Math.max(0, total - franchiseAmount));
   const totals = { subtotal, iva, otros: 0, total };
@@ -314,6 +326,8 @@ export default function SpecialPartsInvoice() {
     setInvoice((prev) => ({ ...prev, [field]: value }));
   };
 
+  const hasSelectedClient = Boolean(invoice.idCliente);
+
   const selectClient = (client) => {
     setInvoice((prev) => ({
       ...prev,
@@ -339,6 +353,7 @@ export default function SpecialPartsInvoice() {
     }));
     setClientSearch("");
     setClientResults([]);
+    setShowClientForm(false);
   };
 
   const saveClientFromInvoice = async () => {
@@ -379,6 +394,13 @@ export default function SpecialPartsInvoice() {
       if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
         throw new Error(res?.data?.message || res?.data?.Message || "No se pudo guardar el cliente.");
       }
+      const created = res?.data?.data?.[0] || res?.data?.Data?.[0] || {};
+      const createdId = created.id ?? created.Id ?? "";
+      setInvoice((prev) => ({
+        ...prev,
+        idCliente: createdId || prev.idCliente,
+      }));
+      setShowClientForm(false);
       setNotice("Cliente guardado correctamente.");
     } catch (err) {
       console.error(err);
@@ -451,9 +473,12 @@ export default function SpecialPartsInvoice() {
     if (isCredit && !accountsReceivableEnabled) {
       throw new Error("El modulo de cuentas por cobrar no esta habilitado para este taller.");
     }
-    if (franchiseAmount > total) {
+    if (!invoiceMode.isRapel && franchiseAmount > total) {
       throw new Error("La franquicia no puede superar el total de la factura.");
     }
+
+    const effectiveBankAccountId =
+      !isCredit && selectedBankId ? Number(selectedBankId) : null;
 
     const res = await api.post("/FacturaEmitida/emitir", {
       tipoFactura: invoiceMode.tipoFactura,
@@ -481,7 +506,7 @@ export default function SpecialPartsInvoice() {
       totalAbonado: isCredit || invoiceMode.isRapel ? 0 : companyPayable,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
-      bankAccountId: !isCredit && selectedBankId ? Number(selectedBankId) : null,
+      bankAccountId: effectiveBankAccountId,
       items: billableItems,
     });
 
@@ -564,6 +589,10 @@ export default function SpecialPartsInvoice() {
       tipo: invoiceMode.itemType,
       kind: invoiceMode.itemType,
     }));
+  const documentTaller = {
+    ...taller,
+    iban: isCredit ? taller.iban : selectedBankIban || taller.iban,
+  };
 
   return (
     <>
@@ -644,6 +673,38 @@ export default function SpecialPartsInvoice() {
             </div>
           </div>
 
+          {hasSelectedClient && !showClientForm && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-slate-700">
+              <p className="font-bold text-slate-900">{invoice.cliente}</p>
+              <p className="mt-1">
+                {[invoice.dni, invoice.telefonoCliente].filter(Boolean).join(" · ") ||
+                  "Sin DNI/telefono"}
+              </p>
+              {(invoice.matricula || invoice.marca || invoice.modelo) && (
+                <p className="mt-1 text-xs text-slate-500">
+                  {[invoice.matricula, invoice.marca, invoice.modelo]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setShowClientForm((value) => !value)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            <UserPlus size={17} />
+            {showClientForm
+              ? "Ocultar formulario"
+              : hasSelectedClient
+                ? "Editar datos"
+                : "Nuevo cliente"}
+          </button>
+
+          {showClientForm && (
+            <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Input label="Cliente" value={invoice.cliente} onChange={(v) => setInvoiceField("cliente", v)} />
             <Input label="NIF/DNI" value={invoice.dni} onChange={(v) => setInvoiceField("dni", v)} />
@@ -683,14 +744,18 @@ export default function SpecialPartsInvoice() {
             <Input label="CV" type="number" value={invoice.cv} onChange={(v) => setInvoiceField("cv", v)} />
             <Input label="Combustible" value={invoice.combustible} onChange={(v) => setInvoiceField("combustible", v)} />
           </div>
-          <button
-            type="button"
-            onClick={saveClientFromInvoice}
-            disabled={savingCustomer}
-            className="mt-3 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-          >
-            {savingCustomer ? "Guardando cliente..." : "Guardar cliente"}
-          </button>
+          {!hasSelectedClient && (
+            <button
+              type="button"
+              onClick={saveClientFromInvoice}
+              disabled={savingCustomer}
+              className="mt-3 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {savingCustomer ? "Guardando cliente..." : "Guardar cliente"}
+            </button>
+          )}
+            </>
+          )}
 
           <div>
             <h3 className="mb-3 text-lg font-bold text-slate-900">{invoiceMode.linesTitle}</h3>
@@ -842,13 +907,15 @@ export default function SpecialPartsInvoice() {
 
       {usesZagaInvoiceTemplate(taller) ? (
         <ZagaInvoiceDocument
-          taller={taller}
+          taller={documentTaller}
           invoice={{
             ...invoice,
             tipoFactura: invoiceMode.tipoFactura,
             tipoOperacion: invoiceMode.operationType,
             franquiciaImporte: franchiseAmount,
             clasificacionCliente: invoice.clasificacion,
+            bankAccountName: isCredit ? "" : selectedBankName,
+            bankAccountIban: isCredit ? "" : selectedBankIban,
             totalAbonado: 0,
             saldoPendiente: isCredit ? companyPayable : 0,
           }}
@@ -858,13 +925,15 @@ export default function SpecialPartsInvoice() {
         />
       ) : (
         <StandardInvoiceDocument
-          taller={taller}
+          taller={documentTaller}
           invoice={{
             ...invoice,
             tipoFactura: invoiceMode.tipoFactura,
             tipoOperacion: invoiceMode.operationType,
             franquiciaImporte: franchiseAmount,
             clasificacionCliente: invoice.clasificacion,
+            bankAccountName: isCredit ? "" : selectedBankName,
+            bankAccountIban: isCredit ? "" : selectedBankIban,
             totalAbonado: 0,
             saldoPendiente: isCredit ? companyPayable : 0,
           }}

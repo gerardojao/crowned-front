@@ -725,7 +725,7 @@ function PrintActions({ title, subtitle }) {
         <button
           type="button"
           onClick={() => window.print()}
-          className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-white transition hover:bg-orange-700"
+          className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-white transition hover:bg-orange-700"          
         >
           <Printer size={18} />
           Emitir e Imprimir

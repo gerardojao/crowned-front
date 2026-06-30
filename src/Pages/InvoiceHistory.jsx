@@ -234,18 +234,14 @@ export default function InvoiceHistory() {
     return;
   }
 
-  window.open(`/print-invoice/${row.id}`, "_blank");
+  window.open(`/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`, "_blank");
 };
 
 const handleView = (row) => {
-    console.log("Viewing invoice:", row.origin, row.invoiceNumber);
-    if(row.origin === "sparePart") {
-        console.log("entre a esta mierda");
-        navigate(
-            `/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`
-            );
-            return;
-    }
+  if (["sparePart", "rapel", "noVat"].includes(row.origin)) {
+    navigate(`/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`);
+    return;
+  }
 
   handlePrint(row);
 };
