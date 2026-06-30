@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, ChevronDown, ChevronUp  } from "lucide-react";
-import api from "../Components/api";
+import api, { getCurrentWorkshopId } from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const EMPTY_CUSTOMER = {
@@ -91,6 +91,16 @@ const Banner = ({ type = "success", text, onClose, actionLabel, onAction }) => {
 const workOrderBtn =
   "inline-flex items-center rounded-xl px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-700 transition shadow-md font-semibold";
 
+function ensureOk(res) {
+  const data = res?.data;
+  if (data?.ok === 0 || data?.Ok === 0) {
+    throw new Error(
+      data?.message || data?.Message || "La operación no se pudo completar.",
+    );
+  }
+  return data;
+}
+
 export default function RegisterCustomer() {
   const labels = useBusinessTerminology();
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
@@ -100,6 +110,8 @@ export default function RegisterCustomer() {
 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [totalCustomers, setTotalCustomers] = useState(0);
+  const [activeWorkshopId, setActiveWorkshopId] = useState(getCurrentWorkshopId());
   const pageSize = 10;
 
   const [errors, setErrors] = useState({});
@@ -109,6 +121,9 @@ export default function RegisterCustomer() {
   const [deleteModal, setDeleteModal] = useState({
     open: false,
     customer: null,
+  });
+  const [updateModal, setUpdateModal] = useState({
+    open: false,
   });
   const [deleting, setDeleting] = useState(false);
 
@@ -149,21 +164,58 @@ export default function RegisterCustomer() {
         : "border-slate-300"
     }`;
 
-  const loadCustomers = async () => {
-    try {
-      const res = await api.get("/Cliente", {
-        params: {
-          search,
-          page,
-          pageSize,
-        },
-      });
+  const loadCustomers = async (overrides = {}) => {
+    if (!getCurrentWorkshopId()) return;
 
-      const pack = res?.data?.data?.[0];
-      setCustomers(pack?.items || []);
+    const nextSearch = overrides.search ?? search;
+    const nextPage = overrides.page ?? page;
+    const hasSearch = Boolean(String(nextSearch || "").trim());
+
+    try {
+      let res;
+
+      if (hasSearch) {
+        res = await api.get("/Cliente", {
+            params: {
+              search: nextSearch,
+              page: nextPage,
+              pageSize,
+            },
+          });
+        ensureOk(res);
+      } else {
+        try {
+          res = await api.get("/Cliente/ultimos", {
+            params: {
+              take: pageSize,
+            },
+          });
+          ensureOk(res);
+        } catch (latestErr) {
+          console.warn(
+            "No se pudieron cargar los ultimos clientes, usando listado general.",
+            latestErr,
+          );
+          res = await api.get("/Cliente", {
+            params: {
+              search: "",
+              page: 1,
+              pageSize,
+            },
+          });
+          ensureOk(res);
+        }
+      }
+
+      const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? {};
+      const list = pack.items ?? pack.Items ?? [];
+      const total = pack.total ?? pack.Total ?? 0;
+      setCustomers(Array.isArray(list) ? list : []);
+      setTotalCustomers(Number(total) || 0);
     } catch (err) {
       console.error(err);
       setCustomers([]);
+      setTotalCustomers(0);
       setNotice({
         type: "error",
         text:
@@ -201,11 +253,24 @@ export default function RegisterCustomer() {
 
   useEffect(() => {
     loadCustomers();
-  }, [search, page]);
+  }, [search, page, activeWorkshopId]);
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
+  useEffect(() => {
+    const syncWorkshop = () => {
+      setActiveWorkshopId(getCurrentWorkshopId());
+      setPage(1);
+    };
 
+    window.addEventListener("tc:workshop-changed", syncWorkshop);
+    window.addEventListener("storage", syncWorkshop);
+
+    return () => {
+      window.removeEventListener("tc:workshop-changed", syncWorkshop);
+      window.removeEventListener("storage", syncWorkshop);
+    };
+  }, []);
+
+  const submitCustomer = async () => {
     try {
       setSubmitting(true);
 
@@ -233,7 +298,7 @@ export default function RegisterCustomer() {
       };
 
       if (editingId) {
-        await api.put(`/Cliente/${editingId}`, payload);
+        ensureOk(await api.put(`/Cliente/${editingId}`, payload));
 
         setNotice({
           type: "success",
@@ -254,7 +319,7 @@ export default function RegisterCustomer() {
           payload.kilometraje = customer.Kilometraje ? Number(customer.Kilometraje) : null;
         }
 
-        await api.post("/Cliente", payload);
+        ensureOk(await api.post("/Cliente", payload));
 
         setNotice({
           type: "success",
@@ -268,7 +333,9 @@ export default function RegisterCustomer() {
       setVehicles([]);
       setIncludeVehicle(false);
       setViewMode("search");
-      await loadCustomers();
+      setSearch("");
+      setPage(1);
+      await loadCustomers({ search: "", page: 1 });
     } catch (err) {
       console.error(err);
 
@@ -284,6 +351,17 @@ export default function RegisterCustomer() {
     }
   };
 
+  const onSubmit = async (e) => {
+    e.preventDefault();
+
+    if (editingId) {
+      setUpdateModal({ open: true });
+      return;
+    }
+
+    await submitCustomer();
+  };
+
   const confirmDeleteCustomer = async () => {
     if (!deleteModal.customer) return;
 
@@ -292,7 +370,7 @@ export default function RegisterCustomer() {
     try {
       setDeleting(true);
 
-      await api.delete(`/Cliente/${id}`);
+      ensureOk(await api.delete(`/Cliente/${id}`));
 
       setNotice({
         type: "success",
@@ -477,9 +555,9 @@ export default function RegisterCustomer() {
     try {
       setVehicleModal((current) => ({ ...current, saving: true }));
       if (vehicleModal.mode === "edit") {
-        await api.put(`/Vehiculo/${form.Id}`, payload);
+        ensureOk(await api.put(`/Vehiculo/${form.Id}`, payload));
       } else {
-        await api.post(`/Vehiculo/cliente/${editingId}`, payload);
+        ensureOk(await api.post(`/Vehiculo/cliente/${editingId}`, payload));
       }
 
       await loadVehicles(editingId);
@@ -514,7 +592,7 @@ export default function RegisterCustomer() {
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            Registro de cliente
+            Registro o busqueda de cliente
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             {labels.customerPageSubtitle}
@@ -1014,15 +1092,27 @@ export default function RegisterCustomer() {
       {viewMode === "search" && (
       <div className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-5">
-          <h3 className="text-lg font-semibold text-slate-800">
-            Clientes registrados
-          </h3>
+          <div>
+            <h3 className="text-lg font-semibold text-slate-800">
+              {search.trim()
+                ? "Clientes registrados"
+                : "Ultimos 10 clientes registrados"}
+            </h3>
+            {!search.trim() && (
+              <p className="text-sm text-slate-500">
+                Mostrando {customers.length} de {totalCustomers} clientes activos.
+              </p>
+            )}
+          </div>
 
           <input
             type="text"
             placeholder="Buscar cliente..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             className="w-full md:w-80 rounded-xl border border-slate-300 px-3 py-2 text-sm"
           />
         </div>
@@ -1118,6 +1208,50 @@ export default function RegisterCustomer() {
         </div>
       </div>
       )}
+      {updateModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
+            <h3 className="text-lg font-semibold text-slate-900">
+              Actualizar cliente
+            </h3>
+
+            <p className="mt-2 text-sm text-slate-600">
+              ¿Deseas guardar los cambios realizados a{" "}
+              <span className="font-semibold text-slate-900">
+                {customer.Nombre || "este cliente"}
+              </span>
+              ?
+            </p>
+
+            <p className="mt-2 text-xs text-slate-500">
+              Se actualizarán solo los datos del cliente. Los coches asociados se gestionan desde su sección.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => setUpdateModal({ open: false })}
+                className="rounded-xl px-4 py-2 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={async () => {
+                  setUpdateModal({ open: false });
+                  await submitCustomer();
+                }}
+                className="rounded-xl px-4 py-2 bg-sky-600 text-white hover:bg-sky-700 transition disabled:opacity-60"
+              >
+                {submitting ? "Actualizando..." : "Actualizar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {deleteModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl ring-1 ring-slate-200">
@@ -1136,8 +1270,7 @@ export default function RegisterCustomer() {
             </p>
 
             <p className="mt-2 text-xs text-slate-500">
-              Esta acción ocultará el cliente del sistema, pero no borrará
-              físicamente el registro de la base de datos.
+              Esta acción borrará el cliente del sistema.
             </p>
 
             <div className="mt-6 flex justify-end gap-3">

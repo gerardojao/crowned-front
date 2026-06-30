@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -518,7 +518,7 @@ export default function RegisterPreOrder() {
     if (form.ClienteId) {
       clearVehicleForQuickCreate();
       setQuickCreateNotice(
-        "Cliente seleccionado. Completa los datos del nuevo vehÃ­culo.",
+        "Cliente seleccionado. Completa los datos del nuevo vehículo.",
       );
     }
 
@@ -936,19 +936,19 @@ export default function RegisterPreOrder() {
                       className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
                     >
                       <span className="block font-semibold text-slate-900">
-                        ðŸ‘¤ {customer.Nombre}
+                        Cliente: {customer.Nombre}
                       </span>
                       <span className="mt-1 block text-slate-600">
-                        ðŸ“ž {customer.Telefono || "Sin telÃ©fono"}
+                        Tel: {customer.Telefono || "Sin teléfono"}
                       </span>
 
                       <span className="mt-1 block text-xs text-slate-500">
-                        ðŸš—{" "}
+                        Vehículos:{" "}
                         {customer.VehicleCount !== null
-                          ? `${customer.VehicleCount} vehÃ­culo${Number(customer.VehicleCount) === 1 ? "" : "s"} registrado${Number(customer.VehicleCount) === 1 ? "" : "s"}`
+                          ? `${customer.VehicleCount} vehículo${Number(customer.VehicleCount) === 1 ? "" : "s"} registrado${Number(customer.VehicleCount) === 1 ? "" : "s"}`
                           : customer.Matricula
-                            ? `${customer.Matricula} Â· ${[customer.Marca, customer.Modelo].filter(Boolean).join(" ")}`
-                            : "VehÃ­culos registrados"}
+                            ? `${customer.Matricula} · ${[customer.Marca, customer.Modelo].filter(Boolean).join(" ")}`
+                            : "Vehículos registrados"}
                       </span>
                     </button>
                   ))}
@@ -987,7 +987,7 @@ export default function RegisterPreOrder() {
                           {vehicle.Bastidor
                             ? `Bastidor ${vehicle.Bastidor}`
                             : "Sin bastidor"}{" "}
-                          Â·{" "}
+                          ·{" "}
                           {vehicle.Kilometraje
                             ? `${vehicle.Kilometraje} km`
                             : "Sin kilometraje"}
@@ -1064,7 +1064,7 @@ export default function RegisterPreOrder() {
                     name="Telefono"
                     value={form.Telefono}
                     onChange={setField}
-                    placeholder="TelÃ©fono"
+                    placeholder="Teléfono"
                   />
                   <select
                     value={form.Clasificacion}
@@ -1076,7 +1076,7 @@ export default function RegisterPreOrder() {
                     <option value="Particular">Particular</option>
                     <option value="Empresa">Empresa</option>
                     <option value="Compania de seguro">
-                      CompaÃ±Ã­a de seguro
+                      Compañía de seguro
                     </option>
                   </select>
 
@@ -1084,19 +1084,19 @@ export default function RegisterPreOrder() {
                     name="Direccion"
                     value={form.Direccion}
                     onChange={setField}
-                    placeholder="DirecciÃ³n"
+                    placeholder="Dirección"
                   />
                   <Input
                     name="CodigoPostal"
                     value={form.CodigoPostal}
                     onChange={setField}
-                    placeholder="CÃ³digo postal"
+                    placeholder="Código postal"
                   />
                   <Input
                     name="Poblacion"
                     value={form.Poblacion}
                     onChange={setField}
-                    placeholder="PoblaciÃ³n"
+                    placeholder="Población"
                   />
                   <Input
                     name="Provincia"
@@ -1105,12 +1105,12 @@ export default function RegisterPreOrder() {
                     placeholder="Provincia"
                   />
                 </FormSection>
-                <FormSection title="VehÃ­culo">
+                <FormSection title="Vehículo">
                   <Input
                     name="Matricula"
                     value={form.Matricula}
                     onChange={setField}
-                    placeholder="MatrÃ­cula *"
+                    placeholder="Matrícula *"
                     required
                   />
                   <Input
@@ -1133,7 +1133,7 @@ export default function RegisterPreOrder() {
                     placeholder="Bastidor"
                   />
 
-                  <Field label="Fecha matriculaciÃ³n">
+                  <Field label="Fecha matriculación">
                     <Input
                       name="FechaMatriculacion"
                       type="date"
@@ -1177,8 +1177,8 @@ export default function RegisterPreOrder() {
                     placeholder="KW"
                   />
                 </FormSection>
-                <FormSection title="RecepciÃ³n">
-                  <Field label="Fecha recepciÃ³n">
+                <FormSection title="Recepción">
+                  <Field label="Fecha recepción">
                     <Input
                       name="Fecha"
                       type="date"
@@ -1221,7 +1221,7 @@ export default function RegisterPreOrder() {
                 </FormSection>
                 <div className="rounded-2xl border border-slate-200 bg-white p-4">
                   <h4 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-600">
-                    Trabajo / recepciÃ³n
+                    Trabajo / recepción
                   </h4>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
@@ -1231,7 +1231,7 @@ export default function RegisterPreOrder() {
                       onChange={setField}
                       className="md:col-span-4"
                       rows={4}
-                      placeholder="Lo que indica el cliente o recepciÃ³n. Ej: al carro le suenan los frenos *"
+                      placeholder="Lo que indica el cliente o recepción. Ej: al carro le suenan los frenos *"
                       required
                     />
 
@@ -1253,8 +1253,8 @@ export default function RegisterPreOrder() {
                   pre-orden.
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  Cuando selecciones el vehÃ­culo, aparecerÃ¡n los datos
-                  necesarios para completar la recepciÃ³n.
+                  Cuando selecciones el vehículo, aparecerán los datos
+                  necesarios para completar la recepción.
                 </p>
               </div>
             )}
@@ -1313,7 +1313,7 @@ export default function RegisterPreOrder() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="text-sm text-slate-500">
-                        #{item.Id} Â·{" "}
+                        #{item.Id} ·{" "}
                         {item.Fecha
                           ? new Date(item.Fecha).toLocaleDateString("es-ES")
                           : ""}
@@ -1322,7 +1322,7 @@ export default function RegisterPreOrder() {
                         {item.Matricula}
                       </h4>
                       <p className="text-sm text-slate-600">
-                        {item.Cliente} Â·{" "}
+                        {item.Cliente} ·{" "}
                         {[item.Marca, item.Modelo].filter(Boolean).join(" ")}
                       </p>
                     </div>
