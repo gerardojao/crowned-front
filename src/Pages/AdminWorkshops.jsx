@@ -46,6 +46,7 @@ const emptyWorkshop = {
   enableSpecialInvoices: true,
   enableRapelInvoices: false,
   enableNoVatInvoices: false,
+  enableDigitalSignatures: true,
   enableReceptionPhotos: true,
   enableDetailedRepairInvoiceLines: false,
   enableAccountsReceivable: true,
@@ -103,6 +104,7 @@ export default function AdminWorkshops() {
     enableSpecialInvoices: true,
     enableRapelInvoices: false,
     enableNoVatInvoices: false,
+    enableDigitalSignatures: true,
     enableReceptionPhotos: true,
     enableDetailedRepairInvoiceLines: false,
     enableAccountsReceivable: true,
@@ -196,6 +198,7 @@ export default function AdminWorkshops() {
         enableSpecialInvoices: true,
         enableRapelInvoices: false,
         enableNoVatInvoices: false,
+        enableDigitalSignatures: true,
         enableReceptionPhotos: true,
         enableDetailedRepairInvoiceLines: false,
         enableAccountsReceivable: true,
@@ -265,6 +268,10 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableNoVatInvoices ??
         selectedWorkshop.EnableNoVatInvoices ??
         false,
+      enableDigitalSignatures:
+        selectedWorkshop.enableDigitalSignatures ??
+        selectedWorkshop.EnableDigitalSignatures ??
+        true,
       enableReceptionPhotos:
         selectedWorkshop.enableReceptionPhotos ??
         selectedWorkshop.EnableReceptionPhotos ??
@@ -349,6 +356,10 @@ export default function AdminWorkshops() {
         selectedWorkshop.enableNoVatInvoices ??
         selectedWorkshop.EnableNoVatInvoices ??
         false,
+      enableDigitalSignatures:
+        selectedWorkshop.enableDigitalSignatures ??
+        selectedWorkshop.EnableDigitalSignatures ??
+        true,
       enableReceptionPhotos:
         selectedWorkshop.enableReceptionPhotos ??
         selectedWorkshop.EnableReceptionPhotos ??
@@ -1200,6 +1211,12 @@ function FeatureSwitches({ values, onChange }) {
           description="Permite guardar hasta 5 fotos internas por pre-orden."
           checked={values.enableReceptionPhotos}
           onChange={(checked) => onChange("enableReceptionPhotos", checked)}
+        />
+        <Switch
+          label="Firmas digitales"
+          description="Permite capturar firmas en presupuestos, pre-ordenes y ordenes de trabajo."
+          checked={values.enableDigitalSignatures}
+          onChange={(checked) => onChange("enableDigitalSignatures", checked)}
         />
         <Switch
           label="Lineas tecnicas"

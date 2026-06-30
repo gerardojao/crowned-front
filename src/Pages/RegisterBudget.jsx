@@ -1922,17 +1922,6 @@ export default function RegisterBudget() {
           </button>
         </div>
 
-        {/* //ojooooooooo
-        <SignatureModal
-            open={signatureModal.open}
-            title="Firma de aceptación del presupuesto"
-            description={`Firma la aceptación del presupuesto ${
-              signatureModal.budget?.NumeroPresupuesto || ""
-            }.`}
-            saving={signatureModal.saving}
-            onClose={closeSignatureModal}
-            onSave={saveAcceptanceSignature}
-          /> */}
           </>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center">
@@ -2144,7 +2133,6 @@ export default function RegisterBudget() {
         </div>
         </section>
       )}
-    {/* ojoooo */}
       <SignatureModal
         open={signatureModal.open}
         title="Firma de aceptación del presupuesto"
