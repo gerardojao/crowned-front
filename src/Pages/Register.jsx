@@ -8,8 +8,24 @@ import { useRef } from "react";
 const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
 const EMPTY_EXPENSE = {
-  Id:"", Foto:"", Fecha:"", Mes:"", Importe:"", NombreEgreso:"", Referencia:"", Descripcion:"", NumeroFactura:"", BankAccountId:"",
+  Id:"", Foto:"", Fecha:"", Mes:"", Importe:"", IvaPct:"21", NombreEgreso:"", Referencia:"", Descripcion:"", NumeroFactura:"", BankAccountId:"",
 };
+
+const VAT_OPTIONS = ["0", "10", "21"];
+
+const calculateTaxBase = (amount, ivaPct) => {
+  const total = Number(amount);
+  const pct = Number(ivaPct);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (!Number.isFinite(pct) || pct <= 0) return Math.round(total * 100) / 100;
+  return Math.round((total / (1 + pct / 100)) * 100) / 100;
+};
+
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+  }).format(Number(value) || 0);
 
 const splitExpenseReference = (value = "") => {
   const text = String(value || "");
@@ -164,6 +180,7 @@ useEffect(() => {
       Referencia: parsedDescription.referencia,
       Descripcion: parsedDescription.descripcion,
       NumeroFactura: r.numeroFactura ?? r.NumeroFactura ?? "",
+      IvaPct: r.ivaPct ?? r.IvaPct ?? "21",
       BankAccountId: r.bankAccountId ?? r.BankAccountId ?? "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -234,6 +251,7 @@ useEffect(() => {
 
     try {
       setSubmitting(true);
+      const importeBase = calculateTaxBase(expense.Importe, expense.IvaPct);
 
       if (isEdit) {
         const id = state.id || record?.id;
@@ -243,7 +261,8 @@ useEffect(() => {
           nombreEgreso: expense.NombreEgreso ? Number(expense.NombreEgreso) : null,
           descripcion: buildExpenseDescription(expense),
           numeroFactura: expense.NumeroFactura?.trim() || null,
-          importe: Number(expense.Importe ?? 0),
+          importe: importeBase,
+          ivaPct: Number(expense.IvaPct ?? 21),
           foto: expense.Foto ?? null,
           ...(expense.BankAccountId ? { bankAccountId: Number(expense.BankAccountId) } : {}),
         });
@@ -266,7 +285,8 @@ useEffect(() => {
         Foto: expense.Foto || null,
         Fecha: expense.Fecha || null,
         Mes: expense.Mes || null,
-        Importe: Number(expense.Importe), // requerido > 0
+        Importe: importeBase, // base imponible segun IVA seleccionado
+        IvaPct: Number(expense.IvaPct ?? 21),
         NombreEgreso: Number(expense.NombreEgreso), // requerido
         Descripcion: buildExpenseDescription(expense),
         NumeroFactura: expense.NumeroFactura?.trim() || null,
@@ -313,6 +333,8 @@ useEffect(() => {
     
       return originalName;
     };
+
+  const importeBase = calculateTaxBase(expense.Importe, expense.IvaPct);
 
   return (
     <>
@@ -481,7 +503,7 @@ useEffect(() => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Importe">Importe</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Importe">Importe con IVA</label>
             <input
               id="Importe"
               type="number"
@@ -496,6 +518,26 @@ useEffect(() => {
               aria-describedby={errors.Importe ? "Importe-error" : undefined}
             />
             {errors.Importe && <FieldError id="Importe-error">{errors.Importe}</FieldError>}
+            {Number(expense.Importe) > 0 && (
+              <p className="mt-1 text-xs text-slate-500">
+                Base gasto: {formatCurrency(importeBase)}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="IvaPct">IVA</label>
+            <select
+              id="IvaPct"
+              name="IvaPct"
+              className={cls("IvaPct")}
+              value={expense.IvaPct ?? "21"}
+              onChange={handleChange}
+            >
+              {VAT_OPTIONS.map((value) => (
+                <option key={value} value={value}>{value}%</option>
+              ))}
+            </select>
           </div>
         </div>
 

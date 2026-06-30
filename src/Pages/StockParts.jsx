@@ -144,6 +144,7 @@ export default function StockParts() {
     numeroFactura: "",
     fecha: "",
     bankAccountId: "",
+    ivaPct: "21",
     loading: false,
   });
 
@@ -540,6 +541,7 @@ export default function StockParts() {
       numeroFactura: String(getValue(row, "numeroFactura", "") || ""),
       fecha: new Date().toISOString().slice(0, 10),
       bankAccountId: String(defaultBankId || ""),
+      ivaPct: "21",
       loading: false,
     });
   };
@@ -552,6 +554,7 @@ export default function StockParts() {
       numeroFactura: "",
       fecha: "",
       bankAccountId: "",
+      ivaPct: "21",
       loading: false,
     });
   };
@@ -585,6 +588,7 @@ export default function StockParts() {
         numeroFactura,
         fecha: paymentModal.fecha || null,
         bankAccountId: Number(paymentModal.bankAccountId),
+        ivaPct: Number(paymentModal.ivaPct ?? 21),
       });
       await loadInventory();
       setPaymentModal({
@@ -593,6 +597,7 @@ export default function StockParts() {
         numeroFactura: "",
         fecha: "",
         bankAccountId: "",
+        ivaPct: "21",
         loading: false,
       });
       setNotice({
@@ -1439,6 +1444,7 @@ export default function StockParts() {
         numeroFactura={paymentModal.numeroFactura}
         fecha={paymentModal.fecha}
         bankAccountId={paymentModal.bankAccountId}
+        ivaPct={paymentModal.ivaPct}
         bankAccounts={bankAccounts}
         loading={paymentModal.loading}
         partLabel={paymentModal.row ? getPartLabel(paymentModal.row) : ""}
@@ -1450,6 +1456,9 @@ export default function StockParts() {
         }
         onChangeBank={(bankAccountId) =>
           setPaymentModal((current) => ({ ...current, bankAccountId }))
+        }
+        onChangeIva={(ivaPct) =>
+          setPaymentModal((current) => ({ ...current, ivaPct }))
         }
         onCancel={closePaymentModal}
         onConfirm={confirmPayment}
@@ -1578,12 +1587,14 @@ function PaymentModal({
   numeroFactura,
   fecha,
   bankAccountId,
+  ivaPct,
   bankAccounts,
   loading,
   partLabel,
   onChangeNumero,
   onChangeFecha,
   onChangeBank,
+  onChangeIva,
   onCancel,
   onConfirm,
 }) {
@@ -1621,6 +1632,18 @@ function PaymentModal({
             value={fecha}
             onChange={onChangeFecha}
           />
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            IVA
+            <select
+              value={ivaPct ?? "21"}
+              onChange={(event) => onChangeIva(event.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            >
+              <option value="0">0%</option>
+              <option value="10">10%</option>
+              <option value="21">21%</option>
+            </select>
+          </label>
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
             Banco *
             <select
