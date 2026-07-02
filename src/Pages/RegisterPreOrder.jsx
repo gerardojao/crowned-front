@@ -10,11 +10,13 @@ import {
   X,
   CheckCircle,
   PenLine,
+  UserPlus,
 } from "lucide-react";
 import api from "../Components/api";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import SignatureModal from "../Components/SignatureModal";
+import SmallSuccessModal from "../Components/SmallSuccessModal";
 
 const EMPTY_PRE_ORDER = {
   ClienteId: "",
@@ -65,6 +67,13 @@ function pickItems(res) {
   return Array.isArray(pack.items ?? pack.Items)
     ? (pack.items ?? pack.Items)
     : [];
+}
+
+function pickArray(res) {
+  const first = res?.data?.data?.[0] ?? res?.data?.Data?.[0];
+  if (Array.isArray(first)) return first;
+  if (Array.isArray(res?.data)) return res.data;
+  return [];
 }
 
 function pickTotal(res) {
@@ -206,6 +215,8 @@ export default function RegisterPreOrder() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [successModal, setSuccessModal] = useState("");
+  const [warningModal, setWarningModal] = useState("");
   const [error, setError] = useState("");
   const [allowed, setAllowed] = useState(null);
 
@@ -227,6 +238,7 @@ export default function RegisterPreOrder() {
   const [receptionPhotosEnabled, setReceptionPhotosEnabled] = useState(true);
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [photoTarget, setPhotoTarget] = useState(null);
+  const [successAfterPhotos, setSuccessAfterPhotos] = useState("");
 
   const [digitalSignaturesEnabled, setDigitalSignaturesEnabled] =
     useState(false);
@@ -326,11 +338,7 @@ export default function RegisterPreOrder() {
       const res = await api.get("/Cliente", {
         params: { search: value, page: 1, pageSize: 6 },
       });
-      const pack = res?.data?.data?.[0] ?? {};
-      const list = Array.isArray(pack.items ?? pack.Items)
-        ? (pack.items ?? pack.Items)
-        : [];
-      const normalizedCustomers = list.map(normalizeCustomer);
+      const normalizedCustomers = pickItems(res).map(normalizeCustomer);
 
       const customersWithVehicleCount = await Promise.all(
         normalizedCustomers.map(async (customer) => {
@@ -338,7 +346,7 @@ export default function RegisterPreOrder() {
             const vehicleRes = await api.get(
               `/Vehiculo/cliente/${customer.Id}`,
             );
-            const vehicles = vehicleRes?.data?.data?.[0] || [];
+            const vehicles = pickArray(vehicleRes);
             return {
               ...customer,
               VehicleCount: Array.isArray(vehicles) ? vehicles.length : 0,
@@ -376,7 +384,7 @@ export default function RegisterPreOrder() {
   const loadVehiclesForCustomer = async (customerId) => {
     if (!customerId) return [];
     const res = await api.get(`/Vehiculo/cliente/${customerId}`);
-    return (res?.data?.data?.[0] || []).map(normalizeVehicle);
+    return pickArray(res).map(normalizeVehicle);
   };
 
   const searchQuickCustomers = async (term) => {
@@ -566,10 +574,17 @@ export default function RegisterPreOrder() {
       setLoadingCustomerVehicles(true);
       setSelectedCustomerForVehicles(customer);
       const res = await api.get(`/Vehiculo/cliente/${customer.Id}`);
-      const vehicles = (res?.data?.data?.[0] || []).map(normalizeVehicle);
+      const vehicles = pickArray(res).map(normalizeVehicle);
 
       if (vehicles.length === 0) {
-        await fillFromCustomer(customer, fallbackVehicle);
+        await fillCustomerOnlyForNewVehicle(customer);
+        setShowNewCustomer(true);
+        setQuickCreateNotice(
+          "Cliente seleccionado. Completa los datos del nuevo vehiculo.",
+        );
+        setWarningModal(
+          "Este cliente no tiene coche asignado. Agrega un coche para poder completar la pre-orden.",
+        );
         return;
       }
 
@@ -596,6 +611,7 @@ export default function RegisterPreOrder() {
     setCustomerVehicles([]);
     setSelectedCustomerForVehicles(null);
     setShowNewCustomer(false);
+    setWarningModal("");
   };
 
   const createCustomerFromPreOrder = async () => {
@@ -758,15 +774,17 @@ export default function RegisterPreOrder() {
 
       if (editingId) {
         ensureOk(await api.put(`/PreOrdenTrabajo/${editingId}`, payload));
-        setNotice("Pre-orden actualizada correctamente.");
+        setSuccessModal("Pre-orden actualizada correctamente.");
       } else {
         const createdData = ensureOk(
           await api.post("/PreOrdenTrabajo", payload),
         );
         const created = createdData?.data?.[0] ?? createdData?.Data?.[0];
-        setNotice("Pre-orden registrada correctamente.");
         if (created && receptionPhotosEnabled) {
           setPhotoTarget(normalizePreOrder(created));
+          setSuccessAfterPhotos("Pre-orden registrada correctamente.");
+        } else {
+          setSuccessModal("Pre-orden registrada correctamente.");
         }
       }
 
@@ -781,6 +799,14 @@ export default function RegisterPreOrder() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const closePhotosModal = () => {
+    setPhotoTarget(null);
+    if (successAfterPhotos) {
+      setSuccessModal(successAfterPhotos);
+      setSuccessAfterPhotos("");
     }
   };
 
@@ -921,6 +947,19 @@ export default function RegisterPreOrder() {
         </div>
       ) : (
         <>
+          <SmallSuccessModal
+            open={Boolean(successModal)}
+            message={successModal}
+            onClose={() => setSuccessModal("")}
+          />
+          <SmallSuccessModal
+            open={Boolean(warningModal)}
+            title="Cliente sin coche"
+            message={warningModal}
+            variant="warning"
+            onClose={() => setWarningModal("")}
+          />
+
           <div className="mt-2 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-slate-900">
@@ -1073,12 +1112,19 @@ export default function RegisterPreOrder() {
                 </div>
               )}
 
+              <div className="my-4 flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-200" />
+                <span className="text-xs font-semibold text-slate-400">o</span>
+                <div className="h-px flex-1 bg-slate-200" />
+              </div>
+
               <div className="mt-3">
                 <button
                   type="button"
                   onClick={toggleQuickCreate}
                   className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                 >
+                  <UserPlus size={17} />
                   {showNewCustomer
                     ? "Ocultar alta rapida"
                     : form.ClienteId
@@ -1546,7 +1592,7 @@ export default function RegisterPreOrder() {
       {photoTarget && (
         <ReceptionPhotosModal
           open={!!photoTarget}
-          onClose={() => setPhotoTarget(null)}
+          onClose={closePhotosModal}
           preOrderId={photoTarget.Id}
           title="Fotos del vehiculo"
           subtitle={`${photoTarget.Matricula || ""} - ${photoTarget.Cliente || ""}`}

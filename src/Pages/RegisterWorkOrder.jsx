@@ -22,6 +22,7 @@ import PartPicker, {
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import { amountInput } from "../utils/currency";
+import SmallSuccessModal from "../Components/SmallSuccessModal";
 
 const EMPTY_ORDER = {
   ClienteId: "",
@@ -217,6 +218,8 @@ export default function RegisterWorkOrder() {
   const [order, setOrder] = useState(EMPTY_ORDER);
   const [orders, setOrders] = useState([]);
   const [notice, setNotice] = useState("");
+  const [successModal, setSuccessModal] = useState("");
+  const [warningModal, setWarningModal] = useState("");
   const [plateSearch, setPlateSearch] = useState("");
   const [error, setError] = useState("");
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -631,6 +634,20 @@ export default function RegisterWorkOrder() {
   const firstResponseItem = (data) =>
     data?.data?.[0] ?? data?.Data?.[0] ?? null;
 
+  const pickItems = (res) => {
+    const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? {};
+    return Array.isArray(pack.items ?? pack.Items)
+      ? (pack.items ?? pack.Items)
+      : [];
+  };
+
+  const pickArray = (res) => {
+    const first = res?.data?.data?.[0] ?? res?.data?.Data?.[0];
+    if (Array.isArray(first)) return first;
+    if (Array.isArray(res?.data)) return res.data;
+    return [];
+  };
+
   const normalizeLookup = (value) =>
     String(value || "")
       .trim()
@@ -663,7 +680,7 @@ export default function RegisterWorkOrder() {
   const loadVehiclesForCustomer = async (customerId) => {
     if (!customerId) return [];
     const res = await api.get(`/Vehiculo/cliente/${customerId}`);
-    return (res?.data?.data?.[0] || []).map(normalizeVehicle);
+    return pickArray(res).map(normalizeVehicle);
   };
 
   const fillOrderFromCustomer = async (customer, vehicle = null) => {
@@ -786,10 +803,17 @@ export default function RegisterWorkOrder() {
       setLoadingCustomerVehicles(true);
       setSelectedCustomerForVehicles(customer);
       const res = await api.get(`/Vehiculo/cliente/${customer.Id}`);
-      const list = (res?.data?.data?.[0] || []).map(normalizeVehicle);
+      const list = pickArray(res).map(normalizeVehicle);
 
       if (list.length === 0) {
-        await fillOrderFromCustomer(customer, fallbackVehicle);
+        await fillCustomerOnlyForNewVehicle(customer);
+        setShowNewCustomer(true);
+        setQuickCreateNotice(
+          "Cliente seleccionado. Completa los datos del nuevo vehiculo.",
+        );
+        setWarningModal(
+          "Este cliente no tiene coche asignado. Agrega un coche para poder completar la orden.",
+        );
         return;
       }
 
@@ -824,9 +848,7 @@ export default function RegisterWorkOrder() {
           pageSize: 6,
         },
       });
-      const pack = res?.data?.data?.[0];
-      const items = Array.isArray(pack?.items) ? pack.items : [];
-      setCustomerMatches(items.map(normalizeCustomer));
+      setCustomerMatches(pickItems(res).map(normalizeCustomer));
     } catch (err) {
       console.error(err);
       setCustomerMatches([]);
@@ -845,11 +867,7 @@ export default function RegisterWorkOrder() {
         pageSize: 10,
       },
     });
-    const pack = res?.data?.data?.[0];
-    const items = Array.isArray(pack?.items ?? pack?.Items)
-      ? (pack.items ?? pack.Items)
-      : [];
-    return items.map(normalizeCustomer);
+    return pickItems(res).map(normalizeCustomer);
   };
 
   const findExistingCustomerForQuickCreate = async (payload) => {
@@ -979,11 +997,11 @@ export default function RegisterWorkOrder() {
             ),
           );
           vehicle = normalizeVehicle(firstResponseItem(createdVehicle) || {});
-          setNotice(
+          setSuccessModal(
             "Cliente existente cargado y vehiculo agregado a la orden.",
           );
         } else {
-          setNotice("Cliente y vehiculo existentes cargados en la orden.");
+          setSuccessModal("Cliente y vehiculo existentes cargados en la orden.");
         }
 
         await fillOrderFromCustomer(existingCustomer, vehicle);
@@ -1004,7 +1022,7 @@ export default function RegisterWorkOrder() {
         );
       }
 
-      setNotice("Cliente registrado y cargado en la orden.");
+      setSuccessModal("Cliente registrado y cargado en la orden.");
       setShowNewCustomer(false);
       setQuickCreateNotice("");
       setCustomerSearch("");
@@ -1415,7 +1433,7 @@ export default function RegisterWorkOrder() {
       let savedOrderId = editingId;
       if (editingId) {
         ensureOk(await api.put(`/OrdenTrabajo/${editingId}`, payload));
-        setNotice("Orden actualizada correctamente.");
+        setSuccessModal("Orden actualizada correctamente.");
       } else {
         const created = ensureOk(await api.post("/OrdenTrabajo", payload));
         savedOrderId =
@@ -1424,14 +1442,16 @@ export default function RegisterWorkOrder() {
           created?.Data?.[0]?.id ??
           created?.Data?.[0]?.Id ??
           null;
-        setNotice("Orden registrada correctamente.");
+        setSuccessModal("Orden registrada correctamente.");
       }
 
       if (!editingId && preOrderSourceId && savedOrderId) {
         await api.put(`/PreOrdenTrabajo/${preOrderSourceId}/convertida`, {
           idOrdenTrabajo: savedOrderId,
         });
-        setNotice("Orden registrada y pre-orden marcada como convertida.");
+        setSuccessModal(
+          "Orden registrada y pre-orden marcada como convertida.",
+        );
         setPreOrderSourceId(null);
         setSearchParams({});
       }
@@ -1442,6 +1462,7 @@ export default function RegisterWorkOrder() {
       setCustomerMatches([]);
       setShowNewCustomer(false);
       setQuickCreateNotice("");
+      setWarningModal("");
 
       await loadOrders(showOrders ? orderPage : 1);
     } catch (err) {
@@ -1482,6 +1503,19 @@ export default function RegisterWorkOrder() {
 
   return (
     <>
+      <SmallSuccessModal
+        open={Boolean(successModal)}
+        message={successModal}
+        onClose={() => setSuccessModal("")}
+      />
+      <SmallSuccessModal
+        open={Boolean(warningModal)}
+        title="Cliente sin coche"
+        message={warningModal}
+        variant="warning"
+        onClose={() => setWarningModal("")}
+      />
+
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
@@ -1561,6 +1595,7 @@ export default function RegisterWorkOrder() {
 
       <form
         onSubmit={onSubmit}
+        autoComplete="off"
         className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 space-y-5"
       >
         <div>
@@ -1581,6 +1616,7 @@ export default function RegisterWorkOrder() {
                 type="text"
                 value={customerSearch}
                 onChange={(e) => setCustomerSearch(e.target.value)}
+                autoComplete="off"
                 className={`${cls} pl-10`}
                 placeholder="Nombre, teléfono, matrícula o modelo"
               />
@@ -1691,6 +1727,12 @@ export default function RegisterWorkOrder() {
               </div>
             )}
 
+            <div className="my-4 flex items-center gap-3">
+              <div className="h-px flex-1 bg-slate-200" />
+              <span className="text-xs font-semibold text-slate-400">o</span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
             <div className="mt-3">
               <button
                 type="button"
@@ -1755,6 +1797,7 @@ export default function RegisterWorkOrder() {
                   name="Cliente"
                   value={order.Cliente}
                   onChange={handleChange}
+                  autoComplete="off"
                   className={cls}
                   placeholder="Cliente *"
                   required
@@ -1764,6 +1807,7 @@ export default function RegisterWorkOrder() {
                   name="Dni"
                   value={order.Dni}
                   onChange={handleChange}
+                  autoComplete="off"
                   className={cls}
                   placeholder="DNI/NIE"
                 />
@@ -1772,6 +1816,7 @@ export default function RegisterWorkOrder() {
                   name="Telefono"
                   value={order.Telefono}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className={cls}
                   placeholder="Teléfono"
                 />
@@ -1791,6 +1836,7 @@ export default function RegisterWorkOrder() {
                   name="Direccion"
                   value={order.Direccion}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm md:col-span-2"
                   placeholder="Dirección del cliente"
                 />
@@ -1799,6 +1845,7 @@ export default function RegisterWorkOrder() {
                   name="CodigoPostal"
                   value={order.CodigoPostal}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className={cls}
                   placeholder="Código postal"
                 />
@@ -1807,6 +1854,7 @@ export default function RegisterWorkOrder() {
                   name="Poblacion"
                   value={order.Poblacion}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className={cls}
                   placeholder="Población"
                 />
@@ -1815,6 +1863,7 @@ export default function RegisterWorkOrder() {
                   name="Provincia"
                   value={order.Provincia}
                   onChange={handleChange}
+                  autoComplete="new-password"
                   className={cls}
                   placeholder="Provincia"
                 />
@@ -2811,4 +2860,3 @@ function Field({ label, children }) {
     </div>
   );
 }
-

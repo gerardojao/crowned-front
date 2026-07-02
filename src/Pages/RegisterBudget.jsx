@@ -8,10 +8,13 @@ import {
   UserPlus,
   Wrench,
   X,
+  Info,
+  Plus,
 } from "lucide-react";
 import api from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import SignatureModal from "../Components/SignatureModal";
+import SmallSuccessModal from "../Components/SmallSuccessModal";
 import PartPicker, {
   getPartDisplayName,
   getPartId,
@@ -111,13 +114,15 @@ export default function RegisterBudget() {
   const [budget, setBudget] = useState(EMPTY_BUDGET);
   const [budgets, setBudgets] = useState([]);
   const [editingId, setEditingId] = useState(null);
-  const [viewMode, setViewMode] = useState("list");
+  const [viewMode, setViewMode] = useState("create");
 
   const [notice, setNotice] = useState("");
+  const [successModal, setSuccessModal] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [budgetSearch, setBudgetSearch] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [customerVehicles, setCustomerVehicles] = useState([]);
@@ -141,6 +146,7 @@ export default function RegisterBudget() {
   });
   const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
+
   const budgetPageSize = 10;
 
   const detailItems = Array.isArray(budget.Items) ? budget.Items : [];
@@ -245,7 +251,9 @@ export default function RegisterBudget() {
     setBudget((prev) => ({
       ...prev,
       Items: (Array.isArray(prev.Items) ? prev.Items : []).map((item) =>
-        item.id === id ? normalizeBudgetLine({ ...item, [field]: value }) : item,
+        item.id === id
+          ? normalizeBudgetLine({ ...item, [field]: value })
+          : item,
       ),
     }));
   };
@@ -417,7 +425,11 @@ export default function RegisterBudget() {
               descripcion: item.descripcion || item.Descripcion || "",
               cantidad: item.cantidad ?? item.Cantidad ?? 1,
               tiempo:
-                item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
+                item.tiempo ??
+                item.Tiempo ??
+                item.cantidad ??
+                item.Cantidad ??
+                1,
               precioUnitario:
                 item.precioUnitario ??
                 item.PrecioUnitario ??
@@ -535,9 +547,10 @@ export default function RegisterBudget() {
       Cv: vehicle?.Cv || fullCustomer.Cv || prev.Cv,
       Combustible:
         vehicle?.Combustible || fullCustomer.Combustible || prev.Combustible,
-      Kilometraje: (vehicle?.Kilometraje ?? fullCustomer.Kilometraje)
-        ? String(vehicle?.Kilometraje ?? fullCustomer.Kilometraje)
-        : prev.Kilometraje,
+      Kilometraje:
+        (vehicle?.Kilometraje ?? fullCustomer.Kilometraje)
+          ? String(vehicle?.Kilometraje ?? fullCustomer.Kilometraje)
+          : prev.Kilometraje,
     }));
     setCustomerSearch("");
     setCustomerMatches([]);
@@ -759,9 +772,9 @@ export default function RegisterBudget() {
   const hasVehicleDataForQuickCreate = (payload) =>
     Boolean(
       payload.matricula?.trim() ||
-        payload.modelo?.trim() ||
-        payload.marca?.trim() ||
-        payload.bastidor?.trim(),
+      payload.modelo?.trim() ||
+      payload.marca?.trim() ||
+      payload.bastidor?.trim(),
     );
 
   const createCustomerFromBudget = async () => {
@@ -843,7 +856,9 @@ export default function RegisterBudget() {
             "Cliente existente cargado y vehiculo agregado al presupuesto.",
           );
         } else {
-          setNotice("Cliente y vehiculo existentes cargados en el presupuesto.");
+          setNotice(
+            "Cliente y vehiculo existentes cargados en el presupuesto.",
+          );
         }
 
         await fillBudgetFromCustomer(existing, vehicle);
@@ -895,6 +910,7 @@ export default function RegisterBudget() {
         params: {
           fechaDesde: dateFrom || null,
           fechaHasta: dateTo || null,
+          search: budgetSearch || null,
           page,
           pageSize: budgetPageSize,
         },
@@ -923,7 +939,7 @@ export default function RegisterBudget() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [dateFrom, dateTo]);
+  }, [dateFrom, dateTo, budgetSearch]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1036,10 +1052,10 @@ export default function RegisterBudget() {
 
       if (editingId) {
         ensureOk(await api.put(`/Presupuesto/${editingId}`, payload));
-        setNotice("Presupuesto actualizado correctamente.");
+        setSuccessModal("Presupuesto actualizado correctamente.");
       } else {
         ensureOk(await api.post("/Presupuesto", payload));
-        setNotice("Presupuesto registrado correctamente.");
+        setSuccessModal("Presupuesto registrado correctamente.");
       }
 
       resetBudgetForm();
@@ -1106,7 +1122,7 @@ export default function RegisterBudget() {
 
       await api.post(`/Presupuesto/${p.Id}/convertir-orden`);
 
-      setNotice("Presupuesto convertido en orden correctamente.");
+      setSuccessModal("Presupuesto convertido en orden correctamente.");
       await loadBudgets();
     } catch (err) {
       console.error(err);
@@ -1184,8 +1200,34 @@ export default function RegisterBudget() {
   const budgetTotalPages = Math.max(1, Math.ceil(budgetTotal / budgetPageSize));
   const isFormVisible = viewMode === "create" || viewMode === "edit";
 
+  const filteredBudgets = budgets.filter((p) => {
+  const term = normalizeLookup(budgetSearch);
+
+  if (!term) return true;
+
+  const text = normalizeLookup(`
+    ${p.NumeroPresupuesto}
+    ${p.Cliente}
+    ${p.Dni}
+    ${p.Telefono}
+    ${p.Matricula}
+    ${p.Marca}
+    ${p.Modelo}
+    ${p.Trabajo}
+    ${p.Estado}
+  `);
+
+  return text.includes(term);
+});
+
   return (
     <>
+      <SmallSuccessModal
+        open={Boolean(successModal)}
+        message={successModal}
+        onClose={() => setSuccessModal("")}
+      />
+
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
@@ -1218,214 +1260,216 @@ export default function RegisterBudget() {
         </div>
       )}
 
-      <div className="mb-6 flex justify-center">
-        <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => {
-              resetBudgetForm();
-              setViewMode("create");
-            }}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              viewMode === "create" || viewMode === "edit"
-                ? "bg-slate-800 text-white"
-                : "text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Nuevo presupuesto
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              resetBudgetForm();
-              setViewMode("list");
-            }}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              viewMode === "list"
-                ? "bg-slate-800 text-white"
-                : "text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            Ver presupuestos
-          </button>
-        </div>
-      </div>
-
       {isFormVisible && (
         <form
           onSubmit={onSubmit}
           className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 space-y-5"
         >
-        <h3 className="text-lg font-semibold text-slate-800">
-          {editingId ? "Actualizar presupuesto" : "Nuevo presupuesto"}
-        </h3>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Buscar cliente registrado
-          </label>
+          <section className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:p-5">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-center">
+              <div>
+                <div className="mb-3 text-sm font-semibold text-slate-700">
+                  Buscar cliente registrado
+                </div>
 
-          <div className="relative">
-            <input
-              type="text"
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-              className={`${cls} pl-10`}
-              placeholder="Nombre, telefono, matricula o modelo"
-            />
+                <div className="relative">
+                  <Search
+                    size={18}
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
 
-            <Search
-              size={16}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-            />
+                  <input
+                    type="text"
+                    value={customerSearch}
+                    onChange={(e) => setCustomerSearch(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-11 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100"
+                    placeholder="Nombre, teléfono, matrícula o modelo"
+                  />
 
-            {customerSearch && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCustomerSearch("");
-                  setCustomerMatches([]);
-                  setCustomerVehicles([]);
-                  setSelectedCustomerForVehicles(null);
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
+                  {customerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerSearch("");
+                        setCustomerMatches([]);
+                        setCustomerVehicles([]);
+                        setSelectedCustomerForVehicles(null);
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
 
-          {loadingCustomers && (
-            <p className="mt-3 text-sm text-slate-500">Buscando clientes...</p>
-          )}
-
-          {loadingCustomerVehicles && (
-            <p className="mt-3 text-sm text-slate-500">
-              Cargando vehiculos del cliente...
-            </p>
-          )}
-
-          {!loadingCustomers &&
-            customerSearch.trim().length >= 2 &&
-            customerMatches.length === 0 && (
-              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
-                No encontramos ese cliente.
-              </div>
-            )}
-
-          {customerMatches.length > 0 && (
-            <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-              {customerMatches.map((customer) => (
-                <button
-                  key={customer.Id}
-                  type="button"
-                  onClick={() => selectCustomer(customer)}
-                  className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
-                >
-                  <span className="block font-semibold text-slate-900">
-                    {customer.Nombre}
+                <div className="my-4 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-200" />
+                  <span className="text-xs font-semibold text-slate-400">
+                    o
                   </span>
+                  <div className="h-px flex-1 bg-slate-200" />
+                </div>
 
-                  <span className="mt-1 block text-slate-600">
-                    {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
-                    {customer.Modelo}
-                  </span>
-
-                  <span className="mt-1 block text-xs text-slate-500">
-                    {customer.Telefono || "Sin teléfono"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {customerVehicles.length > 0 && selectedCustomerForVehicles && (
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-              <p className="mb-2 text-sm font-semibold text-emerald-900">
-                Vehiculos registrados de {selectedCustomerForVehicles.Nombre}
-              </p>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                {customerVehicles.map((vehicle) => (
+                <div className="flex justify-center">
                   <button
-                    key={vehicle.Id}
                     type="button"
-                    onClick={() =>
-                      fillBudgetFromCustomer(
-                        selectedCustomerForVehicles,
-                        vehicle,
-                      )
-                    }
-                    className="rounded-xl border border-emerald-200 bg-white p-3 text-left text-sm hover:border-emerald-400 hover:bg-emerald-50"
+                    onClick={toggleQuickCreate}
+                    className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+                  >
+                    <Plus size={18} />
+                    {showNewCustomer
+                      ? "Ocultar alta rápida"
+                      : budget.ClienteId
+                        ? "Agregar otro vehículo"
+                        : "Registrar nuevo cliente"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-emerald-600 ring-1 ring-emerald-200">
+                    <Info size={18} />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold text-slate-700">
+                      Busca un cliente registrado o crea uno nuevo.
+                    </p>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Cuando selecciones el vehículo, aparecerán los datos
+                      necesarios para completar el presupuesto y los costes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {loadingCustomers && (
+              <p className="mt-3 text-sm text-slate-500">
+                Buscando clientes...
+              </p>
+            )}
+
+            {loadingCustomerVehicles && (
+              <p className="mt-3 text-sm text-slate-500">
+                Cargando vehículos del cliente...
+              </p>
+            )}
+
+            {!loadingCustomers &&
+              customerSearch.trim().length >= 2 &&
+              customerMatches.length === 0 && (
+                <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+                  No encontramos ese cliente. Puedes registrarlo como nuevo.
+                </div>
+              )}
+
+            {customerMatches.length > 0 && (
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
+                {customerMatches.map((customer) => (
+                  <button
+                    key={customer.Id}
+                    type="button"
+                    onClick={() => selectCustomer(customer)}
+                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
                   >
                     <span className="block font-semibold text-slate-900">
-                      {vehicle.Matricula || "Sin matricula"}
+                      {customer.Nombre}
                     </span>
+
                     <span className="mt-1 block text-slate-600">
-                      {vehicle.Marca || "-"} {vehicle.Modelo || ""}
+                      {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
+                      {customer.Modelo}
                     </span>
+
                     <span className="mt-1 block text-xs text-slate-500">
-                      {vehicle.Bastidor
-                        ? `Bastidor ${vehicle.Bastidor}`
-                        : "Sin bastidor"}{" "}
-                      -{" "}
-                      {vehicle.Kilometraje
-                        ? `${vehicle.Kilometraje} km`
-                        : "Sin kilometraje"}
+                      {customer.Telefono || "Sin teléfono"}
                     </span>
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="mt-3">
-            <button
-              type="button"
-              onClick={toggleQuickCreate}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
-            >
-              <UserPlus size={17} />
+            {customerVehicles.length > 0 && selectedCustomerForVehicles && (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="mb-2 text-sm font-semibold text-emerald-900">
+                  Vehículos registrados de {selectedCustomerForVehicles.Nombre}
+                </p>
 
-              {showNewCustomer
-                ? "Ocultar alta rapida"
-                : budget.ClienteId
-                  ? "Agregar otro vehiculo"
-                  : "Registrar nuevo"}
-            </button>
+                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {customerVehicles.map((vehicle) => (
+                    <button
+                      key={vehicle.Id}
+                      type="button"
+                      onClick={() =>
+                        fillBudgetFromCustomer(
+                          selectedCustomerForVehicles,
+                          vehicle,
+                        )
+                      }
+                      className="rounded-xl border border-emerald-200 bg-white p-3 text-left text-sm hover:border-emerald-400 hover:bg-emerald-50"
+                    >
+                      <span className="block font-semibold text-slate-900">
+                        {vehicle.Matricula || "Sin matrícula"}
+                      </span>
 
-            {showNewCustomer && budget.ClienteId && (
-              <p className="mt-2 text-xs font-medium text-emerald-700">
-                Se guardara como nuevo vehiculo de {budget.Cliente}.
-              </p>
+                      <span className="mt-1 block text-slate-600">
+                        {vehicle.Marca || "-"} {vehicle.Modelo || ""}
+                      </span>
+
+                      <span className="mt-1 block text-xs text-slate-500">
+                        {vehicle.Bastidor
+                          ? `Bastidor ${vehicle.Bastidor}`
+                          : "Sin bastidor"}{" "}
+                        -{" "}
+                        {vehicle.Kilometraje
+                          ? `${vehicle.Kilometraje} km`
+                          : "Sin kilometraje"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
 
             {showNewCustomer && (
-              <button
-                type="button"
-                onClick={createCustomerFromBudget}
-                disabled={savingCustomer}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 md:ml-2 md:mt-0"
-              >
-                <UserPlus size={17} />
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={createCustomerFromBudget}
+                  disabled={savingCustomer}
+                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  <UserPlus size={17} />
 
-                {savingCustomer
-                  ? "Guardando..."
-                  : budget.ClienteId
-                    ? "Guardar vehiculo en cliente"
-                    : hasVehicleDataForQuickCreate({
-                          matricula: budget.Matricula,
-                          marca: budget.Marca,
-                          modelo: budget.Modelo,
-                          bastidor: budget.Bastidor,
-                        })
-                      ? "Guardar cliente con vehiculo"
-                      : "Guardar solo cliente"}
-              </button>
+                  {savingCustomer
+                    ? "Guardando..."
+                    : budget.ClienteId
+                      ? "Guardar vehículo en cliente"
+                      : hasVehicleDataForQuickCreate({
+                            matricula: budget.Matricula,
+                            marca: budget.Marca,
+                            modelo: budget.Modelo,
+                            bastidor: budget.Bastidor,
+                          })
+                        ? "Guardar cliente con vehículo"
+                        : "Guardar solo cliente"}
+                </button>
+
+                {budget.ClienteId && (
+                  <p className="text-xs font-medium text-emerald-700">
+                    Se guardará como nuevo vehículo de {budget.Cliente}.
+                  </p>
+                )}
+              </div>
             )}
 
             {quickCreateNotice && (
-              <div className="mt-3 flex items-start justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
+              <div className="mt-4 flex items-start justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
                 <span>{quickCreateNotice}</span>
+
                 <button
                   type="button"
                   onClick={() => setQuickCreateNotice("")}
@@ -1435,704 +1479,746 @@ export default function RegisterBudget() {
                 </button>
               </div>
             )}
-          </div>
-        </div>
+          </section>
 
-        {shouldShowBudgetFields ? (
-          <>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <input
-            name="NumeroPresupuesto"
-            value={budget.NumeroPresupuesto}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Número presupuesto automático"
-          />
+          {shouldShowBudgetFields ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input
+                  name="NumeroPresupuesto"
+                  value={budget.NumeroPresupuesto}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Número presupuesto automático"
+                />
 
-          <input
-            name="Cliente"
-            value={budget.Cliente}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Cliente *"
-            required
-          />
+                <input
+                  name="Cliente"
+                  value={budget.Cliente}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Cliente *"
+                  required
+                />
 
-          <input
-            name="Dni"
-            value={budget.Dni}
-            onChange={handleChange}
-            className={cls}
-            placeholder="DNI/NIE/NIF"
-          />
+                <input
+                  name="Dni"
+                  value={budget.Dni}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="DNI/NIE/NIF"
+                />
 
-          <input
-            name="Telefono"
-            value={budget.Telefono}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Teléfono"
-          />
+                <input
+                  name="Telefono"
+                  value={budget.Telefono}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Teléfono"
+                />
 
-          <input
-            name="Direccion"
-            value={budget.Direccion}
-            onChange={handleChange}
-            className={`${cls} md:col-span-2`}
-            placeholder="Dirección del cliente"
-          />
-          <input
-            name="CodigoPostal"
-            value={budget.CodigoPostal}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Codigo postal"
-          />
-          <input
-            name="Poblacion"
-            value={budget.Poblacion}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Poblacion"
-          />
-          <input
-            name="Provincia"
-            value={budget.Provincia}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Provincia"
-          />
-          <select
-            name="Clasificacion"
-            value={budget.Clasificacion}
-            onChange={handleChange}
-            className={cls}
-          >
-            <option value="Particular">Particular</option>
-            <option value="Empresa">Empresa</option>
-            <option value="Compania de seguro">Compania de seguro</option>
-          </select>
-
-          <input
-            name="Matricula"
-            value={budget.Matricula}
-            onChange={(e) =>
-              setField("Matricula", e.target.value.toUpperCase())
-            }
-            className={cls}
-            placeholder={labels.referencePlaceholder}
-          />
-
-          <input
-            name="Marca"
-            value={budget.Marca}
-            onChange={handleChange}
-            className={cls}
-            placeholder={labels.makeLabel}
-          />
-
-          <input
-            name="Bastidor"
-            value={budget.Bastidor}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Bastidor"
-          />
-
-          <input
-            name="Modelo"
-            value={budget.Modelo}
-            onChange={handleChange}
-            className={cls}
-            placeholder={labels.modelLabel}
-          />
-
-          <input
-            name="FechaMatriculacion"
-            type="date"
-            value={budget.FechaMatriculacion}
-            onChange={handleChange}
-            className={cls}
-            title="Fecha matriculacion"
-          />
-          <input
-            name="Motor"
-            value={budget.Motor}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Motor"
-          />
-          <input
-            name="Kw"
-            type="number"
-            step="0.01"
-            value={budget.Kw}
-            onChange={handleChange}
-            className={cls}
-            placeholder="KW"
-          />
-          <input
-            name="Cv"
-            type="number"
-            step="0.01"
-            value={budget.Cv}
-            onChange={handleChange}
-            className={cls}
-            placeholder="CV"
-          />
-          <input
-            name="Combustible"
-            value={budget.Combustible}
-            onChange={handleChange}
-            className={cls}
-            placeholder="Combustible"
-          />
-
-          <input
-            name="Kilometraje"
-            type="number"
-            value={budget.Kilometraje}
-            onChange={handleChange}
-            className={cls}
-            placeholder={labels.metricPlaceholder}
-          />
-
-          <input
-            name="Fecha"
-            type="date"
-            value={budget.Fecha}
-            onChange={handleChange}
-            className={cls}
-          />
-
-          <select
-            name="TipoOperacion"
-            value={budget.TipoOperacion}
-            onChange={handleChange}
-            className={cls}
-          >
-            {operationTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-
-          <select
-            name="Estado"
-            value={budget.Estado}
-            onChange={handleChange}
-            className={cls}
-          >
-            {states.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-3">
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
-              <div className="relative">
-                <Wrench
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                <input
+                  name="Direccion"
+                  value={budget.Direccion}
+                  onChange={handleChange}
+                  className={`${cls} md:col-span-2`}
+                  placeholder="Dirección del cliente"
+                />
+                <input
+                  name="CodigoPostal"
+                  value={budget.CodigoPostal}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Codigo postal"
+                />
+                <input
+                  name="Poblacion"
+                  value={budget.Poblacion}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Poblacion"
+                />
+                <input
+                  name="Provincia"
+                  value={budget.Provincia}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Provincia"
                 />
                 <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    appendServiceToTrabajo(e.target.value);
-                    e.target.value = "";
-                  }}
-                  className={`${cls} pl-9`}
-                  aria-label="Agregar servicio frecuente"
+                  name="Clasificacion"
+                  value={budget.Clasificacion}
+                  onChange={handleChange}
+                  className={cls}
                 >
-                  <option value="" disabled>
-                    Agregar servicio frecuente
-                  </option>
-                  {frequentServices.map((service) => (
-                    <option key={service} value={service}>
-                      {service}
+                  <option value="Particular">Particular</option>
+                  <option value="Empresa">Empresa</option>
+                  <option value="Compania de seguro">Compania de seguro</option>
+                </select>
+
+                <input
+                  name="Matricula"
+                  value={budget.Matricula}
+                  onChange={(e) =>
+                    setField("Matricula", e.target.value.toUpperCase())
+                  }
+                  className={cls}
+                  placeholder={labels.referencePlaceholder}
+                />
+
+                <input
+                  name="Marca"
+                  value={budget.Marca}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={labels.makeLabel}
+                />
+
+                <input
+                  name="Bastidor"
+                  value={budget.Bastidor}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Bastidor"
+                />
+
+                <input
+                  name="Modelo"
+                  value={budget.Modelo}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={labels.modelLabel}
+                />
+
+                <input
+                  name="FechaMatriculacion"
+                  type="date"
+                  value={budget.FechaMatriculacion}
+                  onChange={handleChange}
+                  className={cls}
+                  title="Fecha matriculacion"
+                />
+                <input
+                  name="Motor"
+                  value={budget.Motor}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Motor"
+                />
+                <input
+                  name="Kw"
+                  type="number"
+                  step="0.01"
+                  value={budget.Kw}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="KW"
+                />
+                <input
+                  name="Cv"
+                  type="number"
+                  step="0.01"
+                  value={budget.Cv}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="CV"
+                />
+                <input
+                  name="Combustible"
+                  value={budget.Combustible}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder="Combustible"
+                />
+
+                <input
+                  name="Kilometraje"
+                  type="number"
+                  value={budget.Kilometraje}
+                  onChange={handleChange}
+                  className={cls}
+                  placeholder={labels.metricPlaceholder}
+                />
+
+                <input
+                  name="Fecha"
+                  type="date"
+                  value={budget.Fecha}
+                  onChange={handleChange}
+                  className={cls}
+                />
+
+                <select
+                  name="TipoOperacion"
+                  value={budget.TipoOperacion}
+                  onChange={handleChange}
+                  className={cls}
+                >
+                  {operationTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  name="Estado"
+                  value={budget.Estado}
+                  onChange={handleChange}
+                  className={cls}
+                >
+                  {states.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <input
-                className={cls}
-                placeholder="Nuevo servicio frecuente"
-                value={newServiceName}
-                onChange={(e) => setNewServiceName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    createFrequentService();
-                  }
-                }}
-              />
-
-              <button
-                type="button"
-                onClick={createFrequentService}
-                disabled={
-                  savingService ||
-                  !newServiceName.trim() ||
-                  newServiceName.trim().toLowerCase() === "servicio"
-                }
-                className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {savingService ? "Guardando..." : "Guardar servicio"}
-              </button>
-            </div>
-          </div>
-
-          <textarea
-            name="Trabajo"
-            value={budget.Trabajo}
-            onChange={handleChange}
-            className={`${cls} md:col-span-3`}
-            rows={3}
-            placeholder="Trabajo presupuestado *"
-            required
-          />
-
-          <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
-            Lineas de detalle / costes
-          </div>
-
-          <div className="md:col-span-4 flex justify-end">
-            <button
-              type="button"
-              onClick={addManualDetailLine}
-              className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
-            >
-              Agregar linea
-            </button>
-          </div>
-
-          <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Repuesto
-            </label>
-            <PartPicker
-              onSelect={addPartToBudget}
-              placeholder="Buscar pieza o repuesto"
-              buttonLabel="Agregar"
-            />
-          </div>
-
-          <div className="space-y-2 rounded-r-xl border border-l-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Mano de obra (EUR)
-            </label>
-            <input
-              name="ManoObra"
-              type="number"
-              step="0.01"
-              value={budget.ManoObra}
-              onChange={handleChange}
-              onBlur={(e) => upsertLaborItem(e.target.value)}
-              className={cls}
-              placeholder="Mano de obra EUR"
-            />
-          </div>
-
-          <textarea
-            name="Observaciones"
-            value={budget.Observaciones}
-            onChange={handleChange}
-            className={`${cls} md:col-span-3`}
-            rows={2}
-            placeholder="Observaciones"
-          />
-
-          <div className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-right">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Total presupuestado
-            </div>
-            {/* <div className="mt-2 text-xs font-semibold text-slate-500">
-              Calculo: ({Number(budget.Cantidad || 1)} x {Number(budget.Repuestos || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) + {Number(budget.ManoObra || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div> */}
-            <div className="mt-2 text-xl font-semibold text-slate-900">
-              {total.toLocaleString("es-ES", {
-                style: "currency",
-                currency: "EUR",
-              })}
-            </div>
-          </div>
-
-          {detailItems.length > 0 && (
-            <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600"></div>
-              <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <div>Codigo</div>
-                <div>Seccion</div>
-                <div>Detalle del presupuesto</div>
-                <div>Tiempo/Cant.</div>
-                <div>Precio</div>
-                <div>%DTO</div>
-                <div className="text-right">Importe</div>
-                <div />
-              </div>
-              <div className="space-y-2">
-                {detailItems.map((item) => {
-                  const section = getBudgetLineSection(item);
-                  const lineTotal = getBudgetLineTotal(item);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="grid grid-cols-1 gap-2 xl:grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px]"
-                    >
-                      <input
-                        value={item.codigo || ""}
-                        onChange={(e) =>
-                          setDetailItemField(item.id, "codigo", e.target.value)
-                        }
-                        className={cls}
-                        placeholder="Codigo"
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-3">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
+                    <div className="relative">
+                      <Wrench
+                        size={16}
+                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                       />
                       <select
-                        value={section}
-                        onChange={(e) =>
-                          setDetailItemField(item.id, "section", e.target.value)
-                        }
-                        className={cls}
+                        defaultValue=""
+                        onChange={(e) => {
+                          appendServiceToTrabajo(e.target.value);
+                          e.target.value = "";
+                        }}
+                        className={`${cls} pl-9`}
+                        aria-label="Agregar servicio frecuente"
                       >
-                        <option value="ManoObra">Servicio</option>
-                        <option value="Piezas">
-                          {budget.TipoOperacion === "Chapa y pintura"
-                            ? "Materiales"
-                            : "Piezas"}
+                        <option value="" disabled>
+                          Agregar servicio frecuente
                         </option>
-                        {budget.TipoOperacion === "Chapa y pintura" && (
-                          <option value="Pintura">Pintura</option>
-                        )}
+                        {frequentServices.map((service) => (
+                          <option key={service} value={service}>
+                            {service}
+                          </option>
+                        ))}
                       </select>
-                      <input
-                        value={item.descripcion}
-                        onChange={(e) =>
-                          setDetailItemField(
-                            item.id,
-                            "descripcion",
-                            e.target.value,
-                          )
-                        }
-                        className={cls}
-                        placeholder="Descripcion"
-                      />
-                      <input
-                        type="number"
-                        min="0.01"
-                        step="0.01"
-                        value={getBudgetLineQuantity(item)}
-                        onChange={(e) =>
-                          setDetailItemField(
-                            item.id,
-                            section === "ManoObra" ? "tiempo" : "cantidad",
-                            e.target.value,
-                          )
-                        }
-                        className={cls}
-                        placeholder={section === "ManoObra" ? "Horas" : "Cantidad"}
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.precioUnitario}
-                        onChange={(e) =>
-                          setDetailItemField(
-                            item.id,
-                            "precioUnitario",
-                            e.target.value,
-                          )
-                        }
-                        onBlur={(e) =>
-                          setDetailItemField(
-                            item.id,
-                            "precioUnitario",
-                            Number(e.target.value || 0).toFixed(2),
-                          )
-                        }
-                        className={cls}
-                        placeholder={section === "ManoObra" ? "Precio/h" : "Precio"}
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={item.descuentoPct ?? 0}
-                        onChange={(e) =>
-                          setDetailItemField(
-                            item.id,
-                            "descuentoPct",
-                            e.target.value,
-                          )
-                        }
-                        className={cls}
-                        placeholder="%DTO"
-                      />
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-semibold text-slate-800">
-                        {lineTotal.toLocaleString("es-ES", {
-                          style: "currency",
-                          currency: "EUR",
-                        })}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeDetailItem(item.id)}
-                        className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
-                        aria-label="Eliminar linea"
-                      >
-                        <Trash2 size={16} />
-                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={submitting}
-            className="rounded-xl px-5 py-3 bg-violet-600 text-white hover:bg-violet-700 transition shadow-md font-bold disabled:opacity-60"
-          >
-            {submitting
-              ? "Guardando..."
-              : editingId
-                ? "Actualizar presupuesto"
-                : "Crear presupuesto"}
-          </button>
+                    <input
+                      className={cls}
+                      placeholder="Nuevo servicio frecuente"
+                      value={newServiceName}
+                      onChange={(e) => setNewServiceName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          createFrequentService();
+                        }
+                      }}
+                    />
 
-          <button
-            type="button"
-            onClick={() => {
-              resetBudgetForm();
-              setViewMode("list");
-            }}
-            className="rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
-          >
-            Cancelar
-          </button>
-        </div>
-
-          </>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center">
-            <p className="text-sm font-semibold text-slate-700">
-              Selecciona un cliente para completar el presupuesto.
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Tambien puedes registrar un cliente nuevo desde la alta rapida.
-            </p>
-          </div>
-        )}
-        </form>
-      )}
-
-      {viewMode === "list" && (
-        <section className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
-          <h3 className="text-lg font-semibold text-slate-800">
-            Presupuestos recientes
-          </h3>
-
-          <div className="flex flex-col md:flex-row gap-3">
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => {
-                setDateFrom(e.target.value);
-                setBudgetPage(1);
-              }}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-            />
-
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => {
-                setDateTo(e.target.value);
-                setBudgetPage(1);
-              }}
-              className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
-            />
-
-            {(dateFrom || dateTo) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setDateFrom("");
-                  setDateTo("");
-                  setBudgetPage(1);
-                }}
-                className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
-              >
-                Limpiar
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
-          {budgets.map((p) => (
-            <article
-              key={p.Id}
-              className="rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h4 className="text-lg font-bold text-slate-900">
-                    {p.NumeroPresupuesto}
-                  </h4>
-
-                  <p className="text-sm text-slate-500">
-                    {p.Matricula} · {p.Marca} {p.Modelo}
-                  </p>
+                    <button
+                      type="button"
+                      onClick={createFrequentService}
+                      disabled={
+                        savingService ||
+                        !newServiceName.trim() ||
+                        newServiceName.trim().toLowerCase() === "servicio"
+                      }
+                      className="inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                    >
+                      {savingService ? "Guardando..." : "Guardar servicio"}
+                    </button>
+                  </div>
                 </div>
 
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-medium ring-1 ring-violet-200 text-violet-700">
-                  {p.Estado}
-                </span>
-              </div>
+                <textarea
+                  name="Trabajo"
+                  value={budget.Trabajo}
+                  onChange={handleChange}
+                  className={`${cls} md:col-span-3`}
+                  rows={3}
+                  placeholder="Trabajo presupuestado *"
+                  required
+                />
 
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Cliente
-                  </p>
-                  <p className="font-semibold text-slate-800">{p.Cliente}</p>
+                <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  Lineas de detalle / costes
                 </div>
 
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Trabajo
-                  </p>
-                  <p className="text-slate-700 line-clamp-2">{p.Trabajo}</p>
+                <div className="md:col-span-4 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={addManualDetailLine}
+                    className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                  >
+                    Agregar linea
+                  </button>
                 </div>
 
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Total
-                  </p>
-                  <p className="text-xl font-bold text-slate-900">
-                    {(
-                      Number(p.ManoObra || 0) +
-                      Number(p.Repuestos || 0) * Number(p.Cantidad || 1)
-                    ).toLocaleString("es-ES", {
+                <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Repuesto
+                  </label>
+                  <PartPicker
+                    onSelect={addPartToBudget}
+                    placeholder="Buscar pieza o repuesto"
+                    buttonLabel="Agregar"
+                  />
+                </div>
+
+                <div className="space-y-2 rounded-r-xl border border-l-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    Mano de obra (EUR)
+                  </label>
+                  <input
+                    name="ManoObra"
+                    type="number"
+                    step="0.01"
+                    value={budget.ManoObra}
+                    onChange={handleChange}
+                    onBlur={(e) => upsertLaborItem(e.target.value)}
+                    className={cls}
+                    placeholder="Mano de obra EUR"
+                  />
+                </div>
+
+                <textarea
+                  name="Observaciones"
+                  value={budget.Observaciones}
+                  onChange={handleChange}
+                  className={`${cls} md:col-span-3`}
+                  rows={2}
+                  placeholder="Observaciones"
+                />
+
+                <div className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-right">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Total presupuestado
+                  </div>
+                  {/* <div className="mt-2 text-xs font-semibold text-slate-500">
+              Calculo: ({Number(budget.Cantidad || 1)} x {Number(budget.Repuestos || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) + {Number(budget.ManoObra || 0).toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div> */}
+                  <div className="mt-2 text-xl font-semibold text-slate-900">
+                    {total.toLocaleString("es-ES", {
                       style: "currency",
                       currency: "EUR",
                     })}
-                  </p>
+                  </div>
                 </div>
+
+                {detailItems.length > 0 && (
+                  <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600"></div>
+                    <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div>Codigo</div>
+                      <div>Seccion</div>
+                      <div>Detalle del presupuesto</div>
+                      <div>Tiempo/Cant.</div>
+                      <div>Precio</div>
+                      <div>%DTO</div>
+                      <div className="text-right">Importe</div>
+                      <div />
+                    </div>
+                    <div className="space-y-2">
+                      {detailItems.map((item) => {
+                        const section = getBudgetLineSection(item);
+                        const lineTotal = getBudgetLineTotal(item);
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="grid grid-cols-1 gap-2 xl:grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px]"
+                          >
+                            <input
+                              value={item.codigo || ""}
+                              onChange={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  "codigo",
+                                  e.target.value,
+                                )
+                              }
+                              className={cls}
+                              placeholder="Codigo"
+                            />
+                            <select
+                              value={section}
+                              onChange={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  "section",
+                                  e.target.value,
+                                )
+                              }
+                              className={cls}
+                            >
+                              <option value="ManoObra">Servicio</option>
+                              <option value="Piezas">
+                                {budget.TipoOperacion === "Chapa y pintura"
+                                  ? "Materiales"
+                                  : "Piezas"}
+                              </option>
+                              {budget.TipoOperacion === "Chapa y pintura" && (
+                                <option value="Pintura">Pintura</option>
+                              )}
+                            </select>
+                            <input
+                              value={item.descripcion}
+                              onChange={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  "descripcion",
+                                  e.target.value,
+                                )
+                              }
+                              className={cls}
+                              placeholder="Descripcion"
+                            />
+                            <input
+                              type="number"
+                              min="0.01"
+                              step="0.01"
+                              value={getBudgetLineQuantity(item)}
+                              onChange={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  section === "ManoObra"
+                                    ? "tiempo"
+                                    : "cantidad",
+                                  e.target.value,
+                                )
+                              }
+                              className={cls}
+                              placeholder={
+                                section === "ManoObra" ? "Horas" : "Cantidad"
+                              }
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={item.precioUnitario}
+                              onChange={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  "precioUnitario",
+                                  e.target.value,
+                                )
+                              }
+                              onBlur={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  "precioUnitario",
+                                  Number(e.target.value || 0).toFixed(2),
+                                )
+                              }
+                              className={cls}
+                              placeholder={
+                                section === "ManoObra" ? "Precio/h" : "Precio"
+                              }
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              max="100"
+                              value={item.descuentoPct ?? 0}
+                              onChange={(e) =>
+                                setDetailItemField(
+                                  item.id,
+                                  "descuentoPct",
+                                  e.target.value,
+                                )
+                              }
+                              className={cls}
+                              placeholder="%DTO"
+                            />
+                            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-right text-sm font-semibold text-slate-800">
+                              {lineTotal.toLocaleString("es-ES", {
+                                style: "currency",
+                                currency: "EUR",
+                              })}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeDetailItem(item.id)}
+                              className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
+                              aria-label="Eliminar linea"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <div className="flex items-center gap-3">
                 <button
-                  type="button"
-                  onClick={() => startEdit(p)}
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-xl px-5 py-3 bg-violet-600 text-white hover:bg-violet-700 transition shadow-md font-bold disabled:opacity-60"
                 >
-                  Editar
+                  {submitting
+                    ? "Guardando..."
+                    : editingId
+                      ? "Actualizar presupuesto"
+                      : "Crear presupuesto"}
                 </button>
 
-                {!p.ConvertidoEnOrden && (
-                  <button
-                    type="button"
-                    onClick={() => convertToOrder(p)}
-                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                  >
-                    Convertir en orden
-                  </button>
-                )}
-
-                {p.ConvertidoEnOrden && (
-                  <Link
-                    to="/register-work-order#ordenes-recientes"
-                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium"
-                  >
-                    Orden creada #{p.IdOrdenTrabajo}
-                  </Link>
-                )}
-
-                {digitalSignaturesEnabled &&
-                  (p.AcceptanceSignatureBase64 || p.IsAccepted ? (
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
-                      <FileSignature size={16} />
-                      Firmado
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => openSignatureModal(p)}
-                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-slate-700 text-white hover:bg-slate-800"
-                    >
-                      <FileSignature size={16} />
-                      Firmar aceptacion
-                    </button>
-                  ))}
-
-                <Link
-                  to={`/print-budget/${p.Id}`}
-                  // target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-violet-600 text-white hover:bg-violet-700"
-                >
-                  Imprimir presupuesto
-                </Link>
-
                 <button
                   type="button"
-                  onClick={() => deleteBudget(p)}
-                  className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
+                  onClick={() => {
+                    resetBudgetForm();
+                    setViewMode("list");
+                  }}
+                  className="rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
                 >
-                  Eliminar
+                  Cancelar
                 </button>
               </div>
-            </article>
-          ))}
-
-          {budgets.length === 0 && (
-            <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
-              <h4 className="text-lg font-semibold text-slate-800">
-                {dateFrom || dateTo
-                  ? "No se encontraron presupuestos"
-                  : "No hay presupuestos registrados"}
-              </h4>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-6 text-center">
+              
             </div>
           )}
-        </div>
-
-        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
-          <button
-            type="button"
-            disabled={budgetPage <= 1}
-            onClick={() => loadBudgets(budgetPage - 1)}
-            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Anterior
-          </button>
-          <span className="text-slate-600">
-            Página {budgetPage} de {budgetTotalPages} · {budgetTotal}{" "}
-            presupuestos
-          </span>
-          <button
-            type="button"
-            disabled={budgetPage >= budgetTotalPages}
-            onClick={() => loadBudgets(budgetPage + 1)}
-            className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
-          >
-            Siguiente
-          </button>
-        </div>
-        </section>
+        </form>
       )}
+
+     
+        <section className="mt-8 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6">
+          <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+  <div>
+    <h3 className="text-lg font-semibold text-slate-800">
+      Presupuestos recientes
+    </h3>
+    <p className="mt-1 text-sm text-slate-500">
+      Busca por número, cliente, matrícula, vehículo o trabajo.
+    </p>
+  </div>
+
+  <div className="flex flex-col gap-3 md:flex-row md:items-center">
+    <div className="relative w-full md:w-80">
+      <Search
+        size={17}
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+      />
+
+      <input
+        type="text"
+        value={budgetSearch}
+        onChange={(e) => {
+          setBudgetSearch(e.target.value);
+          setBudgetPage(1);
+        }}
+        placeholder="Buscar presupuesto..."
+        className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-10 pr-10 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+      />
+
+      {budgetSearch && (
+        <button
+          type="button"
+          onClick={() => {
+            setBudgetSearch("");
+            setBudgetPage(1);
+          }}
+          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        >
+          <X size={16} />
+        </button>
+      )}
+    </div>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => {
+                  setDateFrom(e.target.value);
+                  setBudgetPage(1);
+                }}
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              />
+
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => {
+                  setDateTo(e.target.value);
+                  setBudgetPage(1);
+                }}
+                className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+              />
+
+              {(dateFrom || dateTo) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDateFrom("");
+                    setDateTo("");
+                    setBudgetPage(1);
+                  }}
+                  className="rounded-2xl px-4 py-3 bg-slate-100 hover:bg-slate-200 text-sm font-medium text-slate-700 transition"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
+           {filteredBudgets.map((p) => (
+              <article
+                key={p.Id}
+                className="rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="text-lg font-bold text-slate-900">
+                      {p.NumeroPresupuesto}
+                    </h4>
+
+                    <p className="text-sm text-slate-500">
+                      {p.Matricula} · {p.Marca} {p.Modelo}
+                    </p>
+                  </div>
+
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-medium ring-1 ring-violet-200 text-violet-700">
+                    {p.Estado}
+                  </span>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Cliente
+                    </p>
+                    <p className="font-semibold text-slate-800">{p.Cliente}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Trabajo
+                    </p>
+                    <p className="text-slate-700 line-clamp-2">{p.Trabajo}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400">
+                      Total
+                    </p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {(
+                        Number(p.ManoObra || 0) +
+                        Number(p.Repuestos || 0) * Number(p.Cantidad || 1)
+                      ).toLocaleString("es-ES", {
+                        style: "currency",
+                        currency: "EUR",
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEdit(p)}
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
+                  >
+                    Editar
+                  </button>
+
+                  {!p.ConvertidoEnOrden && (
+                    <button
+                      type="button"
+                      onClick={() => convertToOrder(p)}
+                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      Convertir en orden
+                    </button>
+                  )}
+
+                  {p.ConvertidoEnOrden && (
+                    <Link
+                      to="/register-work-order#ordenes-recientes"
+                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium"
+                    >
+                      Orden creada #{p.IdOrdenTrabajo}
+                    </Link>
+                  )}
+
+                  {digitalSignaturesEnabled &&
+                    (p.AcceptanceSignatureBase64 || p.IsAccepted ? (
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200">
+                        <FileSignature size={16} />
+                        Firmado
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openSignatureModal(p)}
+                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-slate-700 text-white hover:bg-slate-800"
+                      >
+                        <FileSignature size={16} />
+                        Firmar aceptacion
+                      </button>
+                    ))}
+
+                  <Link
+                    to={`/print-budget/${p.Id}`}
+                    // target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-violet-600 text-white hover:bg-violet-700"
+                  >
+                    Imprimir presupuesto
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => deleteBudget(p)}
+                    className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
+                  >
+                    Eliminar
+                  </button>
+                </div>
+              </article>
+            ))}
+
+           {filteredBudgets.length === 0 && (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
+                <h4 className="text-lg font-semibold text-slate-800">
+                  {dateFrom || dateTo
+                    ? "No se encontraron presupuestos"
+                    : "No hay presupuestos registrados"}
+                </h4>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+            <button
+              type="button"
+              disabled={budgetPage <= 1}
+              onClick={() => loadBudgets(budgetPage - 1)}
+              className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Anterior
+            </button>
+            <span className="text-slate-600">
+              Página {budgetPage} de {budgetTotalPages} · {budgetTotal}{" "}
+              presupuestos
+            </span>
+            <button
+              type="button"
+              disabled={budgetPage >= budgetTotalPages}
+              onClick={() => loadBudgets(budgetPage + 1)}
+              className="rounded-xl bg-white px-4 py-2 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Siguiente
+            </button>
+          </div>
+        </section>
+    
       <SignatureModal
         open={signatureModal.open}
         title="Firma de aceptación del presupuesto"
