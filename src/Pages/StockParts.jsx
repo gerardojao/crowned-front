@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -115,7 +115,7 @@ export default function StockParts() {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [notice, setNotice] = useState(null);
   const [accountsPayableEnabled, setAccountsPayableEnabled] = useState(false);
-  const [stockModuleEnabled, setStockModuleEnabled] = useState(null);
+  const [stockModuleEnabled, setStockModuleEnabled] = useState(true);
 
   const [inventoryParts, setInventoryParts] = useState([]);
   const [inventorySearch, setInventorySearch] = useState("");
@@ -191,13 +191,17 @@ export default function StockParts() {
     try {
       const res = await api.get("/WorkshopSettings");
       const settings = res?.data || {};
-      const enabled =
+      const stockEnabled =
         settings.enableAccountsPayable ??
           settings.EnableAccountsPayable ??
           false;
-      setAccountsPayableEnabled(enabled);
-      setStockModuleEnabled(enabled);
-      if (!enabled) setTab("billed");
+      const paymentEnabled =
+        settings.enableStockPayments ??
+          settings.EnableStockPayments ??
+          false;
+      setAccountsPayableEnabled(paymentEnabled);
+      setStockModuleEnabled(stockEnabled);
+      if (!stockEnabled) setTab("billed");
     } catch (err) {
       console.error(err);
       setAccountsPayableEnabled(false);
@@ -706,7 +710,7 @@ export default function StockParts() {
           <p className="mt-1 text-sm text-slate-500">
             {!isInventoryView
               ? "Margen real por concepto vendido desde facturas emitidas."
-              : "Inventario, stock mínimo y rentabilidad de repuestos facturados."}
+              : "Inventario, stock mÃ­nimo y rentabilidad de repuestos facturados."}
           </p>
         </div>
 

@@ -51,6 +51,7 @@ const emptyWorkshop = {
   enableDetailedRepairInvoiceLines: false,
   enableAccountsReceivable: true,
   enableAccountsPayable: false,
+  enableStockPayments: false,
   enableLedger: true,
   allowInvoiceClientEdit: false,
   operationTypes: ["Mecanica"],
@@ -109,6 +110,7 @@ export default function AdminWorkshops() {
     enableDetailedRepairInvoiceLines: false,
     enableAccountsReceivable: true,
     enableAccountsPayable: false,
+    enableStockPayments: false,
     enableLedger: true,
     allowInvoiceClientEdit: false,
     operationTypes: ["Mecanica"],
@@ -216,6 +218,7 @@ export default function AdminWorkshops() {
         enableDetailedRepairInvoiceLines: false,
         enableAccountsReceivable: true,
         enableAccountsPayable: false,
+        enableStockPayments: false,
         enableLedger: true,
         allowInvoiceClientEdit: false,
       });
@@ -300,6 +303,10 @@ export default function AdminWorkshops() {
       enableAccountsPayable:
         selectedWorkshop.enableAccountsPayable ??
         selectedWorkshop.EnableAccountsPayable ??
+        false,
+      enableStockPayments:
+        selectedWorkshop.enableStockPayments ??
+        selectedWorkshop.EnableStockPayments ??
         false,
       enableLedger:
         selectedWorkshop.enableLedger ??
@@ -388,6 +395,10 @@ export default function AdminWorkshops() {
       enableAccountsPayable:
         selectedWorkshop.enableAccountsPayable ??
         selectedWorkshop.EnableAccountsPayable ??
+        false,
+      enableStockPayments:
+        selectedWorkshop.enableStockPayments ??
+        selectedWorkshop.EnableStockPayments ??
         false,
       enableLedger:
         selectedWorkshop.enableLedger ??
@@ -1299,9 +1310,15 @@ function FeatureSwitches({ values, onChange }) {
         />
         <Switch
           label="Stock / Inventario"
-          description="Activa inventario, pagos de stock y gastos automaticos. Si esta apagado, proveedores muestra solo Repuestos facturados."
+          description="Muestra el modulo de Stock con inventario, entradas y repuestos facturados."
           checked={values.enableAccountsPayable}
           onChange={(checked) => onChange("enableAccountsPayable", checked)}
+        />
+        <Switch
+          label="Boton Pagar en stock"
+          description="Muestra el boton Pagar en Stock y permite registrar el pago como gasto automatico."
+          checked={values.enableStockPayments}
+          onChange={(checked) => onChange("enableStockPayments", checked)}
         />
         <Switch
           label="Mayor"
@@ -1384,4 +1401,10 @@ function normalizeOperationTypes(values) {
   if (!selected.includes("Mecanica")) selected.unshift("Mecanica");
   return selected;
 }
+
+
+
+
+
+
 
