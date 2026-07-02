@@ -4,7 +4,7 @@ import { ArrowLeft, HandCoins, RefreshCw } from "lucide-react";
 import api from "../Components/api";
 import { currency, amountInput } from "../utils/currency";
 
-const ESTADOS = ["Todas", "Pendiente", "Parcial", "Pagada"];
+const ESTADOS = ["Todas", "Pendiente", "Parcial", "Rectificada", "Parcial rectificada", "Pagada"];
 
 const pickItems = (res) => {
   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? [];
@@ -42,7 +42,7 @@ const todayStart = () => {
 };
 
 const daysOverdue = (value, estado) => {
-  if (!value || estado === "Pagada") return 0;
+  if (!value || ["Pagada", "Rectificada"].includes(estado)) return 0;
   const due = new Date(value);
   if (Number.isNaN(due.getTime())) return 0;
   const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate());
@@ -54,6 +54,10 @@ const badgeClass = (estado) => {
   switch (estado) {
     case "Pagada":
       return "bg-emerald-50 text-emerald-700 ring-emerald-200";
+    case "Rectificada":
+      return "bg-slate-100 text-slate-700 ring-slate-300";
+    case "Parcial rectificada":
+      return "bg-violet-50 text-violet-700 ring-violet-200";
     case "Parcial":
       return "bg-amber-50 text-amber-700 ring-amber-200";
     default:
@@ -482,7 +486,7 @@ export default function AccountsReceivable() {
                     value={currency(factura.saldoPendiente ?? factura.SaldoPendiente)}
                   />
                 </div>
-                {estadoCxC !== "Pagada" && (
+                {!["Pagada", "Rectificada"].includes(estadoCxC) && (
                   <div className="mt-3 grid gap-2">
                     <input
                       type="number"
@@ -595,7 +599,7 @@ function FacturaRow({
         </span>
       </td>
 <td className="px-3 py-3">
-  {estado === "Pagada" ? (
+  {["Pagada", "Rectificada"].includes(estado) ? (
     <span className="text-xs font-bold text-emerald-700">Completa</span>
   ) : (
     <div className="flex items-center justify-center gap-2">

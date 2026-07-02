@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Building2, Plus, Save, Trash2, UserCog, UserPlus } from "lucide-react";
+﻿import { useEffect, useState } from "react";
+import { Building2, CheckCircle, Plus, Save, Trash2, UserCog, UserPlus, X } from "lucide-react";
 import api from "../Components/api";
 
 const BUSINESS_TYPES = [
@@ -115,9 +115,22 @@ export default function AdminWorkshops() {
   });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [messageModal, setMessageModal] = useState("");
   const [banks, setBanks] = useState([]);
   const [bankDrafts, setBankDrafts] = useState({});
   const [bankForm, setBankForm] = useState({ nombre: "", iban: "", esPrincipal: false });
+
+  useEffect(() => {
+    if (!messageModal) return undefined;
+
+    const timer = setTimeout(() => setMessageModal(""), 2500);
+    return () => clearTimeout(timer);
+  }, [messageModal]);
+
+  const showSuccessModal = (text) => {
+    setMessage(text);
+    setMessageModal(text);
+  };
 
   const load = async () => {
     const res = await api.get("/AdminWorkshops");
@@ -410,14 +423,14 @@ export default function AdminWorkshops() {
           ...form,
           maxUsers: Number(form.maxUsers || 3),
         });
-        setMessage("Negocio actualizado correctamente.");
+        showSuccessModal("Taller actualizado correctamente.");
       } else {
         await api.post("/AdminWorkshops", {
           ...form,
           maxUsers: Number(form.maxUsers || 3),
         });
         setForm(emptyWorkshop);
-        setMessage("Negocio creado correctamente.");
+        showSuccessModal("Taller creado correctamente.");
       }
       await load();
     } catch (err) {
@@ -583,7 +596,7 @@ export default function AdminWorkshops() {
         ...legalForm,
         maxUsers: Number(legalForm.maxUsers || 3),
       });
-      setMessage("Configuracion del negocio actualizada.");
+      showSuccessModal("Taller actualizado correctamente.");
       await load();
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || "No se pudo actualizar el negocio.");
@@ -592,6 +605,33 @@ export default function AdminWorkshops() {
 
   return (
     <div className="space-y-6">
+      {messageModal && (
+        <div
+          className="fixed left-1/2 top-6 z-[120] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2"
+          role="dialog"
+          aria-live="polite"
+        >
+          <div className="rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-emerald-200">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <CheckCircle size={21} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-slate-900">Actualizacion guardada</h3>
+                <p className="mt-1 text-sm text-slate-600">{messageModal}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMessageModal("")}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar aviso"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
@@ -600,12 +640,11 @@ export default function AdminWorkshops() {
           <div>
             <h2 className="text-2xl font-bold text-slate-900">Administrar negocios</h2>
             <p className="text-sm text-slate-500">
-              Solo superadmin puede crear negocios y asignar usuarios. Limite actual: 3 usuarios por negocio.
+              Solo superadmin puede crear negocios, asignar usuarios y ajustar el limite por negocio.
             </p>
           </div>
         </div>
 
-        {message && <div className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200">{message}</div>}
         {error && <div className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700 ring-1 ring-rose-200">{error}</div>}
       </section>
 
@@ -641,7 +680,7 @@ export default function AdminWorkshops() {
             <Input label="Email" value={form.email} onChange={(v) => setField("email", v)} />
             <Input label="IBAN" value={form.iban} onChange={(v) => setField("iban", v)} />
             <Input label="Logo path" value={form.logoPath} onChange={(v) => setField("logoPath", v)} placeholder="/uploads/workshops/logo.png" />
-            <Input label="Max usuarios" type="number" value={form.maxUsers} onChange={(v) => setField("maxUsers", v)} />
+            <Input label="Max usuarios" type="number" min="1" value={form.maxUsers} onChange={(v) => setField("maxUsers", v)} />
             <div className="md:col-span-2">
               <Input label="Direccion" value={form.direccion} onChange={(v) => setField("direccion", v)} required />
             </div>
@@ -688,6 +727,33 @@ export default function AdminWorkshops() {
         </form>
 
         <div className="space-y-6">
+      {messageModal && (
+        <div
+          className="fixed left-1/2 top-6 z-[120] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2"
+          role="dialog"
+          aria-live="polite"
+        >
+          <div className="rounded-2xl bg-white p-4 shadow-2xl ring-1 ring-emerald-200">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                <CheckCircle size={21} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-bold text-slate-900">Actualizacion guardada</h3>
+                <p className="mt-1 text-sm text-slate-600">{messageModal}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMessageModal("")}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Cerrar aviso"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
           <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
             <h3 className="mb-4 text-lg font-bold text-slate-900">Negocios registrados</h3>
             <div className="space-y-2">
@@ -1074,7 +1140,7 @@ export default function AdminWorkshops() {
   );
 }
 
-function Input({ label, value, onChange, type = "text", required = false, placeholder = "" }) {
+function Input({ label, value, onChange, type = "text", required = false, placeholder = "", min }) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
 
@@ -1086,6 +1152,7 @@ function Input({ label, value, onChange, type = "text", required = false, placeh
           type={isPassword && showPassword ? "text" : type}
           required={required}
           placeholder={placeholder}
+          min={min}
           value={value ?? ""}
           onChange={(e) => onChange(e.target.value)}
           className={`w-full rounded-xl border border-slate-300 px-3 py-2 text-sm ${isPassword ? "pr-10" : ""}`}
@@ -1317,3 +1384,4 @@ function normalizeOperationTypes(values) {
   if (!selected.includes("Mecanica")) selected.unshift("Mecanica");
   return selected;
 }
+
