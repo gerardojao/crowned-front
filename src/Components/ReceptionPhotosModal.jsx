@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Images, Printer, Trash2, Upload, X } from "lucide-react";
 import api, { resolveApiAssetUrl } from "./api";
 
@@ -22,6 +22,7 @@ export default function ReceptionPhotosModal({
   const [error, setError] = useState("");
   const [printing, setPrinting] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ open: false, photoId: null, loading: false });
 
   const endpoint = useMemo(() => {
     if (preOrderId) return `/preordentrabajo/${preOrderId}/photos`;
@@ -93,17 +94,30 @@ export default function ReceptionPhotosModal({
     }
   }
 
-  async function deletePhoto(photoId) {
-    if (!preOrderId || !window.confirm("Eliminar esta foto de respaldo?")) return;
+  function openDeletePhotoModal(photoId) {
+    if (!preOrderId || !photoId) return;
+    setDeleteModal({ open: true, photoId, loading: false });
+  }
+
+  function closeDeletePhotoModal() {
+    if (deleteModal.loading) return;
+    setDeleteModal({ open: false, photoId: null, loading: false });
+  }
+
+  async function confirmDeletePhoto() {
+    if (!preOrderId || !deleteModal.photoId) return;
 
     try {
+      setDeleteModal((prev) => ({ ...prev, loading: true }));
       setError("");
-      const res = await api.delete(`/preordentrabajo/${preOrderId}/photos/${photoId}`);
+      const res = await api.delete(`/preordentrabajo/${preOrderId}/photos/${deleteModal.photoId}`);
       const data = res?.data || {};
       setPhotos(Array.isArray(data.photos) ? data.photos : []);
       setMaxPhotos(Number(data.maxPhotos || 5));
+      setDeleteModal({ open: false, photoId: null, loading: false });
     } catch (err) {
       console.error(err);
+      setDeleteModal((prev) => ({ ...prev, loading: false }));
       setError(
         err?.response?.data?.message ||
           err?.message ||
@@ -215,7 +229,7 @@ export default function ReceptionPhotosModal({
                       {canUpload && preOrderId && (
                         <button
                           type="button"
-                          onClick={() => deletePhoto(photo.id ?? photo.Id)}
+                          onClick={() => openDeletePhotoModal(photo.id ?? photo.Id)}
                           className="mt-2 inline-flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 font-semibold text-rose-700 hover:bg-rose-100"
                         >
                           <Trash2 size={14} />
@@ -261,7 +275,47 @@ export default function ReceptionPhotosModal({
           </div>
         </section>
       )}
-      {selectedPhoto && (
+      {deleteModal.open && (
+        <div
+          className="no-print fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/60 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                <Trash2 size={20} />
+              </span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Eliminar foto</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Esta foto se eliminara definitivamente del respaldo de la pre-orden.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deleteModal.loading}
+                onClick={closeDeletePhotoModal}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={deleteModal.loading}
+                onClick={confirmDeletePhoto}
+                className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {deleteModal.loading ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}      {selectedPhoto && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
           onClick={() => setSelectedPhoto(null)}
@@ -289,3 +343,5 @@ function formatDate(value) {
   if (!value) return "";
   return new Date(value).toLocaleString("es-ES");
 }
+
+

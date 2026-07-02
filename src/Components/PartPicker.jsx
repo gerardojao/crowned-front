@@ -413,7 +413,7 @@ export default function PartPicker({
                     />
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Nº Factura"
+                      placeholder="Nº Factura / Albaran"
                       value={newPart.numeroFactura}
                       onChange={(e) => setNewPartField("numeroFactura", e.target.value)}
                     />
