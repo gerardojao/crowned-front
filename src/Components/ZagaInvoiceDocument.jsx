@@ -52,6 +52,8 @@ export default function ZagaInvoiceDocument({
       .toLowerCase()
       .includes("seguro");
   const companyPayable = Math.max(0, Number(totals.total || 0) - franchiseAmount);
+  const detailsSpacerClass = isInsuranceInvoice ? "min-h-[105px]" : "min-h-[220px]";
+  const insuranceBoxClass = isInsuranceInvoice ? "min-h-[17mm]" : "min-h-[28mm]";
 
   return (
     <>
@@ -161,7 +163,7 @@ export default function ZagaInvoiceDocument({
               operationType={invoice.tipoOperacion || invoice.TipoOperacion}
             />
 
-            <div className="min-h-[260px]" />
+            <div className={detailsSpacerClass} />
 
             {paymentLegend && (
               <div className="px-1 py-2">* {paymentLegend}</div>
@@ -170,20 +172,20 @@ export default function ZagaInvoiceDocument({
 
           <div className="border-x border-b border-black text-[10px]">
             {isInsuranceInvoice && (
-              <div className="grid grid-cols-2 border-b border-black text-left text-[12px]">
-                <div className="min-h-[28mm] border-r border-black px-2 py-1">
+              <div className="grid grid-cols-2 border-b border-black text-left text-[11px]">
+                <div className={`${insuranceBoxClass} border-r border-black px-2 py-1`}>
                   <div>
                     <strong>A pagar por :</strong> {invoice.cliente || ""}
                   </div>
-                  <div className="mt-10">
+                  <div className="mt-4">
                     Importe : <strong>{eur.format(companyPayable)}</strong>
                   </div>
                 </div>
-                <div className="min-h-[28mm] px-2 py-1">
+                <div className={`${insuranceBoxClass} px-2 py-1`}>
                   <div>
                     <strong>Franquicia (a pagar por el asegurado)</strong>
                   </div>
-                  <div className="mt-10">
+                  <div className="mt-4">
                     Importe : <strong>{eur.format(franchiseAmount)}</strong>
                   </div>
                 </div>
