@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import api from "../Components/api";
 import Loader from "../Components/Loader";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -176,6 +176,14 @@ export default function InvoiceHistory() {
       origin: "",
       invoiceType: "",
     });
+  };
+  const setToday = () => {
+    const today = ymd(new Date());
+
+    setFrom(today);
+    setTo(today);
+
+    fetchData({ from: today, to: today });
   };
 
   const setThisMonth = () => {
@@ -385,6 +393,13 @@ const filteredRows = useMemo(() => {
           <span className="text-sm text-slate-500 flex items-center gap-2">
             <CalendarDays size={16} /> Rápidos:
           </span>
+          <button
+            type="button"
+            onClick={setToday}
+            className="rounded-full px-3 py-1 text-sm bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition"
+          >
+            Hoy
+          </button>
 
           <button
             type="button"
@@ -691,3 +706,4 @@ const filteredRows = useMemo(() => {
     </>
   );
 }
+

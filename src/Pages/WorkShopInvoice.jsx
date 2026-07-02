@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Printer, Wrench } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
@@ -93,6 +93,7 @@ const lockedInputCls =
 
 export default function WorkshopInvoice() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const labels = useBusinessTerminology();
 
   const [loading, setLoading] = useState(true);
@@ -852,10 +853,10 @@ const printInvoice = async () => {
       window.opener.postMessage(issuedEvent, window.location.origin);
     }
 
-    setTimeout(() => {
-      window.print();
-
-    }, 150);
+    navigate(
+      `/reprint-invoice/number/${encodeURIComponent(numeroFactura)}?autoprint=1&returnTo=${encodeURIComponent("/invoices-history")}`,
+      { replace: true },
+    );
   } catch (err) {
     console.error(err);
     setError(

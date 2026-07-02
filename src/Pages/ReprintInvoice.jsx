@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, FileMinus2, Printer, X } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
@@ -27,18 +27,21 @@ const eur = new Intl.NumberFormat("es-ES", {
 export default function ReprintInvoice() {
   const { idOrden, numeroFactura } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [rectError, setRectError] = useState("");
   const [rectSaving, setRectSaving] = useState(false);
   const [showRectModal, setShowRectModal] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [rectForm, setRectForm] = useState({
     tipo: "Total",
     fecha: new Date().toISOString().slice(0, 10),
     motivo: "",
     importe: "",
     descripcion: "",
+    bankAccountId: "",
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
@@ -84,8 +87,19 @@ export default function ReprintInvoice() {
 
   useEffect(() => {
     loadWorkshopSettings();
+    loadBankAccounts();
     loadInvoice();
   }, [idOrden, numeroFactura]);
+
+  useEffect(() => {
+    if (loading || error || searchParams.get("autoprint") !== "1") return;
+
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [loading, error, searchParams]);
 
   const loadWorkshopSettings = async () => {
     try {
@@ -108,6 +122,15 @@ export default function ReprintInvoice() {
       });
     } catch {
       setTaller(DEFAULT_TALLER);
+    }
+  };
+
+  const loadBankAccounts = async () => {
+    try {
+      const res = await api.get("/WorkshopBankAccounts");
+      setBankAccounts(Array.isArray(res?.data) ? res.data : []);
+    } catch {
+      setBankAccounts([]);
     }
   };
 
@@ -144,6 +167,7 @@ export default function ReprintInvoice() {
 
       setInvoice({
         id: f.id ?? f.Id ?? null,
+        idOrdenTrabajo: f.idOrdenTrabajo ?? f.IdOrdenTrabajo ?? "",
         idCliente: f.idCliente ?? f.IdCliente ?? "",
         numeroCliente: f.numeroCliente ?? f.NumeroCliente ?? f.idCliente ?? f.IdCliente ?? "",
         numero: f.numeroFactura ?? f.NumeroFactura ?? "",
@@ -203,6 +227,13 @@ export default function ReprintInvoice() {
     window.print();
   };
 
+  const returnToParam = searchParams.get("returnTo");
+  const returnTo =
+    returnToParam?.startsWith("/") && !returnToParam.startsWith("//")
+      ? returnToParam
+      : "/invoices-history";
+  const isFreshlyIssued = searchParams.get("autoprint") === "1";
+
   const isRectificativa = invoice.tipoFactura === "Rectificativa";
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
   const documentTaller = {
@@ -211,7 +242,9 @@ export default function ReprintInvoice() {
   };
   const reprintDocumentTitle = isRectificativa
     ? "Factura rectificativa"
-    : "Factura duplicada";
+    : isFreshlyIssued
+      ? "Factura"
+      : "Factura duplicada";
   const franchiseAmount = Math.max(0, Number(invoice.franquiciaImporte || 0));
   const isInsuranceInvoice =
     franchiseAmount > 0 ||
@@ -222,6 +255,10 @@ export default function ReprintInvoice() {
   const linkedRectificativas = Array.isArray(invoice.rectificativas)
     ? invoice.rectificativas
     : [];
+  const isCreditInvoice = String(invoice.tipoPago || "").toLowerCase() === "credito";
+  const mainBank =
+    bankAccounts.find((bank) => bank.esPrincipal ?? bank.EsPrincipal) ||
+    bankAccounts[0];
 
   const handleRectFormChange = (field, value) => {
     setRectForm((prev) => ({ ...prev, [field]: value }));
@@ -235,6 +272,7 @@ export default function ReprintInvoice() {
       motivo: "",
       importe: "",
       descripcion: "",
+      bankAccountId: isCreditInvoice ? "" : String(mainBank?.id ?? mainBank?.Id ?? ""),
     });
     setShowRectModal(true);
   };
@@ -258,6 +296,11 @@ export default function ReprintInvoice() {
       return;
     }
 
+    if (!isCreditInvoice && bankAccounts.length > 0 && !rectForm.bankAccountId) {
+      setRectError("Selecciona el banco por el que se realiza la rectificativa.");
+      return;
+    }
+
     try {
       setRectSaving(true);
       const payload = {
@@ -266,6 +309,10 @@ export default function ReprintInvoice() {
         motivo: rectForm.motivo.trim(),
         descripcion: rectForm.descripcion.trim() || null,
         importe: rectForm.tipo === "Parcial" ? Number(rectForm.importe) : null,
+        bankAccountId:
+          !isCreditInvoice && rectForm.bankAccountId
+            ? Number(rectForm.bankAccountId)
+            : null,
       };
 
       const res = await api.post(`/FacturaEmitida/${invoice.id}/rectificativa`, payload);
@@ -316,7 +363,11 @@ export default function ReprintInvoice() {
       <div className="no-print flex items-center justify-between gap-3 mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">
-            {isRectificativa ? "Reimprimir factura rectificativa" : "Reimprimir factura"}
+            {isRectificativa
+              ? "Reimprimir factura rectificativa"
+              : isFreshlyIssued
+                ? "Factura emitida"
+                : "Reimprimir factura"}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
             Factura {invoice.numero}
@@ -376,7 +427,7 @@ export default function ReprintInvoice() {
           </button>
 
           <Link
-            to="/"
+            to={returnTo}
             className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-700 text-white hover:bg-slate-800 transition"
           >
             <ArrowLeft size={18} />
@@ -398,7 +449,7 @@ export default function ReprintInvoice() {
           items={items}
           totals={totals}
           isRectificativa={isRectificativa}
-          isDuplicate
+          isDuplicate={!isFreshlyIssued}
         />
       )}
 
@@ -665,6 +716,36 @@ export default function ReprintInvoice() {
                     placeholder="Ajuste parcial de factura"
                     className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
                   />
+                </label>
+              )}
+
+              {!isCreditInvoice && (
+                <label className="block text-sm font-medium text-slate-700">
+                  Banco
+                  {bankAccounts.length > 0 ? (
+                    <select
+                      value={rectForm.bankAccountId}
+                      onChange={(e) => handleRectFormChange("bankAccountId", e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
+                      required
+                    >
+                      <option value="">Selecciona banco</option>
+                      {bankAccounts.map((bank) => {
+                        const id = bank.id ?? bank.Id;
+                        const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                        const iban = bank.iban ?? bank.Iban ?? "";
+                        return (
+                          <option key={id} value={id}>
+                            {iban ? `${name} - ${iban}` : name}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  ) : (
+                    <div className="mt-1 rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 ring-1 ring-amber-200">
+                      Sin bancos activos configurados.
+                    </div>
+                  )}
                 </label>
               )}
             </div>

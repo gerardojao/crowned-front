@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Printer, Search, Trash2, UserPlus } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
@@ -123,6 +123,7 @@ function getSignedQuantity(item, mode) {
 
 export default function SpecialPartsInvoice() {
   const { type = "parts" } = useParams();
+  const navigate = useNavigate();
   const invoiceMode = getInvoiceMode(type);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -544,7 +545,10 @@ export default function SpecialPartsInvoice() {
         numeroCliente: emitted.idCliente || prev.numeroCliente,
       }));
       setNotice(`${invoiceMode.title} emitida correctamente.`);
-      setTimeout(() => window.print(), 150);
+      navigate(
+        `/reprint-invoice/number/${encodeURIComponent(numeroFactura)}?autoprint=1&returnTo=${encodeURIComponent("/invoices-history")}`,
+        { replace: true },
+      );
     } catch (err) {
       console.error(err);
       setError(
