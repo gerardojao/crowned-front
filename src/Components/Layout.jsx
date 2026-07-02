@@ -61,6 +61,7 @@ export default function Layout({ children }) {
   const compactRoutes = [
     "/pre-ordenes",
     "/register-work-order",
+    "/register-customer",
     "/print-order/:id",
     "/print-pre-order/:id",
     "/print-budget/:id",
