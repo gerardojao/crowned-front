@@ -72,7 +72,7 @@ const round2 = (value) =>
 const PAYMENT_METHODS = [
   { key: "efectivo", label: "Efectivo" },
   { key: "transferencia", label: "Transferencia" },
-  { key: "tdc", label: "TDC" },
+  { key: "tdc", label: "TPV" },
   { key: "bizum", label: "Bizum" },
 ];
 
@@ -1497,7 +1497,7 @@ const printInvoice = async () => {
             saldoPendiente: Math.max(0, paymentDifference),
             metodoPagoDetalle: paymentDetailText,
             bankAccountName: selectedBank?.nombre ?? selectedBank?.Nombre ?? "",
-            bankAccountIban: selectedBank?.iban ?? selectedBank?.Iban ?? taller.iban,
+            bankAccountIban: selectedBank?.iban ?? selectedBank?.Iban ?? taller.iban
           }}
           items={items}
           totals={{
@@ -1507,6 +1507,8 @@ const printInvoice = async () => {
             total: totalFinal,
           }}
           selectedPaymentMethods={selectedPaymentMethods}
+          warrantyTitle={labels.warrantyTitle}
+          warrantyText={labels.warrantyText}
         />
       )}
 

@@ -776,6 +776,12 @@ export default function RegisterPreOrder() {
         ensureOk(await api.put(`/PreOrdenTrabajo/${editingId}`, payload));
         setSuccessModal("Pre-orden actualizada correctamente.");
       } else {
+    localStorage.setItem(
+      `zaga:preorden:motivoRecepcion:${submitForm.Matricula}`,
+      submitForm.MotivoRecepcion || ""
+
+    //localStorage.setItem("preOrderForm", JSON.stringify(form.MotivoRecepcion));
+    );
         const createdData = ensureOk(
           await api.post("/PreOrdenTrabajo", payload),
         );
@@ -853,8 +859,11 @@ export default function RegisterPreOrder() {
       RepuestosNecesarios: item.RepuestosNecesarios,
       Observaciones: item.Observaciones,
     });
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    //window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  localStorage.setItem("preOrderForm", JSON.stringify(form.MotivoRecepcion));
+
 
   const remove = async (item) => {
     if (!window.confirm(`Eliminar la pre-orden de ${item.Matricula}?`)) return;
@@ -1356,14 +1365,14 @@ export default function RegisterPreOrder() {
                       required
                     />
 
-                    <Textarea
+                    {/* <Textarea
                       name="Observaciones"
                       value={form.Observaciones}
                       onChange={setField}
                       className="md:col-span-4"
                       rows={2}
                       placeholder="Observaciones"
-                    />
+                    /> */}
                   </div>
                 </div>
               </div>

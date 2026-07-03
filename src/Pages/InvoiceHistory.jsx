@@ -1,4 +1,10 @@
-﻿import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+﻿import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import api from "../Components/api";
 import Loader from "../Components/Loader";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -24,7 +30,7 @@ const amountOf = (value) => Number(value ?? 0);
 
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
+    d.getDate(),
   ).padStart(2, "0")}`;
 
 const Banner = ({ type = "success", text, onClose }) => {
@@ -67,22 +73,23 @@ export default function InvoiceHistory() {
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(null);
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
 
   const autoTimerRef = useRef(null);
 
   const totalBase = useMemo(
     () => rows.reduce((acc, x) => acc + amountOf(x.baseAmount), 0),
-    [rows]
+    [rows],
   );
 
   const totalIva = useMemo(
     () => rows.reduce((acc, x) => acc + amountOf(x.ivaAmount), 0),
-    [rows]
+    [rows],
   );
 
   const totalGeneral = useMemo(
     () => rows.reduce((acc, x) => acc + amountOf(x.totalAmount), 0),
-    [rows]
+    [rows],
   );
 
   const fetchData = useCallback(
@@ -118,7 +125,7 @@ export default function InvoiceHistory() {
         setLoading(false);
       }
     },
-    [from, to, origin, invoiceType]
+    [from, to, origin, invoiceType],
   );
 
   useEffect(() => {
@@ -169,7 +176,7 @@ export default function InvoiceHistory() {
     setTo("");
     setOrigin("");
     setInvoiceType("");
-
+    setSearchFilter("");
     fetchData({
       from: "",
       to: "",
@@ -236,23 +243,27 @@ export default function InvoiceHistory() {
   };
 
   const handlePrint = (row) => {
+    if (row.idOrdenTrabajo) {
+      window.open(`/reprint-invoice/order/${row.idOrdenTrabajo}`);
+      return;
+    }
 
-  if (row.idOrdenTrabajo) {
-    window.open(`/reprint-invoice/order/${row.idOrdenTrabajo}`);
-    return;
-  }
+    window.open(
+      `/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`,
+      "_blank",
+    );
+  };
 
-  window.open(`/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`, "_blank");
-};
+  const handleView = (row) => {
+    if (["sparePart", "rapel", "noVat"].includes(row.origin)) {
+      navigate(
+        `/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`,
+      );
+      return;
+    }
 
-const handleView = (row) => {
-  if (["sparePart", "rapel", "noVat"].includes(row.origin)) {
-    navigate(`/reprint-invoice/number/${encodeURIComponent(row.invoiceNumber)}`);
-    return;
-  }
-
-  handlePrint(row);
-};
+    handlePrint(row);
+  };
 
   const handleSendEmail = async (row) => {
     try {
@@ -271,18 +282,122 @@ const handleView = (row) => {
     }
   };
 
-const filteredRows = useMemo(() => {
-  if (!invoiceNumber.trim()) return rows;
+  // const filteredRows = useMemo(() => {
+  //   const search = searchFilter.trim().toLowerCase();
 
-  const search = invoiceNumber.trim().toLowerCase();
+  //   if (!search) return rows;
 
-  return rows.filter((x) =>
-    (x.invoiceNumber || "")
-      .toLowerCase()
-      .includes(search)
-  );
-}, [rows, invoiceNumber]);
+  //   return rows.filter((x) =>
+  //     [
+  //       x.invoiceNumber,
+  //       x.customerName,
+  //       x.nif,
+  //       x.matricula,
+  //       x.vehiclePlate,
+  //       x.marca,
+  //       x.modelo,
+  //       x.origin,
+  //       x.totalAmount,
+  //       x.baseAmount,
+  //       x.ivaAmount,
+  //       x.originalInvoiceNumber,
+  //     ]
+  //       .filter(Boolean)
+  //       .some((value) =>
+  //         String(value).toLowerCase().includes(search)
+  //       )
+  //   );
+  // }, [rows, searchFilter]);
+  const filteredRows = useMemo(() => {
+    const search = searchFilter.trim().toLowerCase();
 
+    if (!search) return rows;
+
+    return rows.filter((row) =>
+      Object.values(row)
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search)),
+    );
+  }, [rows, searchFilter]);
+
+  const printSalesBookPdf = (param) => {
+  const rowsToPrint = filteredRows;
+
+  const totalBase = rowsToPrint.reduce((sum, r) => sum + Number(r.baseAmount || 0), 0);
+  const totalIva = rowsToPrint.reduce((sum, r) => sum + Number(r.ivaAmount || 0), 0);
+  const totalImporte = rowsToPrint.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+
+  const html = `
+    <html>
+      <head>
+        <title>Libro de ventas</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; }
+          h1 { text-align: center; margin-bottom: 6px; }
+          .periodo { text-align: center; margin-bottom: 24px; font-size: 13px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #333; padding: 6px; }
+          th { background: #eee; }
+          td.num { text-align: right; }
+          tfoot td { font-weight: bold; background: #f3f3f3; }
+          @page {
+            size: A4 landscape;
+            margin: 10mm;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Libro de ventas</h1>
+        <div class="periodo">Desde: ${from || "-"} &nbsp; Hasta: ${to || "-"}</div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Nº Factura</th>
+              <th>Cliente</th>
+              <th>NIF</th>
+              <th>Origen</th>
+              <th>Tipo</th>
+              <th>Base imponible</th>
+              <th>IVA</th>
+              <th>Total importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsToPrint.map((r) => `
+              <tr>
+                <td>${r.date ? soloFecha(r.date) : ""}</td>
+                <td>${r.invoiceNumber || ""}</td>
+                <td>${r.customerName || ""}</td>
+                <td>${r.nif || ""}</td>
+                <td>${getOriginLabel(r)}</td>
+                <td>${getTypeLabel(r)}</td>
+                <td class="num">${Number(r.baseAmount || 0).toFixed(2)}</td>
+                <td class="num">${Number(r.ivaAmount || 0).toFixed(2)}</td>
+                <td class="num">${Number(r.totalAmount || 0).toFixed(2)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="6">TOTALES</td>
+              <td class="num">${totalBase.toFixed(2)}</td>
+              <td class="num">${totalIva.toFixed(2)}</td>
+              <td class="num">${totalImporte.toFixed(2)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const win = window.open("", "_blank");
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  win.print();
+};
   return (
     <>
       <div className="flex items-center justify-between gap-3 mt-2 mb-3 md:mb-4">
@@ -305,10 +420,10 @@ const filteredRows = useMemo(() => {
       />
 
       <form
-        className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 mb-6"
+        className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p- mb-6"
         onSubmit={onSubmit}
       >
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-6 items-end  justify-items-center">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Desde
@@ -332,8 +447,8 @@ const filteredRows = useMemo(() => {
               onChange={(e) => setTo(e.target.value)}
             />
           </div>
-
-          <div>
+          {/* cambiar filtro a filtrar por cualquier cosa */}
+          {/* <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
                 Nº Factura
             </label>
@@ -341,12 +456,23 @@ const filteredRows = useMemo(() => {
             <input
                 type="text"
                 value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                placeholder="MT-2026-T2-0001"
+                onChange={(e) => setInvoiceNumber(e.target.value)}            
+                placeholder="Cliente, factura, matricula..."
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
-            </div>
-
+            </div> */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Buscar
+            </label>
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Factura, matricula, cliente..."
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            />
+          </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Origen
@@ -537,6 +663,14 @@ const filteredRows = useMemo(() => {
                 </span>
               </div>
 
+              <button
+                type="button"
+                onClick={printSalesBookPdf}
+                className="rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition text-sm flex items-center gap-2"
+              >
+                Imprimir Ventas
+              </button>
+
               <div className="text-sm font-medium text-slate-600">
                 Total:{" "}
                 <span className="text-slate-900">
@@ -564,9 +698,7 @@ const filteredRows = useMemo(() => {
                       <th className="py-2.5 px-3 font-semibold text-right">
                         Total
                       </th>
-                      <th className="py-2.5 px-3 font-semibold text-right">
-                        
-                      </th>
+                      <th className="py-2.5 px-3 font-semibold text-right"></th>
                     </tr>
                   </thead>
 
@@ -648,8 +780,6 @@ const filteredRows = useMemo(() => {
                               >
                                 <Eye size={16} />
                               </button>
-
-
 
                               <button
                                 type="button"

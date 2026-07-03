@@ -115,7 +115,7 @@ export default function AccountsReceivable() {
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
           err?.message ||
-          "No se pudieron cargar las cuentas por cobrar.",
+          "No se pudieron cargar las facturas pendiente de cobro.",
       );
       setItems([]);
       setSettingsLoaded(true);
@@ -240,7 +240,7 @@ export default function AccountsReceivable() {
             </span>
             <div>
               <h2 className="text-2xl font-bold text-slate-900">
-                Cuentas por cobrar
+                Facturas pendiente de cobro
               </h2>
               <p className="text-sm text-slate-500">
                 Facturas a credito, vencimientos, abonos y saldos pendientes.
@@ -395,7 +395,7 @@ export default function AccountsReceivable() {
 
         {loading && (
           <div className="rounded-2xl border border-slate-200 p-6 text-center text-sm text-slate-500">
-            Cargando cuentas por cobrar...
+            Cargando facturas pendiente de cobro...
           </div>
         )}
 

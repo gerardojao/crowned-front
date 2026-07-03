@@ -63,7 +63,7 @@ const states = [
   "Diagnóstico",
   "Reparando",
   "Esperando repuesto",
-  "Listo",
+  "Terminado",
   "Entregado",
 ];
 
@@ -97,7 +97,7 @@ const getStateStyles = (estado) => {
     case "Esperando repuesto":
       return "border-orange-500 bg-orange-50/40";
 
-    case "Listo":
+    case "Terminado":
       return "border-emerald-300 bg-emerald-50/40";
 
     case "Entregado":
@@ -119,7 +119,7 @@ const ensureOk = (res) => {
 };
 
 const isOrderEditLocked = (estado) =>
-  ["Reparando", "Esperando repuesto", "Listo", "Entregado"].includes(estado);
+  ["Reparando", "Esperando repuesto", "Terminado", "Entregado"].includes(estado);
 
 const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
 const READY_ORDER_ALERTS_KEY_PREFIX = "tc:ready-order-alerts";
@@ -1501,6 +1501,8 @@ export default function RegisterWorkOrder() {
     }
   }, []);
 
+  console.log(order);
+
   return (
     <>
       <SmallSuccessModal
@@ -2500,8 +2502,8 @@ export default function RegisterWorkOrder() {
 
                         if (
                           whatsappEnabled &&
-                          estadoAnterior !== "Listo" &&
-                          nuevoEstado === "Listo"
+                          estadoAnterior !== "Terminado" &&
+                          nuevoEstado === "Terminado"
                         ) {
                           if (whatsappEnabled) {
                             setReadyWhatsappOrder(updatedOrder);
@@ -2643,7 +2645,7 @@ export default function RegisterWorkOrder() {
                       </button>
                     )}
 
-                    {o.Estado === "Listo" && !(o.Facturada || o.facturada) && (
+                    {o.Estado === "Terminado" && !(o.Facturada || o.facturada) && (
                       <Link
                         to={`/workshop-invoice/${o.Id}`}
                         rel="noopener noreferrer"

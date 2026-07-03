@@ -174,6 +174,18 @@ export default function PrintWorkOrder() {
     resetKey: `${id}:${documentType}`,
   });
 
+  useEffect(() => {
+    if (!shouldAutoPrint || !order) return;
+
+    const key = `zaga:preorden:motivoRecepcion:${order.matricula}`;
+
+    const timer = setTimeout(() => {
+      localStorage.removeItem(key);
+    }, 50000);
+
+    return () => clearTimeout(timer);
+  }, [shouldAutoPrint, order]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -311,6 +323,10 @@ export default function PrintWorkOrder() {
       />
     );
   }
+
+  const storageKeyToDelete = `zaga:preorden:motivoRecepcion:${order.matricula}`;
+
+  const motivoRecepcion = localStorage.getItem(storageKeyToDelete) || "";
 
   return (
     <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -460,6 +476,7 @@ export default function PrintWorkOrder() {
 
         .wo-block {
           padding: 1.7mm 1.5mm 1mm;
+          font-size: 10px;
         }
         .wo-op-line {
           margin: 0 0 1mm;
@@ -474,6 +491,7 @@ export default function PrintWorkOrder() {
         .wo-lines td {
           padding: .9mm 1.2mm;
           vertical-align: top;
+                 font-size: 11px;
         }
         .wo-code {
           width: 26mm;
@@ -482,6 +500,7 @@ export default function PrintWorkOrder() {
         .wo-qty {
           width: 18mm;
           text-align: right;
+   
         }
         .wo-footer {
           display: grid;
@@ -788,17 +807,11 @@ export default function PrintWorkOrder() {
             <span />
           </div>
 
-          <div className="wo-block">
-            {operationLines.length ? (
-              operationLines.map((line, index) => (
-                <p key={`${line}-${index}`} className="wo-op-line">
-                  * {line}
-                </p>
-              ))
-            ) : (
-              <p className="wo-op-line">* Sin descripcion de trabajo.</p>
-            )}
-          </div>
+         <div className="wo-block">
+          <p className="wo-op-line">
+            * MOTIVO RECEPCION: {motivoRecepcion || "Sin avería descrita por el cliente."}
+          </p>
+        </div>
 
           <div className="wo-section-head">
             <span>Mano obra</span>
@@ -865,7 +878,7 @@ export default function PrintWorkOrder() {
           </div>
 
           {order.observaciones && (
-            <div className="wo-block">
+            <div className="wo-block mt-40">
               <p className="wo-op-line">
                 * OBSERVACIONES: {order.observaciones}
               </p>

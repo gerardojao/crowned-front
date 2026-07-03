@@ -76,7 +76,7 @@ const getEstadoBadge = (estado) => {
       return "bg-amber-50 text-amber-700 ring-amber-200";
     case "Esperando repuesto":
       return "bg-orange-50 text-orange-700 ring-orange-200";
-    case "Listo":
+    case "Terminado":
       return "bg-emerald-50 text-emerald-700 ring-emerald-200";
     case "Entregado":
       return "bg-slate-100 text-slate-700 ring-slate-300";
@@ -389,7 +389,7 @@ export default function Home() {
 
                 <div>
                   <p className="text-xl text-left font-semibold text-slate-900">
-                    Cuentas por cobrar
+                    Facturas pendiente de cobro
                   </p>
 
                   <div className="mt-2 text-3xl font-extrabold text-sky-700">
@@ -426,6 +426,7 @@ export default function Home() {
               Nueva orden
               <ArrowRight size={17} />
             </Link>
+            
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -449,9 +450,12 @@ export default function Home() {
                         Nueva pre-orden <ArrowRight size={15} />
                       </Link>
                     )}
-                    <Link to="/register-work-order" className={actionLink}>
+                    {!preOrdersEnabled && (
+                      <Link to="/register-work-order" className={actionLink}>
                       Nueva orden <ArrowRight size={15} />
-                    </Link>
+                     </Link>
+                    )}
+                    
                     <Link
                       to="/register-work-order#ordenes-recientes"
                       className={actionLink}
@@ -549,7 +553,7 @@ export default function Home() {
                     </Link>
                     {dashboardFeatures.enableAccountsReceivable && (
                       <Link to="/accounts-receivable" className={actionLink}>
-                        Cuentas por cobrar <ArrowRight size={15} />
+                        Facturas pendiente de cobro <ArrowRight size={15} />
                       </Link>
                     )}
                     {dashboardFeatures.enableLedger && (

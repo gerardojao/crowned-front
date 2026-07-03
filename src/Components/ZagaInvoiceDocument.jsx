@@ -15,6 +15,8 @@ export default function ZagaInvoiceDocument({
   selectedPaymentMethods = [],
   isRectificativa = false,
   isDuplicate = false,
+  warrantyTitle = "",
+  warrantyText = "",
 }) {
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoZaga;
   const ivaPct = Number(invoice.ivaPct || 21);
@@ -118,9 +120,7 @@ export default function ZagaInvoiceDocument({
 
                 <InfoLabel>Cuenta Banco</InfoLabel>
                 <InfoValue>
-                  {isCredit
-                    ? ""
-                    : maskIban(invoice.bankAccountIban || taller.iban)}
+                  {invoice.bankAccountIban || taller.iban}
                 </InfoValue>
               </div>
             </div>
@@ -164,6 +164,17 @@ export default function ZagaInvoiceDocument({
             />
 
             <div className={detailsSpacerClass} />
+
+            {(warrantyTitle || warrantyText) && (
+            <div className="px-1 py-2">
+              {warrantyTitle && (
+                <div className="font-bold uppercase">* {warrantyTitle}</div>
+              )}
+              {warrantyText && (
+                <div className="mt-1 italic leading-tight">{warrantyText}</div>
+              )}
+            </div>
+          )}
 
             {paymentLegend && (
               <div className="px-1 py-2">* {paymentLegend}</div>
@@ -510,7 +521,7 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
     return "PAGO POR TPV";
   if (tipo === "efectivo") return "PAGO EN EFECTIVO";
   if (tipo === "bizum") return "PAGO POR BIZUM";
-  if (tipo === "contado") return "PAGO EN EFECTIVO";
+  if (tipo === "contado") return "PAGO DE CONTADO";
 
   return labels ? `PAGO ${labels.toUpperCase()}` : "";
 }
@@ -534,7 +545,7 @@ function getPaymentDisplayText(invoice, selectedPaymentMethods) {
   if (detail) return detail;
 
   if (tipo === "transferencia") return "Transferencia";
-  if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TDC";
+  if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TPV";
   if (tipo === "efectivo") return "Efectivo";
   if (tipo === "bizum") return "Bizum";
   return tipo === "contado" ? "Efectivo" : "Contado";

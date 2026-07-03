@@ -171,7 +171,7 @@ export default function RegisterBudget() {
       [name]: value,
     }));
   };
-
+//revisar
   const resetBudgetForm = () => {
     setBudget(EMPTY_BUDGET);
     setEditingId(null);
@@ -1379,10 +1379,10 @@ export default function RegisterBudget() {
                       {customer.Nombre}
                     </span>
 
-                    <span className="mt-1 block text-slate-600">
+                    {/* <span className="mt-1 block text-slate-600">
                       {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
                       {customer.Modelo}
-                    </span>
+                    </span> */}
 
                     <span className="mt-1 block text-xs text-slate-500">
                       {customer.Telefono || "Sin teléfono"}
@@ -1970,8 +1970,7 @@ export default function RegisterBudget() {
                 <button
                   type="button"
                   onClick={() => {
-                    resetBudgetForm();
-                    setViewMode("list");
+                    resetBudgetForm();                  
                   }}
                   className="rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
                 >

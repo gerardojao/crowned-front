@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 
 export default function SmallSuccessModal({
   open,
-  title = "Listo",
+  title = "Ok",
   message,
   onClose,
   variant = "success",

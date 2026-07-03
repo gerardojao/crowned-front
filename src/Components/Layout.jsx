@@ -1,5 +1,11 @@
 ﻿import { useEffect, useState } from "react";
-import { Link, NavLink, useNavigate, useLocation, matchPath } from "react-router-dom";
+import {
+  Link,
+  NavLink,
+  useNavigate,
+  useLocation,
+  matchPath,
+} from "react-router-dom";
 import {
   Menu,
   X,
@@ -42,7 +48,9 @@ export default function Layout({ children }) {
   const location = useLocation();
   const { isAuthed, user, logout } = useAuth();
   const [workshops, setWorkshops] = useState([]);
-  const [activeWorkshopId, setActiveWorkshopId] = useState(getCurrentWorkshopId());
+  const [activeWorkshopId, setActiveWorkshopId] = useState(
+    getCurrentWorkshopId(),
+  );
   const [alertCount, setAlertCount] = useState(0);
   const [helpOpen, setHelpOpen] = useState(false);
   const [helpForm, setHelpForm] = useState({
@@ -80,7 +88,7 @@ export default function Layout({ children }) {
   ];
 
   const isCompactRoute = compactRoutes.some((pattern) =>
-    matchPath({ path: pattern, end: true }, location.pathname)
+    matchPath({ path: pattern, end: true }, location.pathname),
   );
 
   const onLogout = () => {
@@ -106,8 +114,12 @@ export default function Layout({ children }) {
         setWorkshops(list);
 
         const stored = getCurrentWorkshopId();
-        const exists = list.some((x) => String(x.id ?? x.Id) === String(stored));
-        const nextId = exists ? stored : String(list[0]?.id ?? list[0]?.Id ?? "");
+        const exists = list.some(
+          (x) => String(x.id ?? x.Id) === String(stored),
+        );
+        const nextId = exists
+          ? stored
+          : String(list[0]?.id ?? list[0]?.Id ?? "");
 
         if (nextId && nextId !== stored) {
           setCurrentWorkshopId(nextId);
@@ -126,7 +138,8 @@ export default function Layout({ children }) {
   useEffect(() => {
     const onWorkshopChanged = () => setActiveWorkshopId(getCurrentWorkshopId());
     window.addEventListener("tc:workshop-changed", onWorkshopChanged);
-    return () => window.removeEventListener("tc:workshop-changed", onWorkshopChanged);
+    return () =>
+      window.removeEventListener("tc:workshop-changed", onWorkshopChanged);
   }, []);
 
   useEffect(() => {
@@ -147,10 +160,12 @@ export default function Layout({ children }) {
   const activeWorkshop = workshops.find(
     (x) => String(x.id ?? x.Id) === String(activeWorkshopId),
   );
-  const activeWorkshopLogo = activeWorkshop?.logoUrl ?? activeWorkshop?.LogoUrl ?? "";
-  const navbarLogo = isAuthed && activeWorkshopLogo
-    ? resolveApiAssetUrl(activeWorkshopLogo)
-    : zagaProLogo;
+  const activeWorkshopLogo =
+    activeWorkshop?.logoUrl ?? activeWorkshop?.LogoUrl ?? "";
+  const navbarLogo =
+    isAuthed && activeWorkshopLogo
+      ? resolveApiAssetUrl(activeWorkshopLogo)
+      : zagaProLogo;
   const navbarLogoAlt = isAuthed
     ? `${activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "Negocio"}`
     : "ZagaPro - Gestion inteligente de negocios";
@@ -167,9 +182,7 @@ export default function Layout({ children }) {
     activeWorkshop?.EnableAccountsReceivable ??
     false;
   const ledgerEnabled =
-    activeWorkshop?.enableLedger ??
-    activeWorkshop?.EnableLedger ??
-    false;
+    activeWorkshop?.enableLedger ?? activeWorkshop?.EnableLedger ?? false;
   const specialInvoicesEnabled =
     activeWorkshop?.enableSpecialInvoices ??
     activeWorkshop?.EnableSpecialInvoices ??
@@ -236,144 +249,155 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-gradient-to-br from-cyan-50 via-white to-amber-50">
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur">
-          <div className="mx-auto w-full max-w-screen-2xl px-4 pr-5 sm:px-6 lg:px-8 py-3 flex items-center">
-            <Link
-              to="/"
-              className="font-extrabold tracking-tight text-slate-900 text-lg sm:text-xl"
-            >
-              <img
-                src={navbarLogo}
-                alt={navbarLogoAlt}
-                className="h-20 w-auto max-w-[220px] rounded-2xl bg-white object-contain p-2 shadow-sm ring-1 ring-slate-200 sm:h-24 sm:max-w-[280px]"
-              />
-            </Link>
+        <div className="mx-auto w-full max-w-screen-2xl px-4 pr-5 sm:px-6 lg:px-8 py-3 flex items-center">
+          <Link
+            to="/"
+            className="font-extrabold tracking-tight text-slate-900 text-lg sm:text-xl"
+          >
+            <img
+              src={navbarLogo}
+              alt={navbarLogoAlt}
+              className="h-20 w-auto max-w-[220px] rounded-2xl bg-white object-contain p-2 shadow-sm ring-1 ring-slate-200 sm:h-24 sm:max-w-[280px]"
+            />
+          </Link>
 
-            {!isAuthRoute && (
-              <div className="ml-auto flex items-center gap-2">
-                <nav className="hidden md:flex items-center gap-3">
-                  {isAuthed ? (
-                    <>
-                      <span className="text-sm text-slate-700">
-                        {user?.email}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={openClientAlerts}
-                        className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        aria-label={`Alertas pendientes: ${alertCount}`}
-                        title={`Alertas pendientes: ${alertCount}`}
-                      >
-                        <Bell size={18} />
-                        {alertCount > 0 && (
-                          <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white ring-2 ring-white">
-                            {alertCount > 99 ? "99+" : alertCount}
-                          </span>
-                        )}
-                      </button>
-                      {workshops.length > 1 && (
-                        <select
-                          value={activeWorkshopId}
-                          onChange={onWorkshopChange}
-                          className="max-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
-                          aria-label="Taller activo"
-                        >
-                          {workshops.map((workshop) => (
-                            <option
-                              key={workshop.id ?? workshop.Id}
-                              value={workshop.id ?? workshop.Id}
-                            >
-                              {workshop.nombre ?? workshop.Nombre}
-                            </option>
-                          ))}
-                        </select>
+          {!isAuthRoute && (
+            <div className="ml-auto flex items-center gap-2">
+              <nav className="hidden md:flex items-center gap-3">
+                {isAuthed ? (
+                  <>
+                    <span className="text-sm text-slate-700">
+                      {user?.email}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={openClientAlerts}
+                      className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      aria-label={`Alertas pendientes: ${alertCount}`}
+                      title={`Alertas pendientes: ${alertCount}`}
+                    >
+                      <Bell size={18} />
+                      {alertCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-orange-600 px-1 text-[11px] font-bold text-white ring-2 ring-white">
+                          {alertCount > 99 ? "99+" : alertCount}
+                        </span>
                       )}
-                      <button
-                        onClick={onLogout}
+                    </button>
+                    {workshops.length > 1 && (
+                      <select
+                        value={activeWorkshopId}
+                        onChange={onWorkshopChange}
+                        className="max-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                        aria-label="Taller activo"
+                      >
+                        {workshops.map((workshop) => (
+                          <option
+                            key={workshop.id ?? workshop.Id}
+                            value={workshop.id ?? workshop.Id}
+                          >
+                            {workshop.nombre ?? workshop.Nombre}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      onClick={onLogout}
+                      className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                    >
+                      <LogOut size={16} />
+                      Salir
+                    </button>
+                    {isSuperAdmin && (
+                      <NavLink
+                        to="/admin/workshops"
                         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
                       >
-                        <LogOut size={16} />
-                        Salir
-                      </button>
-                      {isSuperAdmin && (
-                        <NavLink
-                          to="/admin/workshops"
-                          className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
-                        >
-                          Talleres
-                        </NavLink>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <NavLink
-                        to="/login"
-                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-700"
-                      >
-                        <LogIn size={16} />
-                        Iniciar sesión
+                        Talleres
                       </NavLink>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <NavLink
+                      to="/login"
+                      className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-700"
+                    >
+                      <LogIn size={16} />
+                      Iniciar sesión
+                    </NavLink>
+                  </>
+                )}
+              </nav>
 
-                    </>
-                  )}
-                </nav>
+              <button
+                className="mr-1 inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:mr-0"
+                aria-label="Abrir menú"
+                onClick={() => setOpen((v) => !v)}
+              >
+                {open ? <X size={22} /> : <Menu size={22} />}
+              </button>
+            </div>
+          )}
+        </div>
 
-                <button
-                  className="mr-1 inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:mr-0"
-                  aria-label="Abrir menú"
-                  onClick={() => setOpen((v) => !v)}
-                >
-                  {open ? <X size={22} /> : <Menu size={22} />}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {!isAuthRoute && open && (
-            <div className="border-t border-slate-200 bg-slate-50/95 shadow-lg shadow-slate-900/5">
-              <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col gap-2">
-                  {isAuthed ? (
-                    <>
-                      <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                          Sesión
-                        </div>
-                        <div className="mt-1 break-all text-sm font-medium text-slate-700">
-                          {user?.email}
-                        </div>
-                        {workshops.length > 1 && (
-                          <label className="mt-3 block">
-                            <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">
-                              Negocio activo
-                            </span>
-                            <select
-                              value={activeWorkshopId}
-                              onChange={onWorkshopChange}
-                              className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800"
-                              aria-label="Negocio activo"
-                            >
-                              {workshops.map((workshop) => (
-                                <option
-                                  key={workshop.id ?? workshop.Id}
-                                  value={workshop.id ?? workshop.Id}
-                                >
-                                  {workshop.nombre ?? workshop.Nombre}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
+        {!isAuthRoute && open && (
+          <div className="border-t border-slate-200 bg-slate-50/95 shadow-lg shadow-slate-900/5">
+            <div className="mx-auto w-full max-w-screen-2xl px-4 py-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col gap-2">
+                {isAuthed ? (
+                  <>
+                    <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Sesión
                       </div>
-                      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                      <NavLink
+                      <div className="mt-1 break-all text-sm font-medium text-slate-700">
+                        {user?.email}
+                      </div>
+                      {workshops.length > 1 && (
+                        <label className="mt-3 block">
+                          <span className="mb-1 block text-xs font-black uppercase tracking-wide text-slate-400">
+                            Negocio activo
+                          </span>
+                          <select
+                            value={activeWorkshopId}
+                            onChange={onWorkshopChange}
+                            className="w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800"
+                            aria-label="Negocio activo"
+                          >
+                            {workshops.map((workshop) => (
+                              <option
+                                key={workshop.id ?? workshop.Id}
+                                value={workshop.id ?? workshop.Id}
+                              >
+                                {workshop.nombre ?? workshop.Nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {/* <NavLink
                         to="/register-work-order"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
                         <ClipboardList size={18} className="text-orange-600" />
                         Nueva orden
-                      </NavLink>
-                      {preOrdersEnabled && (
+                      </NavLink> */}
+                      {!preOrdersEnabled ? (
+                        <NavLink
+                          to="/register-work-order"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          <ClipboardList
+                            size={18}
+                            className="text-orange-600"
+                          />
+                          Nueva orden
+                        </NavLink>
+                      ) : (
                         <NavLink
                           to="/pre-ordenes"
                           className={mobileLink}
@@ -430,7 +454,7 @@ export default function Layout({ children }) {
                           onClick={() => setOpen(false)}
                         >
                           <FileText size={18} className="text-cyan-600" />
-                          Cuentas por cobrar
+                          Facturas pendiente de cobro
                         </NavLink>
                       )}
                       {ledgerEnabled && (
@@ -491,61 +515,62 @@ export default function Layout({ children }) {
                           Administrar negocios
                         </NavLink>
                       )}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          openClientAlerts();
-                          setOpen(false);
-                        }}
-                        className="flex w-full items-center justify-between rounded-2xl bg-orange-50 px-3 py-3 text-left text-sm font-bold text-orange-800 ring-1 ring-orange-100 transition hover:bg-orange-100"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <Bell size={16} />
-                          Alertas clientes
-                          {alertCount > 0 && (
-                            <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs font-black text-white">
-                              {alertCount > 99 ? "99+" : alertCount}
-                            </span>
-                          )}
-                        </span>
-                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openClientAlerts();
+                        setOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between rounded-2xl bg-orange-50 px-3 py-3 text-left text-sm font-bold text-orange-800 ring-1 ring-orange-100 transition hover:bg-orange-100"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <Bell size={16} />
+                        Alertas clientes
+                        {alertCount > 0 && (
+                          <span className="rounded-full bg-orange-600 px-2 py-0.5 text-xs font-black text-white">
+                            {alertCount > 99 ? "99+" : alertCount}
+                          </span>
+                        )}
+                      </span>
+                    </button>
 
-                      <button
-                        onClick={onLogout}
-                        className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold text-rose-700 transition hover:bg-rose-50"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <LogOut size={16} />
-                          Salir
-                        </span>
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <NavLink
-                        to="/login"
-                        className={mobileLink}
-                        onClick={() => setOpen(false)}
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <LogIn size={16} />
-                          Iniciar sesión
-                        </span>
-                      </NavLink>
-
-                    </>
-                  )}
-                </div>
+                    <button
+                      onClick={onLogout}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold text-rose-700 transition hover:bg-rose-50"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <LogOut size={16} />
+                        Salir
+                      </span>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <NavLink
+                      to="/login"
+                      className={mobileLink}
+                      onClick={() => setOpen(false)}
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <LogIn size={16} />
+                        Iniciar sesión
+                      </span>
+                    </NavLink>
+                  </>
+                )}
               </div>
             </div>
-          )}
-        </header>
+          </div>
+        )}
+      </header>
 
       {!isAuthRoute && !isCompactRoute && (
         <div
           className={`relative mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 ${
-            isAuthed ? "pt-6 md:pt-8 pb-4 md:pb-6" : "pt-10 md:pt-14 pb-2 md:pb-3"
+            isAuthed
+              ? "pt-6 md:pt-8 pb-4 md:pb-6"
+              : "pt-10 md:pt-14 pb-2 md:pb-3"
           }`}
         >
           <div className="relative overflow-hidden rounded-3xl bg-white/70 p-5 md:p-7 ring-1 ring-slate-200 shadow-sm">
@@ -559,7 +584,9 @@ export default function Layout({ children }) {
                     {isAuthed ? (
                       <>
                         <span className="bg-gradient-to-r from-orange-500 to-red-600 bg-clip-text text-transparent">
-                          {activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "Tu taller"}
+                          {activeWorkshop?.nombre ??
+                            activeWorkshop?.Nombre ??
+                            "Tu taller"}
                         </span>
                       </>
                     ) : (
@@ -586,9 +613,9 @@ export default function Layout({ children }) {
                           Todavia no usas ZagaPro?
                         </p>
                         <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-600">
-                          Solicita una demo gratuita de 15 minutos y descubre como
-                          recuperar tiempo en la gestion de tu taller desde una
-                          sola plataforma.
+                          Solicita una demo gratuita de 15 minutos y descubre
+                          como recuperar tiempo en la gestion de tu taller desde
+                          una sola plataforma.
                         </p>
                         <a
                           href={DEMO_SITE_URL}
@@ -602,10 +629,18 @@ export default function Layout({ children }) {
                       </div>
 
                       <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs font-bold text-slate-700">
-                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Clientes</span>
-                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Documentos</span>
-                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Facturacion</span>
-                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">Seguimiento</span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">
+                          Clientes
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">
+                          Documentos
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">
+                          Facturacion
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1.5 ring-1 ring-slate-200">
+                          Seguimiento
+                        </span>
                       </div>
 
                       <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -632,29 +667,58 @@ export default function Layout({ children }) {
                 </div>
               )}
 
-              <div className={isAuthed ? "mt-7 hidden md:grid grid-cols-1 lg:grid-cols-4 gap-5" : "hidden"}>
+              <div
+                className={
+                  isAuthed
+                    ? "mt-7 hidden md:grid grid-cols-1 lg:grid-cols-4 gap-5"
+                    : "hidden"
+                }
+              >
                 {isAuthed ? (
                   <>
-                    <Link
-                      to="/register-work-order"
-                      className={`${heroBtnBase} bg-orange-600 hover:bg-orange-700`}
-                    >
-                      <span className={heroBtnIcon}>
-                        <ClipboardList size={26} />
-                      </span>
-
-                      <span className="flex-1">
-                        <span className="block text-base font-bold">
-                          Nueva Orden
+                    {!preOrdersEnabled ? (
+                      <Link
+                        to="/register-work-order"
+                        className={`${heroBtnBase} bg-orange-600 hover:bg-orange-700`}
+                      >
+                        <span className={heroBtnIcon}>
+                          <ClipboardList size={26} />
                         </span>
 
-                        <span className="block text-xs text-white/90">
-                          Crear orden de trabajo
-                        </span>
-                      </span>
+                        <span className="flex-1">
+                          <span className="block text-base font-bold">
+                            Nueva Orden
+                          </span>
 
-                      <span className="text-xl opacity-80">›</span>
-                    </Link>
+                          <span className="block text-xs text-white/90">
+                            Crear orden de trabajo
+                          </span>
+                        </span>
+
+                        <span className="text-xl opacity-80">›</span>
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/pre-ordenes"
+                        className={`${heroBtnBase} bg-orange-600 hover:bg-orange-700`}
+                      >
+                        <span className={heroBtnIcon}>
+                          <ClipboardList size={26} />
+                        </span>
+
+                        <span className="flex-1">
+                          <span className="block text-base font-bold">
+                            Nueva Pre-orden
+                          </span>
+
+                          <span className="block text-xs text-white/90">
+                            Crear nueva pre-orden de trabajo
+                          </span>
+                        </span>
+
+                        <span className="text-xl opacity-80">›</span>
+                      </Link>
+                    )}
 
                     <Link
                       to="/register-customer"
@@ -740,7 +804,6 @@ export default function Layout({ children }) {
                         <span className="text-xl opacity-80">€</span>
                       </Link>
                     )}
-
                   </>
                 ) : (
                   <div className="xl:col-span-4 flex justify-center">
@@ -801,7 +864,8 @@ export default function Layout({ children }) {
                   Cuéntanos qué necesitas
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Enviaremos tu solicitud al equipo de ZagaPro con los datos necesarios para atender tu consulta.
+                  Enviaremos tu solicitud al equipo de ZagaPro con los datos
+                  necesarios para atender tu consulta.
                 </p>
               </div>
               <button
@@ -868,10 +932,18 @@ export default function Layout({ children }) {
                   className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-100"
                 >
                   <option value="">Selecciona una opción</option>
-                  <option value="Acceso o contraseña">Acceso o contraseña</option>
-                  <option value="Alta o cambio de usuario">Alta o cambio de usuario</option>
-                  <option value="Problema con facturas o documentos">Facturas o documentos</option>
-                  <option value="Configuración del negocio">Configuración del negocio</option>
+                  <option value="Acceso o contraseña">
+                    Acceso o contraseña
+                  </option>
+                  <option value="Alta o cambio de usuario">
+                    Alta o cambio de usuario
+                  </option>
+                  <option value="Problema con facturas o documentos">
+                    Facturas o documentos
+                  </option>
+                  <option value="Configuración del negocio">
+                    Configuración del negocio
+                  </option>
                   <option value="Otra consulta">Otra consulta</option>
                 </select>
               </label>
@@ -914,7 +986,8 @@ export default function Layout({ children }) {
           <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col items-center justify-center gap-3 py-4 md:py-6 text-sm text-slate-500 md:flex-row md:justify-between">
               <div className="order-2 md:order-1 text-center md:text-left">
-                © {new Date().getFullYear()} ZagaPro. Todos los derechos reservados.
+                © {new Date().getFullYear()} ZagaPro. Todos los derechos
+                reservados.
               </div>
 
               <nav className="order-1 md:order-2 w-full md:w-auto">
@@ -954,4 +1027,3 @@ export default function Layout({ children }) {
     </div>
   );
 }
-

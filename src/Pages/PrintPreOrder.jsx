@@ -249,255 +249,278 @@ export default function PrintPreOrder() {
         subtitle={actionSubtitle}
         backTo="/pre-ordenes"
       />
-      <style>{`
-        .preorder-sheet {
-         width: 190mm;
-          min-height: 255mm;
-          margin: 0 auto;
-          padding: 4mm 5mm;
-          background: #fff;
-          border: 1px solid rgba(148, 163, 184, 0.35);
-          border-radius: 16px;
-          box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
-          font-family: Arial, Helvetica, sans-serif;
-          font-size: 8.2px;
-          line-height: 1.18;
-          color: #111;
-        }
-        .po-header {
-          display: grid;
-          grid-template-columns: 56% 1fr;
-          align-items: start;
-          gap: 5mm;
-          margin-bottom: 6mm;
-        }
-        .po-logo { width: 72mm;
-          max-height: 24mm;
-          object-fit: contain;
-          object-position: left center; }
-        .po-company {  width: 60mm;
-          justify-self: end;
-          margin-top: 7mm;
-          font-size: 9px;
-          line-height: 1.22;
-          text-transform: uppercase; }
-        .po-title-row {
-          display: grid;
-          grid-template-columns: 72mm 1fr;
-          gap: 4mm;
-          align-items: start;
-          margin-bottom: 2mm;
-        }
-        .po-title {  font-size: 15px;
-          font-weight: 800;
-          letter-spacing: .2px;
-          margin: 0 0 3mm;
-          text-align: left; }
-        .po-meta {  width: 52mm;
-          border-collapse: collapse;
-          font-size: 11px; }
-        .po-meta th {  width: 32mm;
-          background: #b7b7b7;
-          border-bottom: 1px solid #fff;
-          padding: 1.7mm 1.6mm;
-          text-align: left;
-          font-weight: 800; }
-        .po-meta td { border: 1px solid transparent; padding: 2.1mm 1.4mm; font-weight: 700; }
+<style>{`
+  .preorder-sheet {
+    width: 190mm;
+    /* Cambiado a max-height y controlado para evitar desbordes */
+    max-height: 260mm; 
+    margin: 0 auto;
+    padding: 4mm 5mm;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 16px;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 8.2px;
+    line-height: 1.18;
+    color: #111;
+    /* Evita que toda la estructura se rompa a la mitad en impresión */
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .po-header {
+    display: grid;
+    grid-template-columns: 56% 1fr;
+    align-items: start;
+    gap: 5mm;
+    margin-bottom: 4mm; /* Reducido un poco para ganar espacio */
+  }
+  .po-logo { width: 72mm;
+    max-height: 24mm;
+    object-fit: contain;
+    object-position: left center; }
+  .po-company {  width: 60mm;
+    justify-self: end;
+    margin-top: 7mm;
+    font-size: 9px;
+    line-height: 1.22;
+    text-transform: uppercase; }
+  .po-title-row {
+    display: grid;
+    grid-template-columns: 72mm 1fr;
+    gap: 4mm;
+    align-items: start;
+    margin-bottom: 2mm;
+  }
+  .po-title {  font-size: 15px;
+    font-weight: 800;
+    letter-spacing: .2px;
+    margin: 0 0 3mm;
+    text-align: left; }
+  .po-meta {  width: 52mm;
+    border-collapse: collapse;
+    font-size: 11px; }
+  .po-meta th {  width: 32mm;
+    background: #b7b7b7;
+    border-bottom: 1px solid #fff;
+    padding: 1.7mm 1.6mm;
+    text-align: left;
+    font-weight: 800; }
+  .po-meta td { border: 1px solid transparent; padding: 2.1mm 1.4mm; font-weight: 700; }
 
-        .po-client-box {
-          position: relative;
-          width: 68mm;
-          min-height: 24mm;
-          padding: 5mm 8mm 4mm;
-          font-size: 10px;
-          line-height: 1.25;
-          text-transform: uppercase;
-          margin-top: 14mm;
-          margin-left: 34mm;
-        }
+  .po-client-box {
+    position: relative;
+    width: 68mm;
+    min-height: 24mm;
+    padding: 5mm 8mm 4mm;
+    font-size: 10px;
+    line-height: 1.25;
+    text-transform: uppercase;
+    margin-top: 14mm;
+    margin-left: 34mm;
+  }
 
-        .po-client-box:before,
-        .po-client-box:after,
-        .po-client-corners:before,
-        .po-client-corners:after {
-          content: "";
-          position: absolute;
-          width: 13mm;
-          height: 9mm;
-          border-color: #111;
-        }
-        .po-client-box:before { top: 0; left: 0; border-top: 1px solid; border-left: 1px solid; }
-        .po-client-box:after { top: 0; right: 0; border-top: 1px solid; border-right: 1px solid; }
-        .po-client-corners:before { bottom: 0; left: 0; border-bottom: 1px solid; border-left: 1px solid; }
-        .po-client-corners:after { bottom: 0; right: 0; border-bottom: 1px solid; border-right: 1px solid; }
-        .po-page-label {
-          text-align: right;
-          font-size: 8px;
-          margin-top: 1mm;
-        }
-        .po-grid {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-          margin-top: 1mm;
-          font-size: 8px;
-        }
-        .po-grid th {
-          background: #b7b7b7;
-          border: 1px solid #fff;
-          padding: 1.3mm 1mm;
-          text-align: center;
-          font-weight: 800;
-          text-transform: uppercase;
-        }
-        .po-grid td {
-          padding: 1.4mm 1mm;
-          text-align: center;
-          border: 1px solid #fff;
-          font-size: 10px;
-        }
-        .po-body {
-          margin-top: 2mm;
-          min-height: 94mm;
-          border: 1px solid #111;
-        }
-        .po-block {
-          padding: 1.7mm 1.5mm 1mm;
-        }
+  .po-client-box:before,
+  .po-client-box:after,
+  .po-client-corners:before,
+  .po-client-corners:after {
+    content: "";
+    position: absolute;
+    width: 13mm;
+    height: 9mm;
+    border-color: #111;
+  }
+  .po-client-box:before { top: 0; left: 0; border-top: 1px solid; border-left: 1px solid; }
+  .po-client-box:after { top: 0; right: 0; border-top: 1px solid; border-right: 1px solid; }
+  .po-client-corners:before { bottom: 0; left: 0; border-bottom: 1px solid; border-left: 1px solid; }
+  .po-client-corners:after { bottom: 0; right: 0; border-bottom: 1px solid; border-right: 1px solid; }
+  .po-page-label {
+    text-align: right;
+    font-size: 8px;
+    margin-top: 1mm;
+  }
+  .po-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-top: 1mm;
+    font-size: 8px;
+  }
+  .po-grid th {
+    background: #b7b7b7;
+    border: 1px solid #fff;
+    padding: 1.3mm 1mm;
+    text-align: center;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .po-grid td {
+    padding: 1.4mm 1mm;
+    text-align: center;
+    border: 1px solid #fff;
+    font-size: 10px;
+  }
+  .po-body {
+    margin-top: 2mm;
+    min-height: 80mm; /* Reducido de 94mm a 80mm para dar un respiro al alto total */
+    border: 1px solid #111;
+  }
+  .po-block {
+    padding: 1.7mm 1.5mm 1mm;
+    font-size: 11px;
+  }
 
-        
-        .po-code {
-          width: 26mm;
-          text-transform: uppercase;
-        }
-        .po-qty {
-          width: 18mm;
-          text-align: right;
-        }
-       
-        .po-sign {
-          margin-top: 6mm;
-          font-size: 7px;
-          text-transform: uppercase;
-        }
-        .po-car-box {
-          height: 38mm;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5mm 0 0;
-        }
-        .po-car-diagram {
-          display: block;
-          width: 51mm;
-          max-width: 100%;
-          height: auto;
-          object-fit: contain;
-        }
-      .po-section-head {
-          display: grid;
-          grid-template-columns: 26mm 1fr 20mm 26mm 16mm;
-          background: #b7b7b7;
-          font-weight: 800;
-          text-transform: uppercase;
-          border-bottom: 1px solid #fff;
-          align-items: center;
-     
-        }
-        .po-section-head span {
-            padding: 1.5mm;
-            font-size: 8px;
-        }
+  .po-code {
+    width: 26mm;
+    text-transform: uppercase;
+  }
+  .po-qty {
+    width: 18mm;
+    text-align: right;
+  }
+ 
+  .po-sign {
+    margin-top: 6mm;
+    font-size: 7px;
+    text-transform: uppercase;
+  }
+  .po-car-box {
+    height: 38mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5mm 0 0;
+  }
+  .po-car-diagram {
+    display: block;
+    width: 51mm;
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
+  }
+  .po-section-head {
+    display: grid;
+    grid-template-columns: 26mm 1fr 20mm 26mm 16mm;
+    background: #b7b7b7;
+    font-weight: 800;
+    text-transform: uppercase;
+    border-bottom: 1px solid #fff;
+    align-items: center;
+  }
+  .po-section-head span {
+      padding: 1.5mm;
+      font-size: 8px;
+  }
 
-        .po-client-info {
-          padding: 1.5mm 1.5mm 0;
-          font-size: 12px;
-        }
-        .po-footer {
-          border: 1px solid #111;
-          border-top: 0;
-          min-height: 50mm;
-          padding: 2mm;
-          font-size: 7px;
-        }
+  .po-client-info {
+    padding: 1.5mm 1.5mm 0;
+    font-size: 12px;
+  }
+  .po-footer {
+    border: 1px solid #111;
+    border-top: 0;
+    min-height: 46mm; /* Ajustado sutilmente */
+    padding: 2mm;
+    font-size: 7px;
+    /* Asegura que el footer no se rompa ni se mueva solo a otra página */
+    page-break-inside: avoid;
+    break-inside: avoid; 
+  }
 
-        .po-footer-topbar {
-          height: 3.5mm;
-          background: #b7b7b7;
-          margin: 0 0 1.5mm;
-        }
+  .po-footer-topbar {
+    height: 3.5mm;
+    background: #b7b7b7;
+    margin: 0 0 1.5mm;
+  }
 
-        .po-departments {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr 1fr 2.2fr;
-          gap: 1.5mm;
-          margin-bottom: 2mm;
-        }
+  .po-departments {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 2.2fr;
+    gap: 1.5mm;
+    margin-bottom: 2mm;
+  }
 
-        .po-department {
-          height: 18mm;
-          border-left: 1px solid #111;
-          border-right: 1px solid #111;
-          position: relative;
-        }
+  .po-department {
+    height: 18mm;
+    border-left: 1px solid #111;
+    border-right: 1px solid #111;
+    position: relative;
+  }
 
-        .po-department-head,
-        .po-check-head {
-          background: #d9d9d9;
-          text-align: center;
-          font-weight: 800;
-          padding: 0.8mm 1mm;
-        }
+  .po-department-head,
+  .po-check-head {
+    background: #d9d9d9;
+    text-align: center;
+    font-weight: 800;
+    padding: 0.8mm 1mm;
+  }
 
-        .po-sign-line {
-          position: absolute;
-          left: 4mm;
-          right: 4mm;
-          bottom: 3mm;
-          border-bottom: 1px solid #111;
-        }
+  .po-sign-line {
+    position: absolute;
+    left: 4mm;
+    right: 4mm;
+    bottom: 3mm;
+    border-bottom: 1px solid #111;
+  }
 
-        .po-checks {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 1.5mm;
-        }
+  .po-checks {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.5mm;
+  }
 
-        .po-check {
-          min-height: 18mm;
-        }
+  .po-check {
+    min-height: 18mm;
+  }
 
-        .po-options {
-          display: grid;
-          grid-template-columns: 4mm auto 4mm auto;
-          align-items: center;
-          column-gap: 2.5mm;
-          padding: 5mm 8mm 0;
-        }
+  .po-options {
+    display: grid;
+    grid-template-columns: 4mm auto 4mm auto;
+    align-items: center;
+    column-gap: 2.5mm;
+    padding: 5mm 8mm 0;
+  }
 
-        .po-box {
-          width: 3.8mm;
-          height: 3.8mm;
-          border: 1px solid #111;
-          display: inline-block;
-        }
+  .po-box {
+    width: 3.8mm;
+    height: 3.8mm;
+    border: 1px solid #111;
+    display: inline-block;
+  }
 
-        .po-final-line {
-          width: 32mm;
-          border-bottom: 1px solid #111;
-          margin: 13mm auto 0;
-        }
-        @media print {
-          @page { size: letter portrait; margin: 8mm; }
-          .preorder-sheet { width: 100%;
-            min-height: auto;
-            margin: 0;
-            padding: 0;
-            border: 0;
-            border-radius: 0;
-            box-shadow: none; }
-        }
-      `}</style>
+  .po-final-line {
+    width: 32mm;
+    border-bottom: 1px solid #111;
+    margin: 13mm auto 0;
+  }
+
+  @media print {
+    /* Forzar que los márgenes del navegador sean cero y controlar el tamaño real */
+    @page { 
+      size: A4 portrait; 
+      margin: 0; 
+    }
+    body {
+      margin: 0;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    /* Esconder componentes de la app que no correspondan a la hoja */
+    .print-actions, nav, button {
+      display: none !important;
+    }
+    .preorder-sheet { 
+      width: 100%;
+      max-height: 100vh;
+      margin: 0;
+      padding: 6mm 8mm; /* Ajuste limpio para el folio físico */
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      page-break-after: avoid;
+    }
+  }
+`}</style>
 
       <section className="preorder-sheet">
         <header className="po-header">
@@ -648,13 +671,13 @@ export default function PrintPreOrder() {
               <span>responsable</span>
               <span>tiempo</span>
             </div>
-            <div className="po-block">
+            <div className="po-block ">
               {(motivoLines.length
                 ? motivoLines
                 : ["Sin motivo indicado."]
               ).map((line, index) => (
                 <p key={`${line}-${index}`} className="po-line">
-                  * {line}
+              <strong style={{ fontSize: '14px',textTransform: 'uppercase' }}> *MOTIVO: {line}</strong>
                 </p>
               ))}
             </div>

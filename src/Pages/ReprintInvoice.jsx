@@ -858,7 +858,7 @@ function getPaymentText(invoice) {
   if (detail) return detail;
 
   if (tipo === "transferencia") return "Transferencia";
-  if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TDC";
+  if (tipo === "tpv" || tipo === "tdc" || tipo === "tarjeta") return "TPV";
   if (tipo === "efectivo") return "Efectivo";
   if (tipo === "bizum") return "Bizum";
   if (tipo === "contado") return "Efectivo";

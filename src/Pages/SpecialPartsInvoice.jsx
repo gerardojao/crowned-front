@@ -42,7 +42,7 @@ const EMPTY_ITEM = {
 const PAYMENT_OPTIONS = [
   { value: "Efectivo", label: "Efectivo" },
   { value: "Transferencia", label: "Transferencia" },
-  { value: "TDC", label: "TDC" },
+  { value: "TDC", label: "TPV" },
   { value: "Bizum", label: "Bizum" },
   { value: "Credito", label: "Credito" },
 ];
@@ -507,7 +507,7 @@ export default function SpecialPartsInvoice() {
       totalAbonado: isCredit || invoiceMode.isRapel ? 0 : companyPayable,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
-      bankAccountId: effectiveBankAccountId,
+      bankAccountId: null,
       items: billableItems,
     });
 
@@ -595,7 +595,7 @@ export default function SpecialPartsInvoice() {
     }));
   const documentTaller = {
     ...taller,
-    iban: isCredit ? taller.iban : selectedBankIban || taller.iban,
+    iban: selectedBankIban || taller.iban,
   };
 
   return (
@@ -852,7 +852,7 @@ export default function SpecialPartsInvoice() {
               />
             </div>
           )}
-          {!isCredit && bankAccounts.length > 0 && (
+          {bankAccounts.length > 0 && (
             <label className="block text-sm font-medium text-slate-700">
               Banco
               <select
