@@ -23,6 +23,13 @@ import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import { amountInput } from "../utils/currency";
 import SmallSuccessModal from "../Components/SmallSuccessModal";
+import {
+  buildWorkOrderPayload,
+  getRepairLineQuantity,
+  getRepairLineSection,
+  getRepairLineTotal,
+  normalizeRepairLine,
+} from "../utils/repairOrderPayload";
 
 const EMPTY_ORDER = {
   ClienteId: "",
@@ -332,8 +339,16 @@ export default function RegisterWorkOrder() {
   const loadFrequentServices = async () => {
     try {
       const res = await api.get("/ServicioFrecuente");
-      const list = res?.data?.data?.[0] || [];
-      const names = list.map((x) => x.nombre ?? x.Nombre).filter(Boolean);
+      const responseData = res?.data?.data ?? res?.data?.Data ?? res?.data;
+      const list = Array.isArray(responseData?.[0])
+        ? responseData[0]
+        : Array.isArray(responseData)
+          ? responseData
+          : [];
+      const names = list
+        .map((x) => (typeof x === "string" ? x : x?.nombre ?? x?.Nombre))
+        .map((x) => String(x || "").trim())
+        .filter(Boolean);
       setFrequentServices(names.length ? names : DEFAULT_FREQUENT_SERVICES);
     } catch (err) {
       console.error(err);
@@ -348,7 +363,11 @@ export default function RegisterWorkOrder() {
       ...prev,
       Items: [
         ...(Array.isArray(prev.Items) ? prev.Items : []),
-        createDetailItem(value, 1, 0),
+        createDetailItem(value, 1, 0, {
+          kind: "labor",
+          section: "ManoObra",
+          codigo: "MO",
+        }),
       ],
       Trabajo: prev.Trabajo?.trim()
         ? `${prev.Trabajo.trim()}\n${value}`
@@ -1343,92 +1362,7 @@ export default function RegisterWorkOrder() {
       setNotice("");
       setError("");
 
-      const normalizedItems = detailItems
-        .filter((item) => {
-          const normalized = normalizeRepairLine(
-            item,
-            detailedRepairLinesEnabled,
-          );
-          return (
-            String(normalized.descripcion || normalized.codigo || "").trim() ||
-            Number(normalized.cantidad || 0) * Number(normalized.importe || 0) >
-              0
-          );
-        })
-        .map((item) => {
-          const normalized = normalizeRepairLine(
-            item,
-            detailedRepairLinesEnabled,
-          );
-          return {
-            codigo: normalized.codigo || null,
-            section: normalized.section || "ManoObra",
-            descripcion: String(normalized.descripcion || "").trim(),
-            cantidad: Number(normalized.cantidad || 1),
-            tiempo: normalized.tiempo ? Number(normalized.tiempo || 0) : null,
-            precioUnitario: Number(normalized.precioUnitario || 0),
-            descuentoPct: Number(normalized.descuentoPct || 0),
-            ivaPct: Number(normalized.ivaPct || 21),
-            importe: Number(
-              normalized.importe ?? normalized.precioUnitario ?? 0,
-            ),
-            kind: normalized.kind || null,
-            repuestoStockId: normalized.repuestoStockId || null,
-            idProveedor: normalized.idProveedor || null,
-            nombreProveedor: normalized.nombreProveedor || null,
-            precioCompra:
-              normalized.precioCompra != null
-                ? Number(normalized.precioCompra || 0)
-                : null,
-          };
-        });
-      const laborTotal = normalizedItems
-        .filter((item) => item.kind === "labor")
-        .reduce((sum, item) => sum + item.cantidad * item.importe, 0);
-      const partsTotal = normalizedItems
-        .filter((item) => item.kind !== "labor")
-        .reduce((sum, item) => sum + item.cantidad * item.importe, 0);
-
-      const payload = {
-        cliente: order.Cliente,
-        dni: order.Dni || null,
-        telefono: order.Telefono || null,
-        direccion: order.Direccion || null,
-        codigoPostal: order.CodigoPostal || null,
-        poblacion: order.Poblacion || null,
-        provincia: order.Provincia || null,
-        clasificacion: order.Clasificacion || "Particular",
-        vehiculoId: order.VehiculoId ? Number(order.VehiculoId) : null,
-        matricula: order.Matricula,
-        bastidor: order.Bastidor || null,
-        marca: order.Marca || null,
-        modelo: order.Modelo,
-        fechaMatriculacion: order.FechaMatriculacion || null,
-        motor: order.Motor || null,
-        kw: order.Kw ? Number(order.Kw) : null,
-        cv: order.Cv ? Number(order.Cv) : null,
-        combustible: order.Combustible || null,
-        kilometraje: order.Kilometraje ? Number(order.Kilometraje) : null,
-        fecha: order.Fecha,
-        fechaPrevistaEntrega: order.FechaPrevistaEntrega || null,
-        tiempoEstimadoHoras: order.TiempoEstimadoHoras
-          ? Number(order.TiempoEstimadoHoras)
-          : null,
-        tipoOperacion: order.TipoOperacion || "Mecanica",
-        trabajo: order.Trabajo,
-        itemsJson: normalizedItems.length
-          ? JSON.stringify(normalizedItems)
-          : null,
-        repuestos: normalizedItems.length
-          ? partsTotal
-          : Number(order.Repuestos || 0),
-        cantidad: Number(order.Cantidad || 1),
-        manoObra: normalizedItems.length
-          ? laborTotal
-          : Number(order.ManoObra || 0),
-        estado: order.Estado || "Recibido",
-        observaciones: order.Observaciones || null,
-      };
+      const payload = buildWorkOrderPayload(order, detailedRepairLinesEnabled);
 
       let savedOrderId = editingId;
       if (editingId) {
@@ -2143,7 +2077,7 @@ export default function RegisterWorkOrder() {
                 onChange={handleChange}
                 onBlur={(e) => upsertLaborItem(e.target.value)}
                 className={cls}
-                placeholder="Mano de obra ?"
+                placeholder="Mano de obra"
               />
             </div>
 
@@ -2610,7 +2544,7 @@ export default function RegisterWorkOrder() {
                             }}
                             className="inline-flex justify-center rounded-xl px-3 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-sm font-medium text-slate-700 transition"
                           >
-                            ver Pre-orden
+                            Ver Pre-orden
                           </a>
                         )}
 
@@ -2737,96 +2671,6 @@ function normalizeOperationTypes(types) {
   const list = Array.isArray(types) ? types : ["Mecanica"];
   const filtered = list.filter((type) => type && type !== "Recambio");
   return filtered.length ? filtered : ["Mecanica"];
-}
-
-function getRepairLineSection(item) {
-  const raw = String(
-    item.section ??
-      item.Section ??
-      item.kind ??
-      item.Kind ??
-      item.tipo ??
-      item.Tipo ??
-      "",
-  )
-    .trim()
-    .toLowerCase();
-  if (raw.includes("pintura")) return "Pintura";
-  if (
-    raw.includes("pieza") ||
-    raw.includes("recambio") ||
-    raw.includes("repuesto") ||
-    raw.includes("material")
-  )
-    return "Piezas";
-  return "ManoObra";
-}
-
-function getRepairLineQuantity(item) {
-  const section = getRepairLineSection(item);
-  const value =
-    section === "Piezas"
-      ? (item.cantidad ?? item.Cantidad)
-      : (item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad);
-  const number = Number(value || 0);
-  return number > 0 ? number : 1;
-}
-
-function getRepairLineTotal(item) {
-  const quantity = getRepairLineQuantity(item);
-  const price = Number(
-    item.precioUnitario ??
-      item.PrecioUnitario ??
-      item.importe ??
-      item.Importe ??
-      0,
-  );
-  const discount = Math.min(
-    100,
-    Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)),
-  );
-  return quantity * price * (1 - discount / 100);
-}
-
-function normalizeRepairLine(item, detailed = false) {
-  if (!detailed) return item;
-
-  const section = getRepairLineSection(item);
-  const quantity = getRepairLineQuantity({ ...item, section });
-  const price = Number(
-    item.precioUnitario ??
-      item.PrecioUnitario ??
-      item.importe ??
-      item.Importe ??
-      0,
-  );
-  const discount = Math.min(
-    100,
-    Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)),
-  );
-  const netTotal = getRepairLineTotal({
-    ...item,
-    section,
-    precioUnitario: price,
-    descuentoPct: discount,
-  });
-  const unitNet =
-    quantity > 0
-      ? Math.round((netTotal / quantity + Number.EPSILON) * 100) / 100
-      : 0;
-
-  return {
-    ...item,
-    section,
-    cantidad: quantity,
-    tiempo:
-      section === "Piezas" ? (item.tiempo ?? item.Tiempo ?? "") : quantity,
-    precioUnitario: price,
-    descuentoPct: discount,
-    ivaPct: Number(item.ivaPct ?? item.IvaPct ?? 21),
-    importe: unitNet,
-    kind: section === "Piezas" ? "repuesto" : "labor",
-  };
 }
 
 function Metric({ label, value }) {

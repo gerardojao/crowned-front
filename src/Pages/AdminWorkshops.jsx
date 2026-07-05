@@ -1310,13 +1310,13 @@ function FeatureSwitches({ values, onChange }) {
         />
         <Switch
           label="Stock / Inventario"
-          description="Muestra el modulo de Stock con inventario, entradas y repuestos facturados."
+          description="Muestra el modulo de Stock con Inventario y Facturados. Si esta apagado, Stock queda en la vista reducida actual."
           checked={values.enableAccountsPayable}
           onChange={(checked) => onChange("enableAccountsPayable", checked)}
         />
         <Switch
-          label="Boton Pagar en stock"
-          description="Muestra el boton Pagar en Stock y permite registrar el pago como gasto automatico."
+          label="Modulo Compras"
+          description="Muestra Compras, facturas recibidas, cuentas por pagar, libro de compras y albaranes."
           checked={values.enableStockPayments}
           onChange={(checked) => onChange("enableStockPayments", checked)}
         />

@@ -18,6 +18,8 @@ import {
   Truck,
   ArrowRight,
   Bell,
+  WalletCards,
+  ShoppingCart,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import api, {
@@ -40,6 +42,9 @@ const heroBtnIcon =
 
 const mobileLink =
   "group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-semibold text-slate-700 ring-1 ring-transparent transition hover:bg-white hover:text-slate-950 hover:shadow-sm hover:ring-slate-200";
+const mobileLinkText = "flex min-w-0 flex-col";
+const mobileLinkTitle = "truncate";
+const mobileLinkHint = "text-xs font-medium text-slate-500";
 const DEMO_SITE_URL = "https://demo.zagapro.store";
 
 export default function Layout({ children }) {
@@ -81,10 +86,12 @@ export default function Layout({ children }) {
     "/reprint-invoice/number/:numeroFactura",
     "/presupuestos",
     "/stock-parts",
+    "/purchases",
     "/statement",
     "/accounts-receivable",
     "/ledger",
     "/invoices-history",
+    "/register-expense"
   ];
 
   const isCompactRoute = compactRoutes.some((pattern) =>
@@ -198,6 +205,10 @@ export default function Layout({ children }) {
   const stockModuleEnabled =
     activeWorkshop?.enableAccountsPayable ??
     activeWorkshop?.EnableAccountsPayable ??
+    false;
+  const purchasesEnabled =
+    activeWorkshop?.enableStockPayments ??
+    activeWorkshop?.EnableStockPayments ??
     false;
   const stockAccessLabel = stockModuleEnabled
     ? labels.stockTitle
@@ -431,6 +442,44 @@ export default function Layout({ children }) {
                         <BarChart3 size={18} className="text-emerald-600" />
                         Registrar ingreso
                       </NavLink>
+                      {accountsReceivableEnabled && (
+                        <NavLink
+                          to="/accounts-receivable"
+                          className={`${mobileLink} bg-cyan-50 ring-cyan-100`}
+                          onClick={() => setOpen(false)}
+                        >
+                          <WalletCards
+                            size={18}
+                            className="shrink-0 text-cyan-700"
+                          />
+                          <span className={mobileLinkText}>
+                            <span className={mobileLinkTitle}>
+                              Facturas por cobrar
+                            </span>
+                            <span className={mobileLinkHint}>
+                              Pendientes y abonos
+                            </span>
+                          </span>
+                        </NavLink>
+                      )}
+                      {purchasesEnabled && (
+                        <NavLink
+                          to="/purchases"
+                          className={`${mobileLink} bg-amber-50 ring-amber-100`}
+                          onClick={() => setOpen(false)}
+                        >
+                          <ShoppingCart
+                            size={18}
+                            className="shrink-0 text-amber-700"
+                          />
+                          <span className={mobileLinkText}>
+                            <span className={mobileLinkTitle}>Compras</span>
+                            <span className={mobileLinkHint}>
+                              Facturas recibidas y CxP
+                            </span>
+                          </span>
+                        </NavLink>
+                      )}
                       <NavLink
                         to="/register-expense"
                         className={mobileLink}
@@ -445,18 +494,8 @@ export default function Layout({ children }) {
                         onClick={() => setOpen(false)}
                       >
                         <FileText size={18} className="text-slate-600" />
-                        Ver balance
+                        Ver Balance
                       </NavLink>
-                      {accountsReceivableEnabled && (
-                        <NavLink
-                          to="/accounts-receivable"
-                          className={mobileLink}
-                          onClick={() => setOpen(false)}
-                        >
-                          <FileText size={18} className="text-cyan-600" />
-                          Facturas pendiente de cobro
-                        </NavLink>
-                      )}
                       {ledgerEnabled && (
                         <NavLink
                           to="/ledger"

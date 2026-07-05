@@ -41,13 +41,22 @@ export function getPartProviderName(part) {
   return getPartValue(part, "nombreProveedor", "");
 }
 
+// export default function PartPicker({
+//   onSelect,
+//   placeholder = "Buscar repuesto",
+//   buttonLabel = "Usar repuesto",
+//   className = "",
+//   allowCreate = true,
+// }) {
 export default function PartPicker({
   onSelect,
   placeholder = "Buscar repuesto",
   buttonLabel = "Usar repuesto",
   className = "",
   allowCreate = true,
+
 }) {
+  const [accountsPayableEnabled, setAccountsPayableEnabled] = useState(false);
   const [query, setQuery] = useState("");
   const [parts, setParts] = useState([]);
   const [open, setOpen] = useState(false);
@@ -86,6 +95,7 @@ export default function PartPicker({
     const viewportLeft = visualViewport?.offsetLeft || 0;
     const gap = 6;
     const margin = 12;
+    
 
     if (viewportWidth < 640) {
       setPanelStyle({
@@ -121,6 +131,38 @@ export default function PartPicker({
       zIndex: 100000,
     });
   }, []);
+
+  useEffect(() => {
+  let alive = true;
+
+  const loadSettings = async () => {
+    try {
+      const res = await api.get("/WorkshopSettings");
+
+      const enabled =
+        res?.data?.enableStockPayments ??
+        res?.data?.EnableStockPayments ??
+        res?.data?.data?.enableStockPayments ??
+        res?.data?.data?.EnableStockPayments ??
+        false;
+
+      if (alive) {
+        setAccountsPayableEnabled(Boolean(enabled));
+      }
+    } catch (err) {
+      console.error("No se pudo validar EnableStockPayments", err);
+      if (alive) {
+        setAccountsPayableEnabled(false);
+      }
+    }
+  };
+
+  loadSettings();
+
+  return () => {
+    alive = false;
+  };
+}, []);
 
   useEffect(() => {
     const onClickOutside = (event) => {
@@ -265,29 +307,57 @@ export default function PartPicker({
       return;
     }
 
-    if (!newPart.numeroFactura.trim()) {
-      setCreateError("Indica el Nº Factura del repuesto.");
-      return;
-    }
+    // if (!newPart.numeroFactura.trim()) {
+    //   setCreateError("Indica el Nº Factura del repuesto.");
+    //   return;
+    // }
+
+    if (!accountsPayableEnabled && !newPart.numeroFactura.trim()) {
+  setCreateError("Indica el Nº Factura del repuesto.");
+  return;
+}
 
     try {
       setCreating(true);
       setCreateError("");
-      const idProveedor = await ensureProvider();
-      const payload = {
-        nombre,
-        codigoReferencia: newPart.codigoReferencia.trim() || null,
-        numeroFactura: newPart.numeroFactura.trim(),
-        marca: newPart.marca.trim() || null,
-        categoria: "Repuestos",
-        cantidad: 0,
-        stockMinimo: 3,
-        precioCompra: Number(newPart.precioCompra || 0),
-        precioVenta,
-        ubicacion: null,
-        observaciones: "Registrado desde presupuesto, orden o factura.",
-        idProveedor,
-      };
+      // const idProveedor = await ensureProvider();
+      // const payload = {
+      //   nombre,
+      //   codigoReferencia: newPart.codigoReferencia.trim() || null,
+      //   numeroFactura: newPart.numeroFactura.trim(),
+      //   marca: newPart.marca.trim() || null,
+      //   categoria: "Repuestos",
+      //   cantidad: 0,
+      //   stockMinimo: 3,
+      //   precioCompra: Number(newPart.precioCompra || 0),
+      //   precioVenta,
+      //   ubicacion: null,
+      //   observaciones: "Registrado desde presupuesto, orden o factura.",
+      //   idProveedor,
+      // };
+
+      const idProveedor = accountsPayableEnabled ? null : await ensureProvider();
+
+const payload = {
+  nombre,
+  codigoReferencia: newPart.codigoReferencia.trim() || null,
+  numeroFactura: accountsPayableEnabled
+    ? null
+    : newPart.numeroFactura.trim(),
+  marca: newPart.marca.trim() || null,
+  categoria: "Repuestos",
+  cantidad: 0,
+  stockMinimo: 3,
+  precioCompra: accountsPayableEnabled
+    ? 0
+    : Number(newPart.precioCompra || 0),
+  precioVenta,
+  ubicacion: null,
+  observaciones: accountsPayableEnabled
+    ? "Artículo registrado desde selector. Coste y proveedor se asignarán desde albarán."
+    : "Registrado desde presupuesto, orden o factura.",
+  idProveedor,
+};
 
       const res = await api.post("/RepuestoStock", payload);
       const createdId = res?.data?.data?.[0]?.id ?? res?.data?.data?.[0]?.Id;
@@ -400,7 +470,7 @@ export default function PartPicker({
                   }}
                   className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-bold text-white hover:bg-slate-900"
                 >
-                  Registrar nuevo repuesto
+                  {accountsPayableEnabled ? "Registrar artículo" : "Registrar nuevo recambio"}
                 </button>
               ) : (
                 <div className="space-y-2">
@@ -411,12 +481,20 @@ export default function PartPicker({
                       value={newPart.codigoReferencia}
                       onChange={(e) => setNewPartField("codigoReferencia", e.target.value)}
                     />
+                    {/* <input
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      placeholder="Nº Factura / Albaran"
+                      value={newPart.numeroFactura}
+                      onChange={(e) => setNewPartField("numeroFactura", e.target.value)}
+                    /> */}
+                    {!accountsPayableEnabled && (
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Nº Factura / Albaran"
                       value={newPart.numeroFactura}
                       onChange={(e) => setNewPartField("numeroFactura", e.target.value)}
                     />
+                  )}
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Nombre del repuesto"
@@ -431,38 +509,56 @@ export default function PartPicker({
                       value={newPart.precioVenta}
                       onChange={(e) => setNewPartField("precioVenta", e.target.value)}
                     />
-                    <input
+                    {/* <input
                       type="number"
                       step="0.01"
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Precio compra opcional"
                       value={newPart.precioCompra}
                       onChange={(e) => setNewPartField("precioCompra", e.target.value)}
-                    />
+                    /> */}
+                    {!accountsPayableEnabled && (
+  <input
+    type="number"
+    step="0.01"
+    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+    placeholder="Precio compra opcional"
+    value={newPart.precioCompra}
+    onChange={(e) => setNewPartField("precioCompra", e.target.value)}
+  />
+)}
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Marca opcional"
                       value={newPart.marca}
                       onChange={(e) => setNewPartField("marca", e.target.value)}
                     />
-                    <select
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-                      value={newPart.idProveedor}
-                      onChange={(e) => setNewPartField("idProveedor", e.target.value)}
-                    >
-                      {providers.length === 0 && (
-                        <option value="">Proveedor por definir</option>
-                      )}
-                      {providers.map((provider) => (
-                        <option
-                          key={provider.id ?? provider.Id}
-                          value={provider.id ?? provider.Id}
-                        >
-                          {provider.nombre ?? provider.Nombre}
-                        </option>
-                      ))}
-                    </select>
+{!accountsPayableEnabled && (
+  <select
+    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+    value={newPart.idProveedor}
+    onChange={(e) => setNewPartField("idProveedor", e.target.value)}
+  >
+    {providers.length === 0 && (
+      <option value="">Proveedor por definir</option>
+    )}
+    {providers.map((provider) => (
+      <option
+        key={provider.id ?? provider.Id}
+        value={provider.id ?? provider.Id}
+      >
+        {provider.nombre ?? provider.Nombre}
+      </option>
+    ))}
+  </select>
+)}
                   </div>
+
+      {accountsPayableEnabled && (
+  <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+    En modo compras, el proveedor, el coste y el documento de compra se asignarán desde el albarán.
+  </p>
+)}            
 
                   {createError && (
                     <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">

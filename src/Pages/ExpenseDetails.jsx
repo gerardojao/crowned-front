@@ -10,6 +10,36 @@ import {
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+function getExpenseBase(row) {
+  return Number(row?.baseImponible ?? row?.BaseImponible ?? row?.importe ?? row?.Importe ?? 0) || 0;
+}
+
+function getExpenseIvaPct(row) {
+  const pct = Number(row?.ivaPct ?? row?.IvaPct ?? 0) || 0;
+  if (pct !== 0) return pct;
+
+  const dateValue = row?.fecha ?? row?.Fecha;
+  if (!dateValue) return 21;
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return 21;
+
+  return date < new Date("2026-06-30T00:00:00") ? 21 : 0;
+}
+
+function getExpenseIva(row) {
+  const direct = row?.iva ?? row?.Iva;
+  if (direct !== undefined && direct !== null) return Number(direct) || 0;
+  return roundMoney(getExpenseBase(row) * (getExpenseIvaPct(row) / 100));
+}
+
+function getExpenseTotal(row) {
+  const direct = row?.total ?? row?.Total;
+  if (direct !== undefined && direct !== null) return Number(direct) || 0;
+  return roundMoney(getExpenseBase(row) + getExpenseIva(row));
+}
 
 /** Banner superior para éxito/error (igual que Register/RegisterIncome) */
 const Banner = ({ type = "success", text, onClose, actionLabel, onAction }) => {
@@ -103,7 +133,19 @@ export default function ExpenseDetails() {
     loading: false,
   });
 
-  const total = useMemo(() => rows.reduce((acc, x) => acc + Number(x.importe ?? 0), 0), [rows]);
+  const totals = useMemo(
+    () =>
+      rows.reduce(
+        (acc, row) => {
+          acc.base += getExpenseBase(row);
+          acc.iva += getExpenseIva(row);
+          acc.total += getExpenseTotal(row);
+          return acc;
+        },
+        { base: 0, iva: 0, total: 0 },
+      ),
+    [rows],
+  );
 
   const loadTipos = useCallback(async () => {
     const NAME_MAP = {
@@ -112,11 +154,9 @@ export default function ExpenseDetails() {
     try {
       const res = await api.get("/Egreso");
       const rawData = res.data?.data ?? [];
-      const translatedData = rawData.map(item => {     
-      const originalName = item.nombre ?? item.nombreEgreso; 
-      
-      console.log(originalName);
-       
+      const translatedData = rawData.map(item => {
+      const originalName = item.nombre ?? item.nombreEgreso;
+
       return {
         ...item,
         nombre: NAME_MAP[originalName] || originalName 
@@ -347,7 +387,6 @@ export default function ExpenseDetails() {
               <option value="">Todos</option>
               {tipos.map((t) => {
                 const originalName = t.nombre ?? t.nombreEgreso;
-                console.log("luego del return", originalName);
                 
                 return (
                   <option key={t.id} value={t.id}>
@@ -395,13 +434,7 @@ export default function ExpenseDetails() {
           >
             Últimos 30 días
           </button>
-          {/* <button
-            type="button"
-            onClick={setThisYear}
-            className="rounded-full px-3 py-1 text-sm bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition"
-          >
-            Este año
-          </button> */}
+
           <button
             type="button"
             onClick={onClear}
@@ -426,7 +459,7 @@ export default function ExpenseDetails() {
           Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
         </div>
         <div className="text-sm font-medium text-slate-600">
-          Total: <span className="text-slate-900">{eur.format(total)}</span>
+          Total: <span className="text-slate-900">{eur.format(totals.total)}</span>
         </div>
       </div>
 
@@ -455,7 +488,9 @@ export default function ExpenseDetails() {
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="font-semibold text-rose-700">{eur.format(Number(r.importe ?? 0))}</div>
+                    <div className="text-xs text-slate-500">Base {eur.format(getExpenseBase(r))}</div>
+                    <div className="text-xs text-slate-500">IVA {eur.format(getExpenseIva(r))}</div>
+                    <div className="font-semibold text-rose-700">{eur.format(getExpenseTotal(r))}</div>
                   </div>
                 </div>
               </article>
@@ -476,7 +511,7 @@ export default function ExpenseDetails() {
                 Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
               </div>
               <div className="text-sm font-medium text-slate-600">
-                Total: <span className="text-slate-900">{eur.format(total)}</span>
+                Total: <span className="text-slate-900">{eur.format(totals.total)}</span>
               </div>
             </div>
 
@@ -490,13 +525,15 @@ export default function ExpenseDetails() {
                       <th className="py-2.5 px-3 font-semibold text-center">Tipo</th>
                       <th className="py-2.5 px-3 font-semibold text-center">Nº Factura</th>
                       <th className="py-2.5 px-3 font-semibold text-center">Descripción</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Importe</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">Base imponible</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">IVA</th>
+                      <th className="py-2.5 px-3 font-semibold text-right">Total importe</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {rows.length === 0 ? (
                       <tr>
-                        <td className="py-6 px-3 text-slate-500" colSpan={6}>
+                        <td className="py-6 px-3 text-slate-500" colSpan={8}>
                           Sin resultados
                         </td>
                       </tr>
@@ -510,8 +547,17 @@ export default function ExpenseDetails() {
                           <td className="py-2.5 px-3">{r.tipo === 'Transporte' ? 'Gastos Casa' : r.tipo ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.numeroFactura ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
+                          <td className="py-2.5 px-3 text-right font-semibold text-slate-700 whitespace-nowrap">
+                            {eur.format(getExpenseBase(r))}
+                          </td>
+                          <td className="py-2.5 px-3 text-right text-slate-700 whitespace-nowrap">
+                            {eur.format(getExpenseIva(r))}
+                            <span className="ml-1 text-xs text-slate-400">
+                              ({getExpenseIvaPct(r)}%)
+                            </span>
+                          </td>
                           <td className="py-2.5 px-3 text-right font-semibold text-rose-700 whitespace-nowrap">
-                            {eur.format(Number(r.importe ?? 0))}
+                            {eur.format(getExpenseTotal(r))}
                           </td>
                         </tr>
                       ))
@@ -522,7 +568,9 @@ export default function ExpenseDetails() {
                       <th className="py-2.5 px-3 text-right font-semibold" colSpan={5}>
                         Total
                       </th>
-                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(total)}</th>
+                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.base)}</th>
+                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.iva)}</th>
+                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.total)}</th>
                     </tr>
                   </tfoot>
                 </table>

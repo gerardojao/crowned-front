@@ -107,6 +107,7 @@ export default function Home() {
     enablePreOrders: false,
     enableAccountsReceivable: false,
     enableAccountsPayable: false,
+    enableStockPayments: false,
     enableLedger: false,
   });
   const [dashboardTotals, setDashboardTotals] = useState({
@@ -242,6 +243,10 @@ export default function Home() {
           enableAccountsPayable:
             settings.enableAccountsPayable ??
             settings.EnableAccountsPayable ??
+            false,
+          enableStockPayments:
+            settings.enableStockPayments ??
+            settings.EnableStockPayments ??
             false,
           enableLedger:
             settings.enableLedger ??
@@ -389,7 +394,7 @@ export default function Home() {
 
                 <div>
                   <p className="text-xl text-left font-semibold text-slate-900">
-                    Facturas pendiente de cobro
+                    Facturas por cobrar
                   </p>
 
                   <div className="mt-2 text-3xl font-extrabold text-sky-700">
@@ -547,13 +552,14 @@ export default function Home() {
                     <Link to="/register-expense-type" className={actionLink}>
                       Registrar tipo de gasto <ArrowRight size={15} />
                     </Link>
-
-                    <Link to="/statement" className={actionLink}>
-                      Ver balance <ArrowRight size={15} />
-                    </Link>
                     {dashboardFeatures.enableAccountsReceivable && (
                       <Link to="/accounts-receivable" className={actionLink}>
-                        Facturas pendiente de cobro <ArrowRight size={15} />
+                        Facturas por cobrar <ArrowRight size={15} />
+                      </Link>
+                    )}
+                    {dashboardFeatures.enableStockPayments && (
+                      <Link to="/purchases" className={actionLink}>
+                        Modulo Compras <ArrowRight size={15} />
                       </Link>
                     )}
                     {dashboardFeatures.enableLedger && (

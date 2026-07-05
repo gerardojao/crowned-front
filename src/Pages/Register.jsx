@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import api from "../Components/api";
 import { soloFecha } from "../utils/date";
 import { useRef } from "react";
+import PurchaseModuleScreen from "./PurchaseModuleScreen";
+
 
 const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 
@@ -83,7 +85,6 @@ const Banner = ({ type = "success", text, onClose, actionLabel, onAction }) => {
   );
 };
 
-
 export default function Register({ expense, setExpense }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -99,6 +100,9 @@ export default function Register({ expense, setExpense }) {
   const [errors, setErrors] = useState({});
   // banner global
   const [notice, setNotice] = useState(null); // { type: 'success'|'error', text: string }
+
+  const [purchasesEnabled, setPurchasesEnabled] = useState(false);
+  const [checkingPurchasesModule, setCheckingPurchasesModule] = useState(true);
 
   const setField = (name, value) => {
     setExpense(prev => ({ ...prev, [name]: value }));
@@ -185,6 +189,41 @@ useEffect(() => {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
+
+  useEffect(() => {
+  let alive = true;
+
+  (async () => {
+    try {
+      setCheckingPurchasesModule(true);
+
+      // Ajusta este endpoint al que tengas para consultar módulos del taller.
+      // La idea es que devuelva enableAccountsPayable o EnableAccountsPayable.
+      const res = await api.get("/WorkshopSettings");
+
+      const enabled =
+        res?.data?.enableAccountsPayable ??
+        res?.data?.EnableAccountsPayable ??
+        res?.data?.data?.enableAccountsPayable ??
+        res?.data?.data?.EnableAccountsPayable ??
+        false;
+
+      console.log(res.data);
+      
+
+      if (alive) setPurchasesEnabled(Boolean(enabled));
+    } catch (err) {
+      console.error("No se pudo validar el módulo de compras", err);
+      if (alive) setPurchasesEnabled(false);
+    } finally {
+      if (alive) setCheckingPurchasesModule(false);
+    }
+  })();
+
+  return () => {
+    alive = false;
+  };
+}, []);
 
   // --- Validación ---
   const REQUIRED = "Este campo es requerido.";
@@ -336,6 +375,19 @@ useEffect(() => {
 
   const importeBase = calculateTaxBase(expense.Importe, expense.IvaPct);
 
+
+if (checkingPurchasesModule) {
+  return (
+    <div className="rounded-2xl bg-white p-6 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200">
+      Validando módulo de compras...
+    </div>
+  );
+}
+
+if (purchasesEnabled) {
+  return <PurchaseModuleScreen />;
+}
+
   return (
     <>
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
@@ -389,12 +441,6 @@ useEffect(() => {
           {errors.NombreEgreso && <FieldError id="NombreEgreso-error">{errors.NombreEgreso}</FieldError>}
         </div>
 
-        {/* <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Foto">Foto (opcional)</label>
-          <input id="Foto" type="file" className={cls("Foto")}
-            accept="image/*" onChange={(e)=>convertirImagen(e.target.files)} />
-        </div> */}
-
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {bankAccounts.length > 1 && (
             <div>
@@ -436,24 +482,6 @@ useEffect(() => {
             />
             {errors.Fecha && <FieldError id="Fecha-error">{errors.Fecha}</FieldError>}
           </div>
-
-          {/* <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="Mes">Mes</label>
-            <select
-              id="Mes"
-              className={cls("Mes")}
-              name="Mes"
-              value={expense.Mes ?? ""}
-              onChange={handleChange}
-              onBlur={onBlurValidate}
-              aria-invalid={!!errors.Mes}
-              aria-describedby={errors.Mes ? "Mes-error" : undefined}
-            >
-              <option value="">Selecciona…</option>
-              {months.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-            {errors.Mes && <FieldError id="Mes-error">{errors.Mes}</FieldError>}
-          </div> */}
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="NumeroFactura">Nº Factura</label>
@@ -559,5 +587,157 @@ useEffect(() => {
         </div>
       </form>
     </>
+  );
+}
+
+function SummaryCard({ label, value, detail = "", tone = "slate" }) {
+  const color =
+    tone === "rose"
+      ? "text-rose-700"
+      : tone === "amber"
+        ? "text-amber-700"
+        : "text-slate-900";
+  return (
+    <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+        {label}
+      </p>
+      <p className={`mt-2 text-3xl font-extrabold ${color}`}>
+        {currency(value)}
+      </p>
+      {detail && <p className="mt-1 text-sm font-semibold text-slate-500">{detail}</p>}
+    </div>
+  );
+}
+
+function FacturaRow({
+  factura,
+  abonos,
+  abonoBanks,
+  bankAccounts,
+  setAbono,
+  setAbonoBank,
+  registrarAbono,
+}) {
+  const id = factura.id ?? factura.Id;
+  const estado = factura.estadoCxC ?? factura.EstadoCxC;
+  const atraso = daysOverdue(factura.fechaVencimiento ?? factura.FechaVencimiento, estado);
+  return (
+    <tr className="hover:bg-slate-50">
+      <td className="px-3 py-3 font-bold text-slate-900">
+        {factura.numeroFactura ?? factura.NumeroFactura}
+      </td>
+      <td className="px-3 py-3 text-slate-700">
+        {factura.cliente ?? factura.Cliente}
+      </td>
+      <td className="px-3 py-3 font-semibold text-slate-600">
+        {factura.matricula ?? factura.Matricula ?? "-"}
+      </td>
+      <td className="px-3 py-3 text-slate-600">
+        {dateOnly(factura.fecha ?? factura.Fecha)}
+      </td>
+      <td className="px-3 py-3 text-slate-600">
+        {dateOnly(factura.fechaVencimiento ?? factura.FechaVencimiento)}
+      </td>
+      <td className="px-3 py-3 text-right">
+        {atraso > 0 ? (
+          <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200">
+            {atraso}
+          </span>
+        ) : (
+          <span className="text-slate-300">-</span>
+        )}
+      </td>
+      <td className="px-3 py-3 text-right font-semibold">
+        {currency(factura.totalFactura ?? factura.TotalFactura)}
+      </td>
+      <td className="px-3 py-3 text-right">
+        {currency(factura.totalAbonado ?? factura.TotalAbonado)}
+      </td>
+      <td className="px-3 py-3 text-right font-bold text-rose-700">
+        {currency(factura.saldoPendiente ?? factura.SaldoPendiente)}
+      </td>
+      <td className="px-3 py-3">
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${badgeClass(estado)}`}
+        >
+          {estado}
+        </span>
+      </td>
+<td className="px-3 py-3">
+  {["Pagada", "Rectificada"].includes(estado) ? (
+    <span className="text-xs font-bold text-emerald-700">Completa</span>
+  ) : (
+    <div className="flex items-center justify-center gap-2">
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={abonos[id] || ""}
+        onChange={(e) => setAbono(id, e.target.value)}
+        onBlur={(e) => setAbono(id, amountInput(e.target.value))}
+        className="w-24 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        placeholder="0.00"
+      />
+
+      <BankSelect
+        value={abonoBanks[id] || ""}
+        bankAccounts={bankAccounts}
+        onChange={(value) => setAbonoBank(id, value)}
+      />
+
+      <button
+        type="button"
+        onClick={() => registrarAbono(factura)}
+        disabled={bankAccounts.length === 0}
+        className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-60"
+      >
+        Aplicar
+      </button>
+    </div>
+  )}
+</td>
+    </tr>
+  );
+}
+
+function BankSelect({ value, bankAccounts, onChange }) {
+  if (bankAccounts.length === 0) {
+    return (
+      <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
+        Sin bancos activos
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+    >
+      <option value="">Banco del abono</option>
+      {bankAccounts.map((bank) => {
+        const id = bank.id ?? bank.Id;
+        const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+        const iban = bank.iban ?? bank.Iban ?? "";
+        return (
+          <option key={id} value={id}>
+            {iban ? `${name} - ${iban}` : name}
+          </option>
+        );
+      })}
+    </select>
+  );
+}
+
+function Info({ label, value }) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-2">
+      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p className="mt-1 font-semibold text-slate-800">{value}</p>
+    </div>
   );
 }

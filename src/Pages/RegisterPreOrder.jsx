@@ -17,6 +17,7 @@ import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import SignatureModal from "../Components/SignatureModal";
 import SmallSuccessModal from "../Components/SmallSuccessModal";
+import { buildPreOrderPayload } from "../utils/repairOrderPayload";
 
 const EMPTY_PRE_ORDER = {
   ClienteId: "",
@@ -736,41 +737,7 @@ export default function RegisterPreOrder() {
         setForm(submitForm);
       }
 
-      const payload = {
-        cliente: submitForm.Cliente,
-        dni: submitForm.Dni || null,
-        telefono: submitForm.Telefono || null,
-        direccion: submitForm.Direccion || null,
-        codigoPostal: submitForm.CodigoPostal || null,
-        poblacion: submitForm.Poblacion || null,
-        provincia: submitForm.Provincia || null,
-        clasificacion: submitForm.Clasificacion || "Particular",
-        vehiculoId: submitForm.VehiculoId
-          ? Number(submitForm.VehiculoId)
-          : null,
-        matricula: submitForm.Matricula,
-        bastidor: submitForm.Bastidor || null,
-        marca: submitForm.Marca || null,
-        modelo: submitForm.Modelo,
-        fechaMatriculacion: submitForm.FechaMatriculacion || null,
-        motor: submitForm.Motor || null,
-        kw: submitForm.Kw ? Number(submitForm.Kw) : null,
-        cv: submitForm.Cv ? Number(submitForm.Cv) : null,
-        combustible: submitForm.Combustible || null,
-        kilometraje: submitForm.Kilometraje
-          ? Number(submitForm.Kilometraje)
-          : null,
-        fecha: submitForm.Fecha,
-        fechaPrevistaEntrega: submitForm.FechaPrevistaEntrega || null,
-        tiempoEstimadoHoras: submitForm.TiempoEstimadoHoras
-          ? Number(submitForm.TiempoEstimadoHoras)
-          : null,
-        tipoOperacion: submitForm.TipoOperacion || "Mecanica",
-        motivoRecepcion: submitForm.MotivoRecepcion,
-        diagnosticoMecanico: submitForm.DiagnosticoMecanico || null,
-        repuestosNecesarios: submitForm.RepuestosNecesarios || null,
-        observaciones: submitForm.Observaciones || null,
-      };
+      const payload = buildPreOrderPayload(submitForm);
 
       if (editingId) {
         ensureOk(await api.put(`/PreOrdenTrabajo/${editingId}`, payload));
@@ -1068,7 +1035,7 @@ export default function RegisterPreOrder() {
                       <span className="mt-1 block text-xs text-slate-500">
                         Vehículos:{" "}
                         {customer.VehicleCount !== null
-                          ? `${customer.VehicleCount} vehículo${Number(customer.VehicleCount) === 1 ? "" : "s"} registrado${Number(customer.VehicleCount) === 1 ? "" : "s"}`
+                          ? `${customer.VehicleCount} registrado${Number(customer.VehicleCount) === 1 ? "" : "s"}`
                           : customer.Matricula
                             ? `${customer.Matricula} · ${[customer.Marca, customer.Modelo].filter(Boolean).join(" ")}`
                             : "Vehículos registrados"}

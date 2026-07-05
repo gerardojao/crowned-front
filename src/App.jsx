@@ -41,6 +41,7 @@ import AdminWorkshops from "./Pages/AdminWorkshops.jsx";
 import AccountsReceivable from "./Pages/AccountsReceivable.jsx";
 import Ledger from "./Pages/Ledger.jsx";
 import InvoiceHistory from "./Pages/InvoiceHistory.jsx";
+import PurchaseModuleScreen from "./Pages/PurchaseModuleScreen.jsx";
 
 function App() {
   const protectedElement = (element) => (
@@ -103,6 +104,7 @@ function App() {
             <Route path="/register-income-type" element={protectedElement(<RegisterIncomeType />)} />
             <Route path="/presupuestos" element={protectedElement(<RegisterBudget />)} />
             <Route path="/accounts-receivable" element={protectedElement(<AccountsReceivable />)} />
+            <Route path="/purchases" element={protectedElement(<PurchaseModuleScreen />)} />
             <Route path="/ledger" element={protectedElement(<Ledger />)} />
             <Route path="/print-budget/:id" element={protectedElement(<PrintBudget />)} />
             <Route
