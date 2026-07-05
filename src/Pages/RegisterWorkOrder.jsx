@@ -2177,18 +2177,7 @@ export default function RegisterWorkOrder() {
                             </select>
                           </>
                         )}
-                        <input
-                          value={item.descripcion}
-                          onChange={(e) =>
-                            setDetailItemField(
-                              item.id,
-                              "descripcion",
-                              e.target.value,
-                            )
-                          }
-                          className={cls}
-                          placeholder="Descripcion"
-                        />
+                       
                         <input
                           type="number"
                           min="0.01"
@@ -2211,6 +2200,18 @@ export default function RegisterWorkOrder() {
                           placeholder={
                             section === "Piezas" ? "Cantidad" : "Tiempo"
                           }
+                        />
+                         <input
+                          value={item.descripcion}
+                          onChange={(e) =>
+                            setDetailItemField(
+                              item.id,
+                              "descripcion",
+                              e.target.value,
+                            )
+                          }
+                          className={cls}
+                          placeholder="Descripcion"
                         />
                         <input
                           type="number"
