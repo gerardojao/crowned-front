@@ -4,7 +4,7 @@ import { ArrowLeft, Landmark, RefreshCw, Trash2 } from "lucide-react";
 import api from "../Components/api";
 import { amountInput, currency } from "../utils/currency";
 
-const ACCOUNTS = ["Cliente", "Proveedor", "Banco"];
+const ACCOUNTS = ["Cliente", "Proveedor", "IvaSoportado", "IvaRepercutido", "Banco"];
 const MOVEMENT_TYPES = ["Ingreso", "Egreso"];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -34,7 +34,14 @@ const dateOnly = (value) => {
 };
 
 const defaultTypeForAccount = (account) =>
-  account === "Proveedor" ? "Egreso" : "Ingreso";
+  account === "Proveedor" || account === "IvaSoportado" ? "Egreso" : "Ingreso";
+
+const accountLabel = (account) =>
+  ({
+    Proveedor: "Compras/Gastos",
+    IvaSoportado: "IVA soportado",
+    IvaRepercutido: "IVA repercutido",
+  })[account] || account;
 
 export default function Ledger() {
   const [moduleEnabled, setModuleEnabled] = useState(false);
@@ -252,7 +259,7 @@ export default function Ledger() {
             <div>
               <h2 className="text-2xl font-bold text-slate-900">Mayor</h2>
               <p className="text-sm text-slate-500">
-                Registro por cuenta contable: Cliente, Proveedor y Banco.
+                Registro por cuenta contable: Cliente, Compras/Gastos, IVA y Banco.
               </p>
             </div>
           </div>
@@ -407,7 +414,7 @@ export default function Ledger() {
                       <option value="">Todas</option>
                       {ACCOUNTS.map((account) => (
                         <option key={account} value={account}>
-                          {account}
+                          {accountLabel(account)}
                         </option>
                       ))}
                     </select>
@@ -483,7 +490,7 @@ export default function Ledger() {
                 <h3 className="text-lg font-bold text-slate-900">
                   Resumen por cuenta
                 </h3>
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
                   {ACCOUNTS.map((account) => {
                     const row = summary.find(
                       (item) => (item.cuenta ?? item.Cuenta) === account,
@@ -493,7 +500,7 @@ export default function Ledger() {
                         key={account}
                         className="rounded-2xl border border-slate-200 bg-white p-4"
                       >
-                        <p className="font-bold text-slate-900">{account}</p>
+                        <p className="font-bold text-slate-900">{accountLabel(account)}</p>
                         <p className="mt-2 text-xs font-bold uppercase text-slate-400">
                           Saldo
                         </p>
@@ -634,7 +641,9 @@ function LedgerRow({ item, onRemove }) {
       <td className="px-3 py-3 text-slate-600">
         {dateOnly(item.fecha ?? item.Fecha)}
       </td>
-      <td className="px-3 py-3 font-bold text-slate-900">{account}</td>
+      <td className="px-3 py-3 font-bold text-slate-900">
+        {accountLabel(account)}
+      </td>
       <td className="px-3 py-3">
         <TypeBadge type={type} />
       </td>
@@ -685,7 +694,7 @@ function MobileMovement({ item, onRemove }) {
     <article className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-bold text-slate-900">{account}</p>
+          <p className="font-bold text-slate-900">{accountLabel(account)}</p>
           <p className="text-sm text-slate-500">
             {dateOnly(item.fecha ?? item.Fecha)}
           </p>
