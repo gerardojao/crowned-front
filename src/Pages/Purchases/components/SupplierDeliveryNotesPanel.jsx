@@ -36,9 +36,19 @@ function isPendingInvoice(note) {
   return estado.includes("pendiente") || estado.includes("factura");
 }
 
+// function isPendingInvoice(note) {
+//   const estado = String(note?.estado || "").toLowerCase();
+
+//   if (note?.facturaRecibidaId) return false;
+
+//   return estado === "pendiente de facturar";
+// }
+
 function buildVatBuckets(notes) {
   const buckets = {
     base0: 0,
+    base4: 0,
+    iva4: 0,
     base10: 0,
     iva10: 0,
     base21: 0,
@@ -63,6 +73,9 @@ function buildVatBuckets(notes) {
 
       if (rate === 0) {
         buckets.base0 += base;
+      } else if (rate === 4) {
+        buckets.base4 += base;
+        buckets.iva4 += iva;
       } else if (rate === 10) {
         buckets.base10 += base;
         buckets.iva10 += iva;
@@ -86,6 +99,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
   const { providers } = useProviders();
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cancellingNoteId, setCancellingNoteId] = useState(null);
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
   const [header, setHeader] = useState(initialHeader);
   const [lines, setLines] = useState([createEmptyLine()]);
@@ -260,6 +274,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
       alert(
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
+          err?.response?.data?.detail ||
           err?.message ||
           "No se pudo crear la factura desde albaranes.",
       );
@@ -340,11 +355,40 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
       alert(
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
+          err?.response?.data?.detail ||
           err?.message ||
           "No se pudo guardar el albaran.",
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const cancelDeliveryNote = async (note) => {
+    if (!isPendingInvoice(note) || cancellingNoteId) return;
+
+    const reason = window.prompt(
+      `Motivo de anulacion del albaran ${note.numeroAlbaran}:`,
+    );
+    if (!reason?.trim()) return;
+
+    try {
+      setCancellingNoteId(note.id);
+      await api.post(`/Albaran/${note.id}/anular`, {
+        motivo: reason.trim(),
+      });
+      setSelectedNoteIds((prev) => prev.filter((id) => id !== note.id));
+      await loadNotes();
+      await onNotesChanged?.();
+    } catch (err) {
+      alert(
+        err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          "No se pudo anular el albaran.",
+      );
+    } finally {
+      setCancellingNoteId(null);
     }
   };
 
@@ -564,6 +608,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                             className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
                           >
                             <option value="0">0%</option>
+                            <option value="4">4%</option>
                             <option value="10">10%</option>
                             <option value="21">21%</option>
                           </select>
@@ -637,6 +682,10 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
               <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold text-sky-800">
                 <span>IVA 0: {formatCurrency(selectedVatBuckets.base0)}</span>
                 <span>
+                  IVA 4: {formatCurrency(selectedVatBuckets.base4)} +{" "}
+                  {formatCurrency(selectedVatBuckets.iva4)}
+                </span>
+                <span>
                   IVA 10: {formatCurrency(selectedVatBuckets.base10)} +{" "}
                   {formatCurrency(selectedVatBuckets.iva10)}
                 </span>
@@ -687,8 +736,12 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 {selectedNotes.length} albaran(es) · Total{" "}
                 {formatCurrency(selectedTotals.total)}
               </p>
-              <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-700 sm:grid-cols-3">
+              <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-700 sm:grid-cols-4">
                 <span>IVA 0: {formatCurrency(selectedVatBuckets.base0)}</span>
+                <span>
+                  IVA 4: {formatCurrency(selectedVatBuckets.base4)} +{" "}
+                  {formatCurrency(selectedVatBuckets.iva4)}
+                </span>
                 <span>
                   IVA 10: {formatCurrency(selectedVatBuckets.base10)} +{" "}
                   {formatCurrency(selectedVatBuckets.iva10)}
@@ -842,19 +895,20 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 <th className="px-4 py-3 text-right">IVA</th>
                 <th className="px-4 py-3 text-right">Total</th>
                 <th className="px-4 py-3 text-left">Estado</th>
+                <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
             </thead>
 
             <tbody>
               {loadingNotes ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center">
+                  <td colSpan={9} className="px-4 py-10 text-center">
                     <Loader />
                   </td>
                 </tr>
               ) : notes.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center">
+                  <td colSpan={9} className="px-4 py-10 text-center">
                     <p className="text-sm font-semibold text-slate-700">
                       Todavia no hay albaranes registrados.
                     </p>
@@ -906,6 +960,20 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                         >
                           {note.estado}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {selectable && (
+                          <button
+                            type="button"
+                            disabled={cancellingNoteId === note.id}
+                            onClick={() => cancelDeliveryNote(note)}
+                            className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 disabled:opacity-60"
+                          >
+                            {cancellingNoteId === note.id
+                              ? "Anulando..."
+                              : "Anular"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );

@@ -7,7 +7,6 @@ export default function PaymentModal({
   confirmLabel = "Marcar pagada",
   fecha,
   bankAccountId,
-  ivaPct,
   amount,
   maxAmount,
   showAmount = false,
@@ -15,7 +14,6 @@ export default function PaymentModal({
   loading,
   onChangeFecha,
   onChangeBank,
-  onChangeIva,
   onChangeAmount,
   onCancel,
   onConfirm,
@@ -71,19 +69,6 @@ export default function PaymentModal({
               onChange={(e) => onChangeFecha(e.target.value)}
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
             />
-          </label>
-
-          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            IVA
-            <select
-              value={ivaPct ?? "21"}
-              onChange={(e) => onChangeIva(e.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="0">0%</option>
-              <option value="10">10%</option>
-              <option value="21">21%</option>
-            </select>
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">

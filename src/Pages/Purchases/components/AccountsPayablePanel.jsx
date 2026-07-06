@@ -13,7 +13,7 @@ function normalizePendingInvoice(item) {
     referencia: item?.referencia ?? item?.Referencia ?? "",
     descripcion: item?.descripcion ?? item?.Descripcion ?? "",
     tipoDocumento: item?.tipoDocumento ?? item?.TipoDocumento ?? "Factura",
-    base: Number(item?.base ?? item?.Base ?? 0),
+    base: Number(item?.tbase ?? item?.Tbase ?? item?.base ?? item?.Base ?? 0),
     iva: Number(item?.iva ?? item?.Iva ?? 0),
     total: Number(item?.total ?? item?.Total ?? 0),
     importePagado: Number(item?.importePagado ?? item?.ImportePagado ?? 0),
@@ -146,6 +146,7 @@ export default function AccountsPayablePanel({
       alert(
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
+          err?.response?.data?.detail ||
           err?.message ||
           "No se pudo marcar la factura como pagada.",
       );
@@ -251,7 +252,7 @@ export default function AccountsPayablePanel({
                           onClick={() => openPaymentModal(item, "partial")}
                           className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
                         >
-                          Abonar
+                          Pago parcial
                         </button>
                         <button
                           type="button"

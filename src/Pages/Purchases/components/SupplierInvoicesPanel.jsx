@@ -27,6 +27,7 @@ const initialForm = {
   tipoGastoId: "",
   estado: "Pendiente de pago",
   bankAccountId: "",
+  facturaOriginalId: "",
 };
 
 function normalizeState(value) {
@@ -114,12 +115,12 @@ export default function SupplierInvoicesPanel({
     const proveedorNombre = String(form.proveedor || "").trim();
     const numeroFactura = String(form.numeroFactura || "").trim();
 
-    if (!form.fecha || !proveedorNombre) {
+    if (!form.fecha || !form.proveedorId || !proveedorNombre) {
       alert("Fecha y proveedor son obligatorios.");
       return;
     }
 
-    if (form.tipoDocumento === "Factura" && !numeroFactura) {
+    if (!numeroFactura) {
       alert("El nº factura es obligatorio para documentos tipo Factura.");
       return;
     }
@@ -135,6 +136,10 @@ export default function SupplierInvoicesPanel({
     }
 
     const isCredit = form.tipoDocumento === "Rappel" || form.tipoDocumento === "Abono";
+    if (isCredit && !form.facturaOriginalId) {
+      alert("Selecciona la factura original del abono o rappel.");
+      return;
+    }
     if (!isCredit && (invoiceTotals.base <= 0 || invoiceTotals.total <= 0)) {
       alert("Base y total deben ser mayores que 0.");
       return;
@@ -183,6 +188,9 @@ export default function SupplierInvoicesPanel({
         total,
         estado: estadoFactura.includes("pagad") ? "Pagada" : "Pendiente de pago",
         bankAccountId: form.bankAccountId ? Number(form.bankAccountId) : null,
+        facturaOriginalId: form.facturaOriginalId
+          ? Number(form.facturaOriginalId)
+          : null,
         lineasIva,
       };
 
@@ -203,6 +211,7 @@ export default function SupplierInvoicesPanel({
       alert(
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
+          err?.response?.data?.detail ||
           err?.message ||
           "No se pudo registrar la factura recibida.",
       );
@@ -299,16 +308,6 @@ export default function SupplierInvoicesPanel({
                 </button>
               </div>
 
-              {!form.proveedorId && (
-                <input
-                  type="text"
-                  name="proveedor"
-                  value={form.proveedor}
-                  onChange={handleChange}
-                  placeholder="Escribe el proveedor manual"
-                  className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                />
-              )}
             </div>
 
             <div>
@@ -355,6 +354,37 @@ export default function SupplierInvoicesPanel({
                 <option value="Abono">Abono</option>
               </select>
             </div>
+
+            {(form.tipoDocumento === "Abono" ||
+              form.tipoDocumento === "Rappel") && (
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Factura original
+                </label>
+                <select
+                  name="facturaOriginalId"
+                  value={form.facturaOriginalId}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">Selecciona la factura que se corrige</option>
+                  {supplierInvoices
+                    .filter(
+                      (invoice) =>
+                        String(invoice.proveedorId) ===
+                          String(form.proveedorId) &&
+                        invoice.estado !== "Anulada" &&
+                        invoice.tipoDocumento !== "Abono" &&
+                        invoice.tipoDocumento !== "Rappel",
+                    )
+                    .map((invoice) => (
+                      <option key={invoice.id} value={invoice.id}>
+                        {invoice.numeroFactura} · {formatCurrency(invoice.total)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -499,6 +529,7 @@ export default function SupplierInvoicesPanel({
                               className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
                             >
                               <option value="0">0%</option>
+                              <option value="4">4%</option>
                               <option value="10">10%</option>
                               <option value="21">21%</option>
                             </select>
