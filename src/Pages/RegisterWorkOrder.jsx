@@ -23,6 +23,7 @@ import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import { amountInput } from "../utils/currency";
 import SmallSuccessModal from "../Components/SmallSuccessModal";
+import ConfirmActionModal from "../Components/ConfirmActionModal";
 import {
   buildWorkOrderPayload,
   getRepairLineQuantity,
@@ -30,6 +31,13 @@ import {
   getRepairLineTotal,
   normalizeRepairLine,
 } from "../utils/repairOrderPayload";
+import {
+  canInvoiceWorkOrder,
+  getAllowedWorkOrderStates,
+  isWorkOrderEditLocked,
+  normalizeWorkOrderState,
+  requiresCompletionConfirmation,
+} from "../utils/workOrderWorkflow";
 
 const EMPTY_ORDER = {
   ClienteId: "",
@@ -64,15 +72,6 @@ const EMPTY_ORDER = {
   Estado: "Recibido",
   Observaciones: "",
 };
-
-const states = [
-  "Recibido",
-  "Diagnóstico",
-  "Reparando",
-  "Esperando repuesto",
-  "Terminado",
-  "Entregado",
-];
 
 const DEFAULT_FREQUENT_SERVICES = [
   "Servicio cambio de aceite y filtro",
@@ -124,9 +123,6 @@ const ensureOk = (res) => {
   }
   return data;
 };
-
-const isOrderEditLocked = (estado) =>
-  ["Reparando", "Esperando repuesto", "Terminado", "Entregado"].includes(estado);
 
 const DEFAULT_WHATSAPP_COUNTRY_PREFIX = "34";
 const READY_ORDER_ALERTS_KEY_PREFIX = "tc:ready-order-alerts";
@@ -227,6 +223,11 @@ export default function RegisterWorkOrder() {
   const [notice, setNotice] = useState("");
   const [successModal, setSuccessModal] = useState("");
   const [warningModal, setWarningModal] = useState("");
+  const [completionConfirmation, setCompletionConfirmation] = useState({
+    order: null,
+    nextState: "",
+    loading: false,
+  });
   const [plateSearch, setPlateSearch] = useState("");
   const [error, setError] = useState("");
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -1296,8 +1297,108 @@ export default function RegisterWorkOrder() {
     }
   }, []);
 
+  const updateOrderState = async (targetOrder, nextState) => {
+    const previousState = normalizeWorkOrderState(targetOrder.Estado);
+
+    try {
+      setError("");
+      await api.put(`/OrdenTrabajo/estado/${targetOrder.Id}`, {
+        estado: nextState,
+      });
+
+      const updatedOrder = {
+        ...targetOrder,
+        Estado: nextState,
+      };
+
+      setOrders((currentOrders) =>
+        currentOrders.map((item) =>
+          item.Id === targetOrder.Id ? updatedOrder : item,
+        ),
+      );
+
+      if (
+        whatsappEnabled &&
+        previousState !== "Terminado" &&
+        nextState === "Terminado"
+      ) {
+        setReadyWhatsappOrder(updatedOrder);
+        setNotice(
+          "Orden marcada como lista. Puedes avisar al cliente por WhatsApp.",
+        );
+        setTimeout(() => {
+          window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+          });
+        }, 100);
+      }
+
+      return true;
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudo actualizar el estado.",
+      );
+      return false;
+    }
+  };
+
+  const requestOrderStateChange = (targetOrder, nextState) => {
+    if (
+      requiresCompletionConfirmation(targetOrder.Estado, nextState)
+    ) {
+      setCompletionConfirmation({
+        order: targetOrder,
+        nextState,
+        loading: false,
+      });
+      return;
+    }
+
+    void updateOrderState(targetOrder, nextState);
+  };
+
+  const closeCompletionConfirmation = () => {
+    if (completionConfirmation.loading) return;
+    setCompletionConfirmation({
+      order: null,
+      nextState: "",
+      loading: false,
+    });
+  };
+
+  const confirmOrderCompletion = async () => {
+    const targetOrder = completionConfirmation.order;
+    const nextState = completionConfirmation.nextState;
+    if (!targetOrder || !nextState || completionConfirmation.loading) return;
+
+    setCompletionConfirmation((current) => ({
+      ...current,
+      loading: true,
+    }));
+
+    const updated = await updateOrderState(targetOrder, nextState);
+
+    if (updated) {
+      setCompletionConfirmation({
+        order: null,
+        nextState: "",
+        loading: false,
+      });
+      return;
+    }
+
+    setCompletionConfirmation((current) => ({
+      ...current,
+      loading: false,
+    }));
+  };
+
   const startEdit = (o) => {
-    if (isOrderEditLocked(o.Estado)) {
+    if (isWorkOrderEditLocked(o.Estado)) {
       setError(
         "No se puede editar una orden en reparacion, lista o entregada.",
       );
@@ -1450,6 +1551,15 @@ export default function RegisterWorkOrder() {
         message={warningModal}
         variant="warning"
         onClose={() => setWarningModal("")}
+      />
+      <ConfirmActionModal
+        open={Boolean(completionConfirmation.order)}
+        title="Marcar orden como terminada"
+        message="Esta acción es irreversible: después de terminar la orden no podrás volver a estados anteriores ni editarla. ¿Deseas continuar?"
+        confirmLabel="Sí, terminar orden"
+        loading={completionConfirmation.loading}
+        onConfirm={confirmOrderCompletion}
+        onCancel={closeCompletionConfirmation}
       />
 
       <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
@@ -1947,7 +2057,10 @@ export default function RegisterWorkOrder() {
                   onChange={handleChange}
                   className={cls}
                 >
-                  {states.map((s) => (
+                  {(editingId
+                    ? getAllowedWorkOrderStates(order.Estado, false)
+                    : ["Recibido"]
+                  ).map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
@@ -2178,41 +2291,57 @@ export default function RegisterWorkOrder() {
                           </>
                         )}
                        
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={
-                            detailedRepairLinesEnabled
-                              ? getRepairLineQuantity(item)
-                              : item.cantidad
-                          }
-                          onChange={(e) =>
-                            setDetailItemField(
-                              item.id,
-                              detailedRepairLinesEnabled && section !== "Piezas"
-                                ? "tiempo"
-                                : "cantidad",
-                              e.target.value,
-                            )
-                          }
-                          className={cls}
-                          placeholder={
-                            section === "Piezas" ? "Cantidad" : "Tiempo"
-                          }
-                        />
-                         <input
-                          value={item.descripcion}
-                          onChange={(e) =>
-                            setDetailItemField(
-                              item.id,
-                              "descripcion",
-                              e.target.value,
-                            )
-                          }
-                          className={cls}
-                          placeholder="Descripcion"
-                        />
+                      {detailedRepairLinesEnabled ? (
+  <>
+    <input
+      value={item.descripcion}
+      onChange={(e) =>
+        setDetailItemField(item.id, "descripcion", e.target.value)
+      }
+      className={cls}
+      placeholder="Descripcion"
+    />
+
+    <input
+      type="number"
+      min="0.01"
+      step="0.01"
+      value={getRepairLineQuantity(item)}
+      onChange={(e) =>
+        setDetailItemField(
+          item.id,
+          section !== "Piezas" ? "tiempo" : "cantidad",
+          e.target.value,
+        )
+      }
+      className={cls}
+      placeholder={section === "Piezas" ? "Cantidad" : "Tiempo"}
+    />
+  </>
+) : (
+  <>
+    <input
+      type="number"
+      min="0.01"
+      step="0.01"
+      value={item.cantidad}
+      onChange={(e) =>
+        setDetailItemField(item.id, "cantidad", e.target.value)
+      }
+      className={cls}
+      placeholder="Cantidad"
+    />
+
+    <input
+      value={item.descripcion}
+      onChange={(e) =>
+        setDetailItemField(item.id, "descripcion", e.target.value)
+      }
+      className={cls}
+      placeholder="Descripcion"
+    />
+  </>
+)}
                         <input
                           type="number"
                           step="0.01"
@@ -2414,56 +2543,10 @@ export default function RegisterWorkOrder() {
                   </div>
 
                   <select
-                    value={o.Estado}
-                    onChange={async (e) => {
-                      const nuevoEstado = e.target.value;
-                      const estadoAnterior = o.Estado;
-
-                      try {
-                        await api.put(`/OrdenTrabajo/estado/${o.Id}`, {
-                          estado: nuevoEstado,
-                        });
-
-                        const updatedOrder = {
-                          ...o,
-                          Estado: nuevoEstado,
-                        };
-
-                        setOrders((prev) =>
-                          prev.map((item) =>
-                            item.Id === o.Id ? updatedOrder : item,
-                          ),
-                        );
-
-                        if (
-                          whatsappEnabled &&
-                          estadoAnterior !== "Terminado" &&
-                          nuevoEstado === "Terminado"
-                        ) {
-                          if (whatsappEnabled) {
-                            setReadyWhatsappOrder(updatedOrder);
-                            setNotice(
-                              "Orden marcada como lista. Puedes avisar al cliente por WhatsApp.",
-                            );
-                          } else {
-                            setNotice("Orden marcada como lista.");
-                          }
-                          setTimeout(() => {
-                            window.scrollTo({
-                              top: 0,
-                              behavior: "smooth",
-                            });
-                          }, 100);
-                        }
-                      } catch (err) {
-                        console.error(err);
-                        setError(
-                          err?.response?.data?.message ||
-                            err?.message ||
-                            "No se pudo actualizar el estado.",
-                        );
-                      }
-                    }}
+                    value={normalizeWorkOrderState(o.Estado)}
+                    onChange={(e) =>
+                      requestOrderStateChange(o, e.target.value)
+                    }
                     className={`w-full rounded-full px-3 py-2 text-xs font-medium ring-1 bg-white sm:w-auto sm:py-1 ${
                       o.Estado === "Entregado"
                         ? "text-emerald-700 ring-emerald-200"
@@ -2472,7 +2555,10 @@ export default function RegisterWorkOrder() {
                           : "text-slate-700 ring-slate-200"
                     }`}
                   >
-                    {states.map((s) => (
+                    {getAllowedWorkOrderStates(
+                      o.Estado,
+                      Boolean(o.Facturada || o.facturada),
+                    ).map((s) => (
                       <option key={s} value={s}>
                         {s}
                       </option>
@@ -2570,7 +2656,7 @@ export default function RegisterWorkOrder() {
                       </button>
                     )}
 
-                    {!isOrderEditLocked(o.Estado) && (
+                    {!isWorkOrderEditLocked(o.Estado) && (
                       <button
                         type="button"
                         onClick={() => startEdit(o)}
@@ -2580,7 +2666,8 @@ export default function RegisterWorkOrder() {
                       </button>
                     )}
 
-                    {o.Estado === "Terminado" && !(o.Facturada || o.facturada) && (
+                    {canInvoiceWorkOrder(o.Estado) &&
+                      !(o.Facturada || o.facturada) && (
                       <Link
                         to={`/workshop-invoice/${o.Id}`}
                         rel="noopener noreferrer"

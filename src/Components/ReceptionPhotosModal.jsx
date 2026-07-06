@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Images, Printer, Trash2, Upload, X } from "lucide-react";
-import api, { resolveApiAssetUrl } from "./api";
+import api from "./api";
 
 const ACCEPTED_TYPES = "image/jpeg,image/png,image/webp";
 
@@ -15,6 +15,7 @@ export default function ReceptionPhotosModal({
   context = {},
 }) {
   const inputRef = useRef(null);
+  const loadedPhotosRef = useRef([]);
   const [photos, setPhotos] = useState([]);
   const [maxPhotos, setMaxPhotos] = useState(5);
   const [loading, setLoading] = useState(false);
@@ -33,10 +34,20 @@ export default function ReceptionPhotosModal({
   const remainingSlots = Math.max(0, maxPhotos - photos.length);
 
   useEffect(() => {
-    if (!open || !endpoint) return;
+    if (!open || !endpoint) {
+      replaceLoadedPhotos([]);
+      return;
+    }
     loadPhotos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, endpoint]);
+
+  useEffect(
+    () => () => {
+      revokePhotoUrls(loadedPhotosRef.current);
+    },
+    [],
+  );
 
   if (!open) return null;
 
@@ -46,7 +57,7 @@ export default function ReceptionPhotosModal({
       setError("");
       const res = await api.get(endpoint);
       const data = res?.data || {};
-      setPhotos(Array.isArray(data.photos) ? data.photos : []);
+      await loadPrivatePhotos(Array.isArray(data.photos) ? data.photos : []);
       setMaxPhotos(Number(data.maxPhotos || 5));
     } catch (err) {
       console.error(err);
@@ -80,7 +91,7 @@ export default function ReceptionPhotosModal({
         headers: { "Content-Type": "multipart/form-data" },
       });
       const data = res?.data || {};
-      setPhotos(Array.isArray(data.photos) ? data.photos : []);
+      await loadPrivatePhotos(Array.isArray(data.photos) ? data.photos : []);
       setMaxPhotos(Number(data.maxPhotos || 5));
     } catch (err) {
       console.error(err);
@@ -112,8 +123,9 @@ export default function ReceptionPhotosModal({
       setError("");
       const res = await api.delete(`/preordentrabajo/${preOrderId}/photos/${deleteModal.photoId}`);
       const data = res?.data || {};
-      setPhotos(Array.isArray(data.photos) ? data.photos : []);
+      await loadPrivatePhotos(Array.isArray(data.photos) ? data.photos : []);
       setMaxPhotos(Number(data.maxPhotos || 5));
+      setSelectedPhoto(null);
       setDeleteModal({ open: false, photoId: null, loading: false });
     } catch (err) {
       console.error(err);
@@ -132,6 +144,27 @@ export default function ReceptionPhotosModal({
       window.print();
       setPrinting(false);
     }, 120);
+  }
+
+  async function loadPrivatePhotos(source) {
+    const responses = await Promise.all(
+      source.map(async (photo) => {
+        const path = String(photo.url ?? photo.Url ?? "").replace(/^\/api(?=\/)/, "");
+        return api.get(path, { responseType: "blob" });
+      }),
+    );
+    const loaded = source.map((photo, index) => ({
+      ...photo,
+      privateUrl: URL.createObjectURL(responses[index].data),
+    }));
+    setSelectedPhoto(null);
+    replaceLoadedPhotos(loaded);
+  }
+
+  function replaceLoadedPhotos(nextPhotos) {
+    revokePhotoUrls(loadedPhotosRef.current);
+    loadedPhotosRef.current = nextPhotos;
+    setPhotos(nextPhotos);
   }
 
   return (
@@ -213,11 +246,11 @@ export default function ReceptionPhotosModal({
                 {photos.map((photo, index) => (
                   <figure key={photo.id ?? photo.Id} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
                       <img
-                        src={resolveApiAssetUrl(photo.url ?? photo.Url)}
+                        src={photo.privateUrl}
                         alt={`Foto ${index + 1}`}
                         className="h-56 w-full object-cover cursor-zoom-in transition hover:scale-[1.02]"
                         onClick={() =>
-                          setSelectedPhoto(resolveApiAssetUrl(photo.url ?? photo.Url))
+                          setSelectedPhoto(photo.privateUrl)
                         }
                       />
                     <figcaption className="space-y-1 p-3 text-xs text-slate-500">
@@ -263,7 +296,7 @@ export default function ReceptionPhotosModal({
             {photos.map((photo, index) => (
               <div key={photo.id ?? photo.Id} className="break-inside-avoid border border-black p-2">
                 <img
-                  src={resolveApiAssetUrl(photo.url ?? photo.Url)}
+                  src={photo.privateUrl}
                   alt={`Foto ${index + 1}`}
                   className="h-[250px] w-full object-contain"
                 />
@@ -337,6 +370,12 @@ export default function ReceptionPhotosModal({
       )}
     </>
   );
+}
+
+function revokePhotoUrls(photos) {
+  photos.forEach((photo) => {
+    if (photo.privateUrl) URL.revokeObjectURL(photo.privateUrl);
+  });
 }
 
 function formatDate(value) {
