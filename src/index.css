@@ -138,3 +138,24 @@
     display: none !important;
   }
 }
+
+@page purchase-book {
+  size: A4 landscape;
+  margin: 7mm;
+}
+
+.purchase-book-print {
+  page: purchase-book;
+}
+
+.purchase-book-print table {
+  width: 100% !important;
+  min-width: 0 !important;
+  font-size: 7pt !important;
+}
+
+.purchase-book-print th,
+.purchase-book-print td {
+  padding: 3px 4px !important;
+  white-space: nowrap;
+}

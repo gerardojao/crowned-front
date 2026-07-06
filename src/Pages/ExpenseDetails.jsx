@@ -18,15 +18,7 @@ function getExpenseBase(row) {
 
 function getExpenseIvaPct(row) {
   const pct = Number(row?.ivaPct ?? row?.IvaPct ?? 0) || 0;
-  if (pct !== 0) return pct;
-
-  const dateValue = row?.fecha ?? row?.Fecha;
-  if (!dateValue) return 21;
-
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return 21;
-
-  return date < new Date("2026-06-30T00:00:00") ? 21 : 0;
+  return pct;
 }
 
 function getExpenseIva(row) {
@@ -39,6 +31,40 @@ function getExpenseTotal(row) {
   const direct = row?.total ?? row?.Total;
   if (direct !== undefined && direct !== null) return Number(direct) || 0;
   return roundMoney(getExpenseBase(row) + getExpenseIva(row));
+}
+
+function isFiscalExpense(row) {
+  const direct = row?.esFiscal ?? row?.EsFiscal;
+  if (direct !== undefined && direct !== null) return Boolean(direct);
+
+  const type = row?.tipoMovimiento ?? row?.TipoMovimiento;
+  return !type || type === "Egreso";
+}
+
+function getExpenseAmount(row) {
+  if (isFiscalExpense(row)) return getExpenseTotal(row);
+  return Number(row?.importe ?? row?.Importe ?? row?.total ?? row?.Total ?? 0) || 0;
+}
+
+function getExpenseTypeName(row) {
+  const type = row?.tipo ?? row?.Tipo ?? row?.nombre ?? row?.Nombre;
+  if (type === "Transporte") return "Gastos Casa";
+  return type ?? "â€”";
+}
+
+function getMovementBadge(row) {
+  if (isFiscalExpense(row)) {
+    return {
+      label: "Gasto fiscal",
+      className: "bg-rose-50 text-rose-700 ring-rose-200",
+    };
+  }
+
+  const movementType = row?.tipoMovimiento ?? row?.TipoMovimiento;
+  return {
+    label: movementType === "PagoFacturaProveedor" ? "Pago proveedor" : "No fiscal",
+    className: "bg-sky-50 text-sky-700 ring-sky-200",
+  };
 }
 
 /** Banner superior para éxito/error (igual que Register/RegisterIncome) */
@@ -137,12 +163,16 @@ export default function ExpenseDetails() {
     () =>
       rows.reduce(
         (acc, row) => {
-          acc.base += getExpenseBase(row);
-          acc.iva += getExpenseIva(row);
-          acc.total += getExpenseTotal(row);
+          if (isFiscalExpense(row)) {
+            acc.base += getExpenseBase(row);
+            acc.iva += getExpenseIva(row);
+            acc.total += getExpenseTotal(row);
+          } else {
+            acc.financial += getExpenseAmount(row);
+          }
           return acc;
         },
-        { base: 0, iva: 0, total: 0 },
+        { base: 0, iva: 0, total: 0, financial: 0 },
       ),
     [rows],
   );
@@ -458,8 +488,11 @@ export default function ExpenseDetails() {
         <div className="text-sm text-slate-500">
           Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
         </div>
-        <div className="text-sm font-medium text-slate-600">
-          Total: <span className="text-slate-900">{eur.format(totals.total)}</span>
+        <div className="text-right text-sm font-medium text-slate-600">
+          <div>Fiscal: <span className="text-slate-900">{eur.format(totals.total)}</span></div>
+          {totals.financial !== 0 && (
+            <div>Pagos proveedor: <span className="text-sky-700">{eur.format(totals.financial)}</span></div>
+          )}
         </div>
       </div>
 
@@ -469,18 +502,21 @@ export default function ExpenseDetails() {
           Sin resultados
         </div>
       ) : (
-            rows.map((r) => (
+            rows.map((r) => {
+              const fiscal = isFiscalExpense(r);
+              const badge = getMovementBadge(r);
+              return (
               <article key={r.id} className="rounded-2xl border border-slate-200 bg-white/70 p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-800">
                       {r.fecha ? soloFecha(r.fecha) : "—"}
-                      <span className="ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 bg-rose-50 text-rose-700 ring-rose-200">
-                        Egreso
+                      <span className={`ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${badge.className}`}>
+                        {badge.label}
                       </span>
                     </div>
                     <div className="text-xs text-slate-500 mt-0.5">
-                      {r.tipo === "Transporte" ? "Gastos casa" : r.tipo} · {r.mes ?? "—"}
+                      {getExpenseTypeName(r)} · {r.mes ?? "—"}
                     </div>
                     <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
                     {r.numeroFactura && (
@@ -488,13 +524,16 @@ export default function ExpenseDetails() {
                     )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-xs text-slate-500">Base {eur.format(getExpenseBase(r))}</div>
-                    <div className="text-xs text-slate-500">IVA {eur.format(getExpenseIva(r))}</div>
-                    <div className="font-semibold text-rose-700">{eur.format(getExpenseTotal(r))}</div>
+                    <div className="text-xs text-slate-500">Base {fiscal ? eur.format(getExpenseBase(r)) : "—"}</div>
+                    <div className="text-xs text-slate-500">IVA {fiscal ? eur.format(getExpenseIva(r)) : "—"}</div>
+                    <div className={`font-semibold ${fiscal ? "text-rose-700" : "text-sky-700"}`}>
+                      {eur.format(getExpenseAmount(r))}
+                    </div>
                   </div>
                 </div>
               </article>
-            ))
+              );
+            })
           )}
         </>
         )}
@@ -510,8 +549,11 @@ export default function ExpenseDetails() {
               <div className="text-sm text-slate-500">
                 Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
               </div>
-              <div className="text-sm font-medium text-slate-600">
-                Total: <span className="text-slate-900">{eur.format(totals.total)}</span>
+              <div className="text-right text-sm font-medium text-slate-600">
+                <div>Fiscal: <span className="text-slate-900">{eur.format(totals.total)}</span></div>
+                {totals.financial !== 0 && (
+                  <div>Pagos proveedor: <span className="text-sky-700">{eur.format(totals.financial)}</span></div>
+                )}
               </div>
             </div>
 
@@ -538,40 +580,65 @@ export default function ExpenseDetails() {
                         </td>
                       </tr>
                     ) : (
-                      rows.map((r) => (
+                      rows.map((r) => {
+                        const fiscal = isFiscalExpense(r);
+                        const badge = getMovementBadge(r);
+                        return (
                         <tr key={r.id} className="hover:bg-slate-50">
                           <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
                             {r.fecha ? soloFecha(r.fecha) : "—"}
                           </td>
                           <td className="py-2.5 px-3 text-right">{""}</td>
-                          <td className="py-2.5 px-3">{r.tipo === 'Transporte' ? 'Gastos Casa' : r.tipo ?? "—"}</td>
+                          <td className="py-2.5 px-3">
+                            <div>{getExpenseTypeName(r)}</div>
+                            <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${badge.className}`}>
+                              {badge.label}
+                            </span>
+                          </td>
                           <td className="py-2.5 px-3 text-slate-700">{r.numeroFactura ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-slate-700 whitespace-nowrap">
-                            {eur.format(getExpenseBase(r))}
+                            {fiscal ? eur.format(getExpenseBase(r)) : "—"}
                           </td>
                           <td className="py-2.5 px-3 text-right text-slate-700 whitespace-nowrap">
-                            {eur.format(getExpenseIva(r))}
-                            <span className="ml-1 text-xs text-slate-400">
-                              ({getExpenseIvaPct(r)}%)
-                            </span>
+                            {fiscal ? (
+                              <>
+                                {eur.format(getExpenseIva(r))}
+                                <span className="ml-1 text-xs text-slate-400">
+                                  ({getExpenseIvaPct(r)}%)
+                                </span>
+                              </>
+                            ) : (
+                              "—"
+                            )}
                           </td>
-                          <td className="py-2.5 px-3 text-right font-semibold text-rose-700 whitespace-nowrap">
-                            {eur.format(getExpenseTotal(r))}
+                          <td className={`py-2.5 px-3 text-right font-semibold whitespace-nowrap ${fiscal ? "text-rose-700" : "text-sky-700"}`}>
+                            {eur.format(getExpenseAmount(r))}
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     )}
                   </tbody>
                   <tfoot className="bg-slate-50">
                     <tr>
                       <th className="py-2.5 px-3 text-right font-semibold" colSpan={5}>
-                        Total
+                        Total fiscal
                       </th>
                       <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.base)}</th>
                       <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.iva)}</th>
                       <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.total)}</th>
                     </tr>
+                    {totals.financial !== 0 && (
+                      <tr>
+                        <th className="py-2.5 px-3 text-right font-semibold text-sky-700" colSpan={5}>
+                          Pagos proveedor / movimientos no fiscales
+                        </th>
+                        <th className="py-2.5 px-3 text-right font-bold text-slate-400">—</th>
+                        <th className="py-2.5 px-3 text-right font-bold text-slate-400">—</th>
+                        <th className="py-2.5 px-3 text-right font-bold text-sky-700">{eur.format(totals.financial)}</th>
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </div>

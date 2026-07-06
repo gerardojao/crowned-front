@@ -16,6 +16,10 @@ import PartPicker, {
   getPartSalePrice,
 } from "../Components/PartPicker";
 import { amountInput } from "../utils/currency";
+import {
+  currentFiscalYearStart,
+  localDateInputValue,
+} from "../utils/date";
 
 const EMPTY_ITEM = {
   codigo: "",
@@ -108,7 +112,7 @@ export default function WorkshopInvoice() {
   const [invoice, setInvoice] = useState({
     numero: "",
     idCliente: "",
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: localDateInputValue(),
     cliente: "",
     dni: "",
     direccionCliente: "",
@@ -740,6 +744,10 @@ const saveIssuedInvoice = async () => {
 
 const printInvoice = async () => {
   try {
+    if (otros < 0 || otros > baseAntesOtros) {
+      throw new Error("Otros debe ser un descuento entre 0 y la base de la factura.");
+    }
+
     if (isCredit && !accountsReceivableEnabled) {
       throw new Error("El modulo de cuentas por cobrar no esta habilitado para este taller.");
     }
@@ -1024,6 +1032,8 @@ const printInvoice = async () => {
               type="date"
               className={inputCls}
               value={invoice.fecha}
+              min={currentFiscalYearStart()}
+              max={localDateInputValue()}
               onChange={(e) => setInvoiceField("fecha", e.target.value)}
             />
 
@@ -1148,11 +1158,13 @@ const printInvoice = async () => {
               className={inputCls}
               placeholder="Otros"
               value={invoice.otros}
+              min="0"
+              max={baseAntesOtros}
               onChange={(e) => setInvoiceField("otros", e.target.value)}
               onBlur={(e) => setInvoiceField("otros", amountInput(e.target.value))}
             />
 
-
+    {accountsReceivableEnabled && (
             <label className="block text-sm font-semibold text-slate-700">
               Tipo de pago
               <select
@@ -1161,12 +1173,12 @@ const printInvoice = async () => {
                 onChange={(e) => setTipoPago(e.target.value)}
               >
                 <option value="Efectivo">Contado</option>
-                {accountsReceivableEnabled && (
+            
                   <option value="Credito">Credito</option>
-                )}
+               
               </select>
             </label>
-
+ )}
             {isCredit && (
               <>
                 <label className="block text-sm font-semibold text-slate-700">

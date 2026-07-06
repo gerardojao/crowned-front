@@ -12,6 +12,10 @@ import PartPicker, {
   getPartSalePrice,
 } from "../Components/PartPicker";
 import ZagaInvoiceDocument, { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+import {
+  currentFiscalYearStart,
+  localDateInputValue,
+} from "../utils/date";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -139,7 +143,7 @@ export default function SpecialPartsInvoice() {
   const [invoice, setInvoice] = useState({
     numero: "",
     idCliente: "",
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: localDateInputValue(),
     cliente: "",
     dni: "",
     direccionCliente: "",
@@ -821,7 +825,14 @@ export default function SpecialPartsInvoice() {
         <aside className="space-y-4 rounded-2xl bg-white/90 p-5 ring-1 ring-slate-200">
           <h3 className="text-lg font-bold text-slate-900">Datos de factura</h3>
           <Input label="Numero" value={invoice.numero} readOnly />
-          <Input label="Fecha" type="date" value={invoice.fecha} onChange={(v) => setInvoiceField("fecha", v)} />
+          <Input
+            label="Fecha"
+            type="date"
+            value={invoice.fecha}
+            min={currentFiscalYearStart()}
+            max={localDateInputValue()}
+            onChange={(v) => setInvoiceField("fecha", v)}
+          />
           <label className="block text-sm font-medium text-slate-700">
             Metodo de pago
             <select
@@ -949,7 +960,7 @@ export default function SpecialPartsInvoice() {
   );
 }
 
-function Input({ label, value, onChange, type = "text", readOnly = false }) {
+function Input({ label, value, onChange, type = "text", readOnly = false, ...props }) {
   return (
     <label className="block text-sm font-medium text-slate-700">
       {label}
@@ -959,6 +970,7 @@ function Input({ label, value, onChange, type = "text", readOnly = false }) {
         readOnly={readOnly}
         onChange={(event) => onChange?.(event.target.value)}
         className={`${inputCls} mt-1 w-full ${readOnly ? "bg-slate-100 text-slate-600" : ""}`}
+        {...props}
       />
     </label>
   );

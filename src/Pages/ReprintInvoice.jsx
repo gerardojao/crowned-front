@@ -6,6 +6,10 @@ import logoTaller from "../assets/LogoTallerCrowned.png";
 import ZagaInvoiceDocument, {
   usesZagaInvoiceTemplate,
 } from "../Components/ZagaInvoiceDocument";
+import {
+  currentFiscalYearStart,
+  localDateInputValue,
+} from "../utils/date";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -37,7 +41,7 @@ export default function ReprintInvoice() {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [rectForm, setRectForm] = useState({
     tipo: "Total",
-    fecha: new Date().toISOString().slice(0, 10),
+    fecha: localDateInputValue(),
     motivo: "",
     importe: "",
     descripcion: "",
@@ -268,7 +272,7 @@ export default function ReprintInvoice() {
     setRectError("");
     setRectForm({
       tipo: "Total",
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: localDateInputValue(),
       motivo: "",
       importe: "",
       descripcion: "",
@@ -686,6 +690,8 @@ export default function ReprintInvoice() {
                 <input
                   type="date"
                   value={rectForm.fecha}
+                  min={currentFiscalYearStart()}
+                  max={localDateInputValue()}
                   onChange={(e) => handleRectFormChange("fecha", e.target.value)}
                   className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
                 />
