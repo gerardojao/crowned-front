@@ -6,6 +6,7 @@ import {
   useLocation,
   matchPath,
 } from "react-router-dom";
+import { Suspense, lazy } from "react";
 import {
   Menu,
   X,
@@ -33,6 +34,8 @@ import ClientAlertModal from "./ClienteAlertModal";
 import { getBusinessTerminology } from "../utils/businessTerminology";
 import { usesZagaInvoiceTemplate } from "./ZagaInvoiceDocument";
 import { sendSupportRequest } from "./supportRequest";
+
+const ProductTour = lazy(() => import("./ProductTour"));
 
 const heroBtnBase =
   "group flex min-w-[240px] items-center justify-between gap-4 rounded-2xl px-5 py-5 text-white shadow-md transition hover:scale-[1.01]";
@@ -263,6 +266,7 @@ export default function Layout({ children }) {
         <div className="mx-auto w-full max-w-screen-2xl px-4 pr-5 sm:px-6 lg:px-8 py-3 flex items-center">
           <Link
             to="/"
+            data-tour="main-logo"
             className="font-extrabold tracking-tight text-slate-900 text-lg sm:text-xl"
           >
             <img
@@ -283,6 +287,7 @@ export default function Layout({ children }) {
                     <button
                       type="button"
                       onClick={openClientAlerts}
+                      data-tour="client-alerts"
                       className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       aria-label={`Alertas pendientes: ${alertCount}`}
                       title={`Alertas pendientes: ${alertCount}`}
@@ -298,6 +303,7 @@ export default function Layout({ children }) {
                       <select
                         value={activeWorkshopId}
                         onChange={onWorkshopChange}
+                        data-tour="workshop-switcher"
                         className="max-w-[220px] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
                         aria-label="Taller activo"
                       >
@@ -341,6 +347,7 @@ export default function Layout({ children }) {
               </nav>
 
               <button
+                data-tour="main-menu"
                 className="mr-1 inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 sm:mr-0"
                 aria-label="Abrir menú"
                 onClick={() => setOpen((v) => !v)}
@@ -399,6 +406,7 @@ export default function Layout({ children }) {
                       {!preOrdersEnabled ? (
                         <NavLink
                           to="/register-work-order"
+                          data-tour="menu-order"
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
@@ -411,6 +419,7 @@ export default function Layout({ children }) {
                       ) : (
                         <NavLink
                           to="/pre-ordenes"
+                          data-tour="menu-order"
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
@@ -420,6 +429,7 @@ export default function Layout({ children }) {
                       )}
                       <NavLink
                         to="/register-customer"
+                        data-tour="menu-customers"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
@@ -428,6 +438,7 @@ export default function Layout({ children }) {
                       </NavLink>
                       <NavLink
                         to="/register-supplier"
+                        data-tour="menu-suppliers"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
@@ -490,6 +501,7 @@ export default function Layout({ children }) {
                       </NavLink>
                       <NavLink
                         to="/statement"
+                        data-tour="menu-balance"
                         className={mobileLink}
                         onClick={() => setOpen(false)}
                       >
@@ -557,6 +569,7 @@ export default function Layout({ children }) {
                     </div>
                     <button
                       type="button"
+                      data-tour="menu-alerts"
                       onClick={() => {
                         openClientAlerts();
                         setOpen(false);
@@ -718,6 +731,7 @@ export default function Layout({ children }) {
                     {!preOrdersEnabled ? (
                       <Link
                         to="/register-work-order"
+                        data-tour="quick-order"
                         className={`${heroBtnBase} bg-orange-600 hover:bg-orange-700`}
                       >
                         <span className={heroBtnIcon}>
@@ -739,6 +753,7 @@ export default function Layout({ children }) {
                     ) : (
                       <Link
                         to="/pre-ordenes"
+                        data-tour="quick-order"
                         className={`${heroBtnBase} bg-orange-600 hover:bg-orange-700`}
                       >
                         <span className={heroBtnIcon}>
@@ -761,6 +776,7 @@ export default function Layout({ children }) {
 
                     <Link
                       to="/register-customer"
+                      data-tour="quick-customers"
                       className={`${heroBtnBase} bg-emerald-600 hover:bg-emerald-700`}
                     >
                       <span className={heroBtnIcon}>
@@ -782,6 +798,7 @@ export default function Layout({ children }) {
 
                     <Link
                       to="/stock-parts"
+                      data-tour="quick-suppliers"
                       className={`${heroBtnBase} bg-slate-700 hover:bg-slate-800`}
                     >
                       <span className={heroBtnIcon}>
@@ -803,6 +820,7 @@ export default function Layout({ children }) {
 
                     <Link
                       to="/statement"
+                      data-tour="quick-balance"
                       className={`${heroBtnBase} bg-sky-600 hover:bg-sky-700`}
                     >
                       <span className={heroBtnIcon}>
@@ -873,6 +891,14 @@ export default function Layout({ children }) {
         {children}
       </main>
       <ClientAlertModal workshop={activeWorkshop} />
+      <Suspense fallback={null}>
+        <ProductTour
+          isAuthed={isAuthed}
+          pathname={location.pathname}
+          disabled={isAuthRoute || isPrintRoute}
+          menuOpen={open}
+        />
+      </Suspense>
 
       {isAuthed && !isAuthRoute && !isPrintRoute && (
         <button

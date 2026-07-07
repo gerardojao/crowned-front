@@ -548,7 +548,7 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            <article className={moduleCard}>
+            <article data-tour="home-orders" className={moduleCard}>
               <div className="flex items-start gap-4">
                 <span className={`${moduleIcon} bg-orange-600`}>
                   <ClipboardList size={26} />
@@ -588,7 +588,7 @@ export default function Home() {
               </div>
             </article>
 
-            <article className={moduleCard}>
+            <article data-tour="home-customers" className={moduleCard}>
               <div className="flex items-start gap-4">
                 <span className={`${moduleIcon} bg-emerald-600`}>
                   <Users size={26} />
@@ -614,7 +614,7 @@ export default function Home() {
               </div>
             </article>
 
-            <article className={moduleCard}>
+            <article data-tour="home-suppliers" className={moduleCard}>
               <div className="flex items-start gap-4">
                 <span className={`${moduleIcon} bg-teal-700`}>
                   <Truck size={26} />
@@ -643,7 +643,7 @@ export default function Home() {
               </div>
             </article>
 
-            <article className={moduleCard}>
+            <article data-tour="home-balance" className={moduleCard}>
               <div className="flex items-start gap-4">
                 <span className={`${moduleIcon} bg-sky-600`}>
                   <Wallet size={26} />

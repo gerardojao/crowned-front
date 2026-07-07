@@ -1667,12 +1667,18 @@ export default function RegisterWorkOrder() {
         <div>
           <div className="mb-4 flex items-center gap-2">
             <Wrench size={18} className="text-slate-500" />
-            <h3 className="text-lg font-semibold text-slate-800">
+            <h3
+              data-tour="work-order-form"
+              className="text-lg font-semibold text-slate-800"
+            >
               {editingId ? "Editar orden" : "Nueva orden"}
             </h3>
           </div>
 
-          <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+          <div
+            data-tour="work-order-customer-search"
+            className="mb-4 rounded-2xl border border-slate-200 bg-slate-50/80 p-4"
+          >
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Buscar cliente registrado
             </label>
@@ -2445,6 +2451,7 @@ export default function RegisterWorkOrder() {
           <button
             type="submit"
             disabled={submitting}
+            data-tour="work-order-save"
             className="inline-flex items-center rounded-xl px-5 py-3 bg-amber-600 text-white hover:bg-amber-700 transition shadow-md font-bold disabled:opacity-60"
           >
             {submitting

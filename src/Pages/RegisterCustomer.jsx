@@ -651,7 +651,10 @@ export default function RegisterCustomer() {
         </p>
       </div> */}
 
-      <section className="mb-6 rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200">
+      <section
+        data-tour="customer-search"
+        className="mb-6 rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200"
+      >
         <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 md:p-5">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-center">
             <div>
@@ -728,7 +731,10 @@ export default function RegisterCustomer() {
           >
             {/* DATOS CLIENTE */}
             <div>
-              <h3 className="text-lg font-semibold text-slate-800 mb-4">
+              <h3
+                data-tour="customer-form"
+                className="text-lg font-semibold text-slate-800 mb-4"
+              >
                 Datos del cliente
               </h3>
 
@@ -1084,7 +1090,10 @@ export default function RegisterCustomer() {
           </form>
 
           {editingId && (
-            <section className="mt-6 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5">
+            <section
+              data-tour="customer-vehicles"
+              className="mt-6 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5"
+            >
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800">
