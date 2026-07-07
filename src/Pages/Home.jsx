@@ -54,6 +54,19 @@ const moduleIcon =
 const actionLink =
   "inline-flex items-center justify-between gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-slate-50 text-slate-700 hover:bg-slate-100 ring-1 ring-slate-200 transition";
 
+const URL_MIGRATION_NOTICE_KEY = "zagapro-url-migration-notice-v1";
+const URL_MIGRATION_NOTICE_REQUIRED_VIEWS = 2;
+
+const getUrlMigrationNoticeStorageKey = (user) => {
+  const userKey = user?.id ?? user?.Id ?? user?.email ?? "anonymous";
+  return `${URL_MIGRATION_NOTICE_KEY}:${userKey}`;
+};
+
+const getUrlMigrationNoticeViewCount = (user) => {
+  const value = Number(localStorage.getItem(getUrlMigrationNoticeStorageKey(user)) || 0);
+  return Number.isFinite(value) ? value : 0;
+};
+
 const IVA_RATE = 0.21;
 const sumRows = (rows) =>
   (Array.isArray(rows) ? rows : []).reduce(
@@ -86,7 +99,7 @@ const getEstadoBadge = (estado) => {
 };
 
 export default function Home() {
-  const { isAuthed } = useAuth();
+  const { isAuthed, user } = useAuth();
   const labels = useBusinessTerminology();
   const [ordenes, setOrdenes] = useState([]);
   const [vehiculosEstado, setVehiculosEstado] = useState({
@@ -116,8 +129,39 @@ export default function Home() {
   });
   const [lastStatement, setLastStatement] = useState(null);
   const [useZagaDocuments, setUseZagaDocuments] = useState(false);
+  const [showUrlMigrationNotice, setShowUrlMigrationNotice] = useState(false);
+  const [urlMigrationModalOpen, setUrlMigrationModalOpen] = useState(false);
 
   const ts = (d) => (d ? new Date(d).getTime() : 0);
+
+  useEffect(() => {
+    if (!isAuthed) {
+      setShowUrlMigrationNotice(false);
+      setUrlMigrationModalOpen(false);
+      return;
+    }
+
+    setShowUrlMigrationNotice(
+      getUrlMigrationNoticeViewCount(user) < URL_MIGRATION_NOTICE_REQUIRED_VIEWS,
+    );
+    setUrlMigrationModalOpen(false);
+  }, [isAuthed, user?.id, user?.Id, user?.email]);
+
+  const openUrlMigrationModal = () => {
+    setUrlMigrationModalOpen(true);
+  };
+
+  const acceptUrlMigrationNotice = () => {
+    const nextViewCount = getUrlMigrationNoticeViewCount(user) + 1;
+    localStorage.setItem(
+      getUrlMigrationNoticeStorageKey(user),
+      String(nextViewCount),
+    );
+    setUrlMigrationModalOpen(false);
+    setShowUrlMigrationNotice(
+      nextViewCount < URL_MIGRATION_NOTICE_REQUIRED_VIEWS,
+    );
+  };
 
   const ordenesSorted = useMemo(
     () =>
@@ -284,6 +328,75 @@ export default function Home() {
 
   return (
     <>
+      {showUrlMigrationNotice && (
+        <section className="rounded-2xl border border-orange-200 bg-white p-4 shadow-sm ring-1 ring-orange-100 md:p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-start gap-3">
+              
+              <div>
+                <p className="text-lg font-black uppercase tracking-[0.14em] text-orange-700">
+                  Nueva actualización
+                </p>
+                <h2 className="mt-1 text-lg font-extrabold text-slate-950">
+                  Próximo cambio de url del sistema
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Tenemos una comunicación importante sobre el acceso a ZagaPro.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={openUrlMigrationModal}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700"
+            >
+              Ver
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </section>
+      )}
+
+      {urlMigrationModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="url-migration-title"
+            className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200"
+          >
+            <div className="flex items-start gap-4">
+  
+              <div>
+                <p className="text-sm font-black uppercase tracking-[0.16em] text-orange-700">
+                  Nueva actualización
+                </p>
+                <h2
+                  id="url-migration-title"
+                  className="mt-1 text-2xl font-extrabold text-slate-950"
+                >
+                  Nueva URL de acceso
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  Próximamente la URL del sistema será app.zagapro.es. No tienes que hacer nada ni cambiar tu forma de entrar: sigue accediendo como siempre y el propio sistema te redirigirá automáticamente cuando llegue el momento.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={acceptUrlMigrationNotice}
+                className="inline-flex items-center justify-center rounded-xl bg-orange-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-orange-700"
+              >
+                Aceptar
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <KPIs totalsOverride={dashboardTotals} />
 
       {showDashboardModules && (
