@@ -27,6 +27,7 @@ const eur = new Intl.NumberFormat("es-ES", {
 });
 
 const amountOf = (value) => Number(value ?? 0);
+const PAGE_SIZE = 10;
 
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -71,6 +72,9 @@ export default function InvoiceHistory() {
   const [origin, setOrigin] = useState("");
   const [invoiceType, setInvoiceType] = useState("");
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [notice, setNotice] = useState(null);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
@@ -101,6 +105,7 @@ export default function InvoiceHistory() {
         const t = opts.to ?? to;
         const o = opts.origin ?? origin;
         const type = opts.invoiceType ?? invoiceType;
+        const nextPage = opts.page ?? 1;
 
         const params = new URLSearchParams();
 
@@ -108,6 +113,8 @@ export default function InvoiceHistory() {
         if (t) params.set("fechaFin", t);
         if (o) params.set("origin", o);
         if (type) params.set("invoiceType", type);
+        params.set("page", String(nextPage));
+        params.set("pageSize", String(PAGE_SIZE));
 
         const res = await api.get(`/FacturaEmitida?${params.toString()}`);
         console.log("API response for invoice history:", res.data);
@@ -115,8 +122,13 @@ export default function InvoiceHistory() {
         console.log("Fetched invoice history:", list);
 
         setRows(Array.isArray(list) ? list : []);
+        setPage(Number(res.data?.page ?? nextPage));
+        setTotal(Number(res.data?.total ?? 0));
+        setTotalPages(Math.max(1, Number(res.data?.totalPages ?? 1)));
       } catch {
         setRows([]);
+        setTotal(0);
+        setTotalPages(1);
         setNotice({
           type: "error",
           text: "No se pudo obtener el historial de facturas.",
@@ -168,7 +180,7 @@ export default function InvoiceHistory() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    fetchData();
+    fetchData({ page: 1 });
   };
 
   const onClear = () => {
@@ -182,6 +194,7 @@ export default function InvoiceHistory() {
       to: "",
       origin: "",
       invoiceType: "",
+      page: 1,
     });
   };
   const setToday = () => {
@@ -190,7 +203,7 @@ export default function InvoiceHistory() {
     setFrom(today);
     setTo(today);
 
-    fetchData({ from: today, to: today });
+    fetchData({ from: today, to: today, page: 1 });
   };
 
   const setThisMonth = () => {
@@ -201,7 +214,7 @@ export default function InvoiceHistory() {
     setFrom(f);
     setTo(t);
 
-    fetchData({ from: f, to: t });
+    fetchData({ from: f, to: t, page: 1 });
   };
 
   const setLast30 = () => {
@@ -216,7 +229,7 @@ export default function InvoiceHistory() {
     setFrom(f);
     setTo(t);
 
-    fetchData({ from: f, to: t });
+    fetchData({ from: f, to: t, page: 1 });
   };
 
   const setThisYear = () => {
@@ -227,7 +240,7 @@ export default function InvoiceHistory() {
     setFrom(f);
     setTo(t);
 
-    fetchData({ from: f, to: t });
+    fetchData({ from: f, to: t, page: 1 });
   };
 
   const getOriginLabel = (row) => {
@@ -320,14 +333,127 @@ export default function InvoiceHistory() {
     );
   }, [rows, searchFilter]);
 
-  const printSalesBookPdf = (param) => {
-  const rowsToPrint = filteredRows;
+  const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const pageEnd = Math.min(total, page * PAGE_SIZE);
+  const canGoPrevious = page > 1 && !loading;
+  const canGoNext = page < totalPages && !loading;
 
-  const totalBase = rowsToPrint.reduce((sum, r) => sum + Number(r.baseAmount || 0), 0);
-  const totalIva = rowsToPrint.reduce((sum, r) => sum + Number(r.ivaAmount || 0), 0);
-  const totalImporte = rowsToPrint.reduce((sum, r) => sum + Number(r.totalAmount || 0), 0);
+  const goToPage = (nextPage) => {
+    const safePage = Math.min(Math.max(1, nextPage), totalPages);
+    fetchData({ page: safePage });
+  };
 
-  const html = `
+  const PaginationControls = ({ className = "" }) => (
+    <div
+      className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between ${className}`}
+    >
+      <div className="text-sm text-slate-500">
+        Mostrando{" "}
+        <span className="font-medium text-slate-700">
+          {pageStart}-{pageEnd}
+        </span>{" "}
+        de <span className="font-medium text-slate-700">{total}</span>{" "}
+        facturas
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          disabled={!canGoPrevious}
+          onClick={() => goToPage(page - 1)}
+          className="rounded-xl px-3 py-2 text-sm bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Anterior
+        </button>
+
+        <span className="min-w-[7rem] text-center text-sm text-slate-600">
+          Página {page} de {totalPages}
+        </span>
+
+        <button
+          type="button"
+          disabled={!canGoNext}
+          onClick={() => goToPage(page + 1)}
+          className="rounded-xl px-3 py-2 text-sm bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Siguiente
+        </button>
+      </div>
+    </div>
+  );
+
+  const buildInvoiceParams = ({ targetPage, targetPageSize }) => {
+    const params = new URLSearchParams();
+
+    if (from) params.set("fechaInicio", from);
+    if (to) params.set("fechaFin", to);
+    if (origin) params.set("origin", origin);
+    if (invoiceType) params.set("invoiceType", invoiceType);
+    params.set("page", String(targetPage));
+    params.set("pageSize", String(targetPageSize));
+
+    return params;
+  };
+
+  const fetchAllFilteredRows = async () => {
+    const firstRes = await api.get(
+      `/FacturaEmitida?${buildInvoiceParams({
+        targetPage: 1,
+        targetPageSize: 100,
+      }).toString()}`,
+    );
+    const firstRows = Array.isArray(firstRes.data?.data) ? firstRes.data.data : [];
+    const pages = Math.max(1, Number(firstRes.data?.totalPages ?? 1));
+
+    if (pages === 1) return firstRows;
+
+    const rest = await Promise.all(
+      Array.from({ length: pages - 1 }, (_, index) =>
+        api.get(
+          `/FacturaEmitida?${buildInvoiceParams({
+            targetPage: index + 2,
+            targetPageSize: 100,
+          }).toString()}`,
+        ),
+      ),
+    );
+
+    return rest.reduce(
+      (acc, res) => acc.concat(Array.isArray(res.data?.data) ? res.data.data : []),
+      firstRows,
+    );
+  };
+
+  const applyLocalSearch = (items) => {
+    const search = searchFilter.trim().toLowerCase();
+
+    if (!search) return items;
+
+    return items.filter((row) =>
+      Object.values(row)
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(search)),
+    );
+  };
+
+  const printSalesBookPdf = async () => {
+    try {
+      const rowsToPrint = applyLocalSearch(await fetchAllFilteredRows());
+
+      const totalBase = rowsToPrint.reduce(
+        (sum, r) => sum + Number(r.baseAmount || 0),
+        0,
+      );
+      const totalIva = rowsToPrint.reduce(
+        (sum, r) => sum + Number(r.ivaAmount || 0),
+        0,
+      );
+      const totalImporte = rowsToPrint.reduce(
+        (sum, r) => sum + Number(r.totalAmount || 0),
+        0,
+      );
+
+      const html = `
     <html>
       <head>
         <title>Libro de ventas</title>
@@ -392,12 +518,18 @@ export default function InvoiceHistory() {
     </html>
   `;
 
-  const win = window.open("", "_blank");
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-  win.print();
-};
+      const win = window.open("", "_blank");
+      win.document.write(html);
+      win.document.close();
+      win.focus();
+      win.print();
+    } catch {
+      setNotice({
+        type: "error",
+        text: "No se pudo preparar el libro de ventas para imprimir.",
+      });
+    }
+  };
   return (
     <>
       <div className="flex items-center justify-between gap-3 mt-2 mb-3 md:mb-4">
@@ -650,6 +782,8 @@ export default function InvoiceHistory() {
         )}
       </section>
 
+      {!loading && total > 0 && <PaginationControls className="md:hidden mt-4" />}
+
       <section className="hidden md:block rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6">
         {loading ? (
           <Loader />
@@ -659,7 +793,7 @@ export default function InvoiceHistory() {
               <div className="text-sm text-slate-500">
                 Resultados:{" "}
                 <span className="font-medium text-slate-700">
-                  {filteredRows.length}
+                  {total}
                 </span>
               </div>
 
@@ -830,6 +964,8 @@ export default function InvoiceHistory() {
                 </table>
               </div>
             </div>
+
+            {total > 0 && <PaginationControls className="mt-4" />}
           </>
         )}
       </section>
