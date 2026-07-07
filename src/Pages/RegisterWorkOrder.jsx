@@ -559,6 +559,14 @@ export default function RegisterWorkOrder() {
         Number(o.repuestos ?? o.Repuestos ?? 0) *
           Number(o.cantidad ?? o.Cantidad ?? 1),
     Facturada: o.facturada ?? o.Facturada ?? false,
+     VehicleCount:
+      o.vehicleCount ??
+      o.VehicleCount ??
+      o.vehiculosCount ??
+      o.VehiculosCount ??
+      o.totalVehiculos ??
+      o.TotalVehiculos ??
+      null,
   });
 
   const parseDetailItems = (itemsJson) => {
@@ -630,6 +638,14 @@ export default function RegisterWorkOrder() {
     Provincia: c.provincia ?? c.Provincia ?? "",
     Clasificacion: c.clasificacion ?? c.Clasificacion ?? "Particular",
     Observaciones: c.observaciones ?? c.Observaciones ?? "",
+    VehicleCount:
+      c.vehicleCount ??
+      c.VehicleCount ??
+      c.vehiculosCount ??
+      c.VehiculosCount ??
+      c.totalVehiculos ??
+      c.TotalVehiculos ??
+      null,
   });
 
   const normalizeVehicle = (v) => ({
@@ -703,6 +719,8 @@ export default function RegisterWorkOrder() {
     return pickArray(res).map(normalizeVehicle);
   };
 
+  
+
   const fillOrderFromCustomer = async (customer, vehicle = null) => {
     const fullCustomer = await loadCustomerDetail(customer);
     setOrder((prev) => ({
@@ -742,6 +760,8 @@ export default function RegisterWorkOrder() {
     setShowNewCustomer(false);
     setQuickCreateNotice("");
   };
+
+  
 
   const fillCustomerOnlyForNewVehicle = async (customer) => {
     const fullCustomer = await loadCustomerDetail(customer);
@@ -1703,30 +1723,33 @@ export default function RegisterWorkOrder() {
               )}
 
             {customerMatches.length > 0 && (
-              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                {customerMatches.map((customer) => (
-                  <button
-                    key={customer.Id}
-                    type="button"
-                    onClick={() => selectCustomerMatch(customer)}
-                    className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
-                  >
-                    <span className="block font-semibold text-slate-900">
-                      {customer.Nombre}
-                    </span>
+                <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {customerMatches.map((customer) => (
+                    <button
+                      key={customer.Id}
+                      type="button"
+                      onClick={() => selectCustomerMatch(customer)}
+                      className="rounded-xl border border-slate-200 bg-white p-3 text-left text-sm hover:border-emerald-300 hover:bg-emerald-50"
+                    >
+                      <span className="block font-semibold text-slate-900">
+                        Cliente: {customer.Nombre}
+                      </span>
+                      <span className="mt-1 block text-slate-600">
+                        Tel: {customer.Telefono || "Sin teléfono"}
+                      </span>
 
-                    <span className="mt-1 block text-slate-600">
-                      {customer.Matricula || "Sin matrícula"} · {customer.Marca}{" "}
-                      {customer.Modelo}
-                    </span>
-
-                    <span className="mt-1 block text-xs text-slate-500">
-                      {customer.Telefono || "Sin teléfono"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
+                      <span className="mt-1 block text-xs text-slate-500">
+                        Vehículos:{" "}
+                        {customer.VehicleCount !== null
+                          ? `${customer.VehicleCount} registrado${Number(customer.VehicleCount) === 1 ? "" : "s"}`
+                          : customer.Matricula
+                            ? `${customer.Matricula} · ${[customer.Marca, customer.Modelo].filter(Boolean).join(" ")}`
+                            : "Vehículos registrados"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
 
             {loadingCustomerVehicles && (
               <p className="mt-3 text-sm text-slate-500">
