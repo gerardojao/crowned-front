@@ -764,7 +764,7 @@ export default function StockParts() {
 
       {isInventoryView ? (
         <>
-          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-4">
+          <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
             <MetricCard
               label="Unidades"
               value={qty.format(inventorySummary.unidades)}
@@ -778,13 +778,13 @@ export default function StockParts() {
               value={inventorySummary.stockBajo}
               danger={inventorySummary.stockBajo > 0}
             />
-            {accountsPayableEnabled && (
+            {/* {accountsPayableEnabled && (
               <MetricCard
                 label="Pendientes pago"
                 value={inventorySummary.pendientesPago}
                 danger={inventorySummary.pendientesPago > 0}
               />
-            )}
+            )} */}
           </section>
 
           <section className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
@@ -979,9 +979,9 @@ export default function StockParts() {
                     <th className="px-3 py-3">Compra</th>
                     <th className="px-3 py-3">Venta</th>
                     <th className="px-3 py-3">Ubicacion</th>
-                    {accountsPayableEnabled && (
+                    {/* {accountsPayableEnabled && (
                       <th className="px-3 py-3">Pago</th>
-                    )}
+                    )} */}
                     <th className="px-3 py-3">Acciones</th>
                   </tr>
                 </thead>
@@ -1035,7 +1035,7 @@ export default function StockParts() {
                         <td className="px-3 py-3">
                           {getValue(row, "ubicacion", "-") || "-"}
                         </td>
-                        {accountsPayableEnabled && (
+                        {/* {accountsPayableEnabled && (
                           <td className="px-3 py-3">
                             {pagado ? (
                               <span className="inline-flex items-center justify-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
@@ -1052,7 +1052,7 @@ export default function StockParts() {
                               </button>
                             )}
                           </td>
-                        )}
+                        )} */}
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap justify-center gap-2">
                             <button
