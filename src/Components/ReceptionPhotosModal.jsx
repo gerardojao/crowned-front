@@ -289,7 +289,7 @@ export default function ReceptionPhotosModal({
             {context.preOrderId && <div>Pre-orden: {context.preOrderId}</div>}
             {context.orderId && <div>Orden: {context.orderId}</div>}
             {context.cliente && <div>Cliente: {context.cliente}</div>}
-            {context.matricula && <div>Matricula: {context.matricula}</div>}
+            {context.matricula && <div>Matrícula: {context.matricula}</div>}
             <div>Fecha impresion: {new Date().toLocaleString("es-ES")}</div>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-4">

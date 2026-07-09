@@ -109,10 +109,10 @@ export default function Login() {
               Productividad, control y crecimiento
             </p>
             <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight md:text-5xl">
-              Administra tu operacion con una plataforma clara, rapida y profesional.
+              Administra tu operación con una plataforma clara, rápida y profesional.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-7 text-slate-300">
-              Clientes, documentos, facturacion, ingresos, gastos y procesos diarios
+              Clientes, documentos, facturación, ingresos, gastos y procesos diarios
               conectados en un mismo entorno para tomar mejores decisiones.
             </p>
           </div>
@@ -122,7 +122,7 @@ export default function Login() {
               <FileText className="text-cyan-300" size={24} />
               <p className="mt-3 text-sm font-bold">Documentos</p>
               <p className="mt-1 text-xs leading-5 text-slate-300">
-                Presupuestos, ordenes y facturas con trazabilidad.
+                Presupuestos, órdenes y facturas con trazabilidad.
               </p>
             </div>
             <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/10">
@@ -152,7 +152,7 @@ export default function Login() {
             Iniciar sesion
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Entra a tu panel y continua gestionando clientes, documentos y operaciones.
+            Entra a tu panel y continúa gestionando clientes, documentos y operaciones.
           </p>
         </div>
 
@@ -176,7 +176,7 @@ export default function Login() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Contrasena</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña</label>
             <input
               type="password"
               autoComplete="current-password"
@@ -201,7 +201,7 @@ export default function Login() {
             Volver al inicio
           </Link>
           <Link to="/forgot" className="text-cyan-700 hover:text-cyan-800">
-            Olvidaste tu contrasena?
+            ¿Olvidaste tu contraseña?
           </Link>
         </div>
         <div className="mt-3 text-center text-sm">

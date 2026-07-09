@@ -12,9 +12,9 @@ const supportItems = [
 
 const commonCases = [
   "Alta, baja o cambio de usuarios.",
-  "Recuperacion de acceso o problemas con contrasena.",
-  "Revision de modulos activos por negocio.",
-  "Incidencias al crear presupuestos, ordenes, facturas, ingresos o gastos.",
+  "Recuperación de acceso o problemas con contraseña.",
+  "Revisión de módulos activos por negocio.",
+  "Incidencias al crear presupuestos, órdenes, facturas, ingresos o gastos.",
   "Dudas sobre configuracion del negocio, logo, serie de factura o datos fiscales.",
 ];
 
@@ -72,7 +72,7 @@ export default function Support() {
             <p className="text-sm font-bold uppercase text-emerald-700">Soporte</p>
             <h1 className="mt-1 text-3xl font-bold text-slate-900">Soporte y contacto</h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              Estamos para ayudarte con acceso, configuracion, usuarios, modulos e incidencias operativas dentro de
+              Estamos para ayudarte con acceso, configuración, usuarios, módulos e incidencias operativas dentro de
               ZagaPro.
             </p>
           </div>
@@ -89,7 +89,7 @@ export default function Support() {
           <InfoPanel icon={ShieldQuestion} title="Acceso y seguridad">
             <p>
               Si perdiste acceso, indica el correo de la cuenta y el negocio asociado. Por seguridad, podemos solicitar
-              validacion adicional antes de modificar usuarios o contrasenas.
+              validación adicional antes de modificar usuarios o contraseñas.
             </p>
           </InfoPanel>
         </div>
@@ -188,7 +188,7 @@ export default function Support() {
                 className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
               >
                 <option value="">Selecciona una opcion</option>
-                <option value="Acceso o contrasena">Acceso o contrasena</option>
+                <option value="Acceso o contrasena">Acceso o contraseña</option>
                 <option value="Alta o cambio de usuario">Alta o cambio de usuario</option>
                 <option value="Problema con facturas o documentos">Facturas o documentos</option>
                 <option value="Configuracion del negocio">Configuracion del negocio</option>

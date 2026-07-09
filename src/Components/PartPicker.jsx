@@ -282,7 +282,7 @@ export default function PartPicker({
     const res = await api.post("/Proveedor", {
       nombre: "Proveedor por definir",
       categoria: "Repuestos",
-      observaciones: "Proveedor generico creado desde el selector rapido de repuestos.",
+      observaciones: "Proveedor genérico creado desde el selector rápido de repuestos.",
     });
 
     const providerId = res?.data?.data?.[0]?.id ?? res?.data?.data?.[0]?.Id;

@@ -186,7 +186,7 @@ export default function RegisterExpenseType() {
           <h2 className="text-2xl font-semibold text-slate-900">Egresos</h2>
 
           <p className="text-sm text-slate-500 mt-1">
-            Crea, actualiza o eliminalas cuentas/categorías de gastos del
+            Crea, actualiza o elimina las cuentas/categorías de gastos del
             taller.
           </p>
         </div>

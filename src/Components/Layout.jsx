@@ -424,7 +424,7 @@ export default function Layout({ children }) {
                           onClick={() => setOpen(false)}
                         >
                           <Truck size={18} className="text-emerald-600" />
-                          Pre-ordenes
+                          Pre-órdenes
                         </NavLink>
                       )}
                       <NavLink
@@ -655,18 +655,18 @@ export default function Layout({ children }) {
                   <p className="mx-auto mt-4 max-w-2xl text-slate-600 text-sm md:text-lg font-medium leading-7">
                     {isAuthed
                       ? `Gestion inteligente para ${labels.businessPlural}.`
-                      : "Gestiona clientes, documentos, facturacion y operaciones desde una plataforma clara, segura y preparada para tu negocio."}
+                      : "Gestiona clientes, documentos, facturación y operaciones desde una plataforma clara, segura y preparada para tu negocio."}
                   </p>
 
                   {!isAuthed && (
                     <>
                       <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4 text-center shadow-sm">
                         <p className="text-sm font-black text-slate-950">
-                          Todavia no usas ZagaPro?
+                          ¿Todavía no usas ZagaPro?
                         </p>
                         <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-600">
                           Solicita una demo gratuita de 15 minutos y descubre
-                          como recuperar tiempo en la gestion de tu taller desde
+                          cómo recuperar tiempo en la gestión de tu taller desde
                           una sola plataforma.
                         </p>
                         <a

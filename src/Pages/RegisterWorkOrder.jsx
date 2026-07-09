@@ -849,7 +849,7 @@ export default function RegisterWorkOrder() {
         await fillCustomerOnlyForNewVehicle(customer);
         setShowNewCustomer(true);
         setQuickCreateNotice(
-          "Cliente seleccionado. Completa los datos del nuevo vehiculo.",
+          "Cliente seleccionado. Completa los datos del nuevo vehículo.",
         );
         setWarningModal(
           "Este cliente no tiene coche asignado. Agrega un coche para poder completar la orden.",
@@ -938,7 +938,7 @@ export default function RegisterWorkOrder() {
       );
       if (exact.length > 1) {
         throw new Error(
-          "Hay varios clientes con ese nombre. Selecciona el cliente desde el buscador antes de guardar el vehiculo.",
+          "Hay varios clientes con ese nombre. Selecciona el cliente desde el buscador antes de guardar el vehículo.",
         );
       }
       if (exact.length === 1) return exact[0];
@@ -1038,10 +1038,10 @@ export default function RegisterWorkOrder() {
           );
           vehicle = normalizeVehicle(firstResponseItem(createdVehicle) || {});
           setSuccessModal(
-            "Cliente existente cargado y vehiculo agregado a la orden.",
+            "Cliente existente cargado y vehículo agregado a la orden.",
           );
         } else {
-          setSuccessModal("Cliente y vehiculo existentes cargados en la orden.");
+          setSuccessModal("Cliente y vehículo existentes cargados en la orden.");
         }
 
         await fillOrderFromCustomer(existingCustomer, vehicle);
@@ -1759,14 +1759,14 @@ export default function RegisterWorkOrder() {
 
             {loadingCustomerVehicles && (
               <p className="mt-3 text-sm text-slate-500">
-                Cargando vehiculos del cliente...
+                Cargando vehículos del cliente...
               </p>
             )}
 
             {selectedCustomerForVehicles && customerVehicles.length > 1 && (
               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
                 <p className="mb-2 text-sm font-semibold text-emerald-900">
-                  Selecciona el vehiculo de {selectedCustomerForVehicles.Nombre}
+                  Selecciona el vehículo de {selectedCustomerForVehicles.Nombre}
                 </p>
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {customerVehicles.map((vehicle) => (
@@ -1782,7 +1782,7 @@ export default function RegisterWorkOrder() {
                       className="rounded-xl border border-emerald-200 bg-white p-3 text-left text-sm hover:border-emerald-400 hover:bg-emerald-50"
                     >
                       <span className="block font-semibold text-slate-900">
-                        {vehicle.Matricula || "Sin matricula"}
+                        {vehicle.Matricula || "Sin matrícula"}
                       </span>
                       <span className="mt-1 block text-slate-600">
                         {vehicle.Marca || "-"} {vehicle.Modelo || ""}
@@ -1817,14 +1817,14 @@ export default function RegisterWorkOrder() {
                 <UserPlus size={17} />
 
                 {showNewCustomer
-                  ? "Ocultar alta rapida"
+                    ? "Ocultar alta rápida"
                   : order.ClienteId
-                    ? "Agregar otro vehiculo"
+                    ? "Agregar otro vehículo"
                     : "Registrar nuevo"}
               </button>
               {showNewCustomer && order.ClienteId && (
                 <p className="mt-2 text-xs font-medium text-emerald-700 ">
-                  Se guardara como nuevo vehiculo de {order.Cliente}.
+                  Se guardará como nuevo vehículo de {order.Cliente}.
                 </p>
               )}
 
@@ -1840,7 +1840,7 @@ export default function RegisterWorkOrder() {
                   {savingCustomer
                     ? "Guardando..."
                     : order.ClienteId
-                      ? "Guardar vehiculo en cliente"
+                      ? "Guardar vehículo en cliente"
                       : "Guardar cliente nuevo"}
                 </button>
               )}
@@ -2181,7 +2181,7 @@ export default function RegisterWorkOrder() {
             />
 
             <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
-              Lineas de detalle / costes
+              Líneas de detalle / costes
             </div>
 
             {detailedRepairLinesEnabled && (
@@ -2191,7 +2191,7 @@ export default function RegisterWorkOrder() {
                   onClick={addManualDetailLine}
                   className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
                 >
-                  Agregar linea
+                  Agregar línea
                 </button>
               </div>
             )}
@@ -2248,7 +2248,7 @@ export default function RegisterWorkOrder() {
               <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
                 {detailedRepairLinesEnabled && (
                   <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    <div>Codigo</div>
+                    <div>Código</div>
                     <div>Seccion</div>
                     <div>Descripcion</div>
                     <div>Tiempo/Cant.</div>
@@ -2294,7 +2294,7 @@ export default function RegisterWorkOrder() {
                                 )
                               }
                               className={cls}
-                              placeholder="Codigo"
+                              placeholder="Código"
                             />
                             <select
                               value={section}

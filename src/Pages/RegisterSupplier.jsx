@@ -357,7 +357,7 @@ export default function RegisterSupplier() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Categoria
+                Categoría
               </label>
               <input
                 type="text"
@@ -503,7 +503,7 @@ export default function RegisterSupplier() {
                 <th className="text-center py-3">Proveedor</th>
                 <th className="text-center py-3">Teléfono</th>
                 <th className="text-center py-3">Email</th>
-                <th className="text-center py-3">Categoria</th>
+                <th className="text-center py-3">Categoría</th>
                 <th className="text-center py-3">-</th>
               </tr>
             </thead>

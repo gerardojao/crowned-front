@@ -389,7 +389,7 @@ export default function SpecialPartsInvoice() {
 
     if (!payload.nombre?.trim()) return setError("Indica el nombre del cliente para registrarlo.");
     if (!payload.telefono?.trim()) return setError("Indica el telefono del cliente para registrarlo.");
-    if (!payload.matricula?.trim()) return setError("Indica la matricula para registrar el cliente.");
+    if (!payload.matricula?.trim()) return setError("Indica la matrícula para registrar el cliente.");
     if (!payload.modelo?.trim()) return setError("Indica el modelo para registrar el cliente.");
 
     try {
@@ -470,13 +470,13 @@ export default function SpecialPartsInvoice() {
 
     if (!invoice.cliente.trim()) throw new Error("El cliente es requerido.");
     if (!billableItems.length) {
-      throw new Error(`Agrega al menos una linea de ${invoiceMode.titleLower} con importe mayor que 0.`);
+      throw new Error(`Agrega al menos una línea de ${invoiceMode.titleLower} con importe mayor que 0.`);
     }
     if (!isCredit && bankAccounts.length > 1 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
     if (isCredit && !accountsReceivableEnabled) {
-      throw new Error("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+      throw new Error("El módulo de cuentas por cobrar no está habilitado para este taller.");
     }
     if (!invoiceMode.isRapel && franchiseAmount > total) {
       throw new Error("La franquicia no puede superar el total de la factura.");
@@ -575,7 +575,7 @@ export default function SpecialPartsInvoice() {
       <section className="rounded-2xl bg-white p-6 ring-1 ring-slate-200">
         <h2 className="text-xl font-bold text-slate-900">{invoiceMode.title} desactivada</h2>
         <p className="mt-2 text-sm text-slate-600">
-          El modulo de {invoiceMode.titleLower} no esta habilitado para este taller.
+          El módulo de {invoiceMode.titleLower} no está habilitado para este taller.
         </p>
         <Link
           to="/"
@@ -718,7 +718,7 @@ export default function SpecialPartsInvoice() {
             <Input label="NIF/DNI" value={invoice.dni} onChange={(v) => setInvoiceField("dni", v)} />
             <Input label="Telefono" value={invoice.telefonoCliente} onChange={(v) => setInvoiceField("telefonoCliente", v)} />
             <Input label="Direccion" value={invoice.direccionCliente} onChange={(v) => setInvoiceField("direccionCliente", v)} />
-            <Input label="Codigo postal" value={invoice.codigoPostalCliente} onChange={(v) => setInvoiceField("codigoPostalCliente", v)} />
+            <Input label="Código postal" value={invoice.codigoPostalCliente} onChange={(v) => setInvoiceField("codigoPostalCliente", v)} />
             <Input label="Poblacion" value={invoice.poblacionCliente} onChange={(v) => setInvoiceField("poblacionCliente", v)} />
             <Input label="Provincia" value={invoice.provinciaCliente} onChange={(v) => setInvoiceField("provinciaCliente", v)} />
             <label className="flex flex-col gap-1 text-sm font-semibold text-slate-700">
@@ -741,12 +741,12 @@ export default function SpecialPartsInvoice() {
                 onChange={(v) => setInvoiceField("franquiciaImporte", v)}
               />
             )}
-            <Input label="Matricula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
+            <Input label="Matrícula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
             <Input label="Bastidor" value={invoice.bastidor} onChange={(v) => setInvoiceField("bastidor", v)} />
             <Input label="Km" value={invoice.km} onChange={(v) => setInvoiceField("km", v)} />
             <Input label="Marca" value={invoice.marca} onChange={(v) => setInvoiceField("marca", v)} />
             <Input label="Modelo" value={invoice.modelo} onChange={(v) => setInvoiceField("modelo", v)} />  
-            <Input label="Fecha matriculacion" type="date" value={invoice.fechaMatriculacion} onChange={(v) => setInvoiceField("fechaMatriculacion", v)} />
+            <Input label="Fecha matriculación" type="date" value={invoice.fechaMatriculacion} onChange={(v) => setInvoiceField("fechaMatriculacion", v)} />
             <Input label="Motor" value={invoice.motor} onChange={(v) => setInvoiceField("motor", v)} />
             <Input label="KW" type="number" value={invoice.kw} onChange={(v) => setInvoiceField("kw", v)} />
             <Input label="CV" type="number" value={invoice.cv} onChange={(v) => setInvoiceField("cv", v)} />
@@ -804,7 +804,7 @@ export default function SpecialPartsInvoice() {
                     type="button"
                     onClick={() => removeItem(index)}
                     className="inline-flex h-10 items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
-                    title="Quitar linea"
+                    title="Quitar línea"
                   >
                     <Trash2 size={17} />
                   </button>
@@ -817,7 +817,7 @@ export default function SpecialPartsInvoice() {
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-200"
             >
               <Plus size={17} />
-              Agregar linea manual
+              Agregar línea manual
             </button>
           </div>
         </div>
@@ -850,7 +850,7 @@ export default function SpecialPartsInvoice() {
           {isCredit && (
             <div className="grid grid-cols-1 gap-3">
               <Input
-                label="Plazo credito dias"
+                label="Plazo crédito días"
                 type="number"
                 value={invoice.plazoCreditoDias}
                 onChange={(v) => setInvoiceField("plazoCreditoDias", v)}

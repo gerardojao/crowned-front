@@ -1173,7 +1173,7 @@ function Input({ label, value, onChange, type = "text", required = false, placeh
             type="button"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-1 text-base text-slate-500 hover:text-slate-700"
             onClick={() => setShowPassword((current) => !current)}
-            aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
           >
             👁️
           </button>
@@ -1248,7 +1248,7 @@ function FeatureSwitches({ values, onChange }) {
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         <Switch
           label="Vehiculos por estado"
-          description="Muestra el contador de ordenes en estado Reparando o Entregado."
+          description="Muestra el contador de órdenes en estado Reparando o Entregado."
           checked={values.enableDashboardRepairVehicles}
           onChange={(checked) =>
             onChange("enableDashboardRepairVehicles", checked)
@@ -1261,7 +1261,7 @@ function FeatureSwitches({ values, onChange }) {
           onChange={(checked) => onChange("enableDashboardBilling", checked)}
         />
         <Switch
-          label="Pre-ordenes"
+          label="Pre-órdenes"
           description="Habilita la recepcion previa y conversion a orden."
           checked={values.enablePreOrders}
           onChange={(checked) => onChange("enablePreOrders", checked)}
@@ -1292,25 +1292,25 @@ function FeatureSwitches({ values, onChange }) {
         />
         <Switch
           label="Firmas digitales"
-          description="Permite capturar firmas en presupuestos, pre-ordenes y ordenes de trabajo."
+          description="Permite capturar firmas en presupuestos, pre-órdenes y órdenes de trabajo."
           checked={values.enableDigitalSignatures}
           onChange={(checked) => onChange("enableDigitalSignatures", checked)}
         />
         <Switch
-          label="Lineas tecnicas"
-          description="Activa precio, tiempo, descuento e IVA por linea de reparacion."
+          label="Líneas técnicas"
+          description="Activa precio, tiempo, descuento e IVA por línea de reparación."
           checked={values.enableDetailedRepairInvoiceLines}
           onChange={(checked) => onChange("enableDetailedRepairInvoiceLines", checked)}
         />
         <Switch
           label="Cuentas por cobrar"
-          description="Muestra el modulo de importes pendientes de cobro."
+          description="Muestra el módulo de importes pendientes de cobro."
           checked={values.enableAccountsReceivable}
           onChange={(checked) => onChange("enableAccountsReceivable", checked)}
         />
         <Switch
           label="Stock / Inventario"
-          description="Muestra el modulo de Stock con Inventario y Facturados. Si esta apagado, Stock queda en la vista reducida actual."
+          description="Muestra el módulo de Stock con Inventario y Facturados. Si está apagado, Stock queda en la vista reducida actual."
           checked={values.enableAccountsPayable}
           onChange={(checked) => onChange("enableAccountsPayable", checked)}
         />
@@ -1350,7 +1350,7 @@ function OperationTypeSwitches({ values, onChange }) {
 
   return (
     <div>
-      <p className="mb-2 text-sm font-bold text-slate-800">Tipos de operacion</p>
+      <p className="mb-2 text-sm font-bold text-slate-800">Tipos de operación</p>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
         {OPERATION_TYPES.map((type) => (
           <Switch
@@ -1359,7 +1359,7 @@ function OperationTypeSwitches({ values, onChange }) {
             description={
               type === "Recambio"
                 ? "Usado por las facturas de recambio."
-                : "Disponible en pre-ordenes, ordenes y presupuestos."
+                : "Disponible en pre-órdenes, órdenes y presupuestos."
             }
             checked={selected.includes(type)}
             onChange={(checked) => toggle(type, checked)}

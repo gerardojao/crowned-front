@@ -80,7 +80,7 @@ const ensureOk = (res) => {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
     throw new Error(
-      data?.message || data?.Message || "La operacion no se pudo completar.",
+      data?.message || data?.Message || "La operación no se pudo completar.",
     );
   }
   return data;
@@ -709,7 +709,7 @@ export default function RegisterBudget() {
     if (budget.ClienteId) {
       clearVehicleForQuickCreate();
       setQuickCreateNotice(
-        `Cliente seleccionado. Completa los datos del nuevo vehiculo de ${budget.Cliente}.`,
+        `Cliente seleccionado. Completa los datos del nuevo vehículo de ${budget.Cliente}.`,
       );
     }
 
@@ -740,7 +740,7 @@ export default function RegisterBudget() {
         await fillCustomerOnlyForNewVehicle(customer);
         setCustomerVehicles([]);
         setQuickCreateNotice(
-          `Cliente seleccionado. No tiene vehiculos registrados; puedes agregar uno desde alta rapida.`,
+          `Cliente seleccionado. No tiene vehículos registrados; puedes agregar uno desde alta rápida.`,
         );
         return;
       }
@@ -748,7 +748,7 @@ export default function RegisterBudget() {
       await fillCustomerOnlyForNewVehicle(customer);
       setCustomerVehicles(vehicles);
       setQuickCreateNotice(
-        `Selecciona un vehiculo de ${customer.Nombre} para el presupuesto.`,
+        `Selecciona un vehículo de ${customer.Nombre} para el presupuesto.`,
       );
     } catch (err) {
       console.error(err);
@@ -853,11 +853,11 @@ export default function RegisterBudget() {
           );
           vehicle = normalizeVehicle(firstResponseItem(createdVehicle) || {});
           setNotice(
-            "Cliente existente cargado y vehiculo agregado al presupuesto.",
+            "Cliente existente cargado y vehículo agregado al presupuesto.",
           );
         } else {
           setNotice(
-            "Cliente y vehiculo existentes cargados en el presupuesto.",
+            "Cliente y vehículo existentes cargados en el presupuesto.",
           );
         }
 
@@ -884,7 +884,7 @@ export default function RegisterBudget() {
 
       setNotice(
         shouldCreateVehicle
-          ? "Cliente registrado con vehiculo y cargado en el presupuesto."
+          ? "Cliente registrado con vehículo y cargado en el presupuesto."
           : "Cliente registrado y cargado en el presupuesto.",
       );
       setShowNewCustomer(false);
@@ -1529,7 +1529,7 @@ export default function RegisterBudget() {
                   value={budget.CodigoPostal}
                   onChange={handleChange}
                   className={cls}
-                  placeholder="Codigo postal"
+                  placeholder="Código postal"
                 />
                 <input
                   name="Poblacion"
@@ -1596,7 +1596,7 @@ export default function RegisterBudget() {
                   value={budget.FechaMatriculacion}
                   onChange={handleChange}
                   className={cls}
-                  title="Fecha matriculacion"
+                  title="Fecha matriculación"
                 />
                 <input
                   name="Motor"
@@ -1742,7 +1742,7 @@ export default function RegisterBudget() {
                 />
 
                 <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  Lineas de detalle / costes
+                  Líneas de detalle / costes
                 </div>
 
                 <div className="md:col-span-4 flex justify-end">
@@ -1751,7 +1751,7 @@ export default function RegisterBudget() {
                     onClick={addManualDetailLine}
                     className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
                   >
-                    Agregar linea
+                    Agregar línea
                   </button>
                 </div>
 
@@ -1810,7 +1810,7 @@ export default function RegisterBudget() {
                   <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600"></div>
                     <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      <div>Codigo</div>
+                      <div>Código</div>
                       <div>Seccion</div>
                       <div>Detalle del presupuesto</div>
                       <div>Tiempo/Cant.</div>
@@ -1839,7 +1839,7 @@ export default function RegisterBudget() {
                                 )
                               }
                               className={cls}
-                              placeholder="Codigo"
+                              placeholder="Código"
                             />
                             <select
                               value={section}
@@ -1942,7 +1942,7 @@ export default function RegisterBudget() {
                               type="button"
                               onClick={() => removeDetailItem(item.id)}
                               className="inline-flex items-center justify-center rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100"
-                              aria-label="Eliminar linea"
+                              aria-label="Eliminar línea"
                             >
                               <Trash2 size={16} />
                             </button>

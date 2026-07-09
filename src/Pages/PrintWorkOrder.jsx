@@ -710,7 +710,7 @@ export default function PrintWorkOrder() {
                   <td>{isCustody ? "PENDIENTE" : "-"}</td>
                 </tr>
                 <tr>
-                  <th>Tipo de Operacion</th>
+                  <th>Tipo de Operación</th>
                   <td>{operationType}</td>
                 </tr>
               </tbody>
@@ -802,7 +802,7 @@ export default function PrintWorkOrder() {
 
         <section className="wo-body">
           <div className="wo-section-head">
-            <span>Codigo operacion</span>
+            <span>Código operación</span>
             <span>Descripcion</span>
             <span />
           </div>

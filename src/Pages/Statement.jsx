@@ -860,10 +860,10 @@ function downloadProfitAndLossExcel(report, filename) {
           <tr class="spacer"><td colspan="6"></td></tr>
 
           <tr>
-            <td class="section" colspan="6">Ingresos por categoria</td>
+            <td class="section" colspan="6">Ingresos por categoría</td>
           </tr>
           <tr>
-            <td class="head" colspan="2">Categoria</td>
+            <td class="head" colspan="2">Categoría</td>
             <td class="head">Participacion</td>
             <td class="head">Importe</td>
             <td class="head">IVA</td>
@@ -880,10 +880,10 @@ function downloadProfitAndLossExcel(report, filename) {
           <tr class="spacer"><td colspan="6"></td></tr>
 
           <tr>
-            <td class="section" colspan="6">Gastos por categoria</td>
+            <td class="section" colspan="6">Gastos por categoría</td>
           </tr>
           <tr>
-            <td class="head" colspan="2">Categoria</td>
+            <td class="head" colspan="2">Categoría</td>
             <td class="head">Clasificacion</td>
             <td class="head">Participacion</td>
             <td class="head" colspan="2">Importe</td>

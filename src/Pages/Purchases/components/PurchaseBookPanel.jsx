@@ -487,7 +487,7 @@ const exportExcel = async () => {
               Libro de compras
             </h3>
             <p className="text-sm text-slate-500">
-              Registro fiscal de facturas recibidas, tickets, rappels y abonos.
+              Registro fiscal de facturas recibidas, facturas simplificadas, rappels y abonos.
             </p>
           </div>
 

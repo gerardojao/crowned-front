@@ -45,12 +45,12 @@ const tourCatalog = {
       {
         target: '[data-tour="menu-order"]',
         content:
-          "Desde el menu tambien puedes iniciar ordenes o pre-ordenes rapidamente.",
+          "Desde el menú también puedes iniciar órdenes o pre-órdenes rápidamente.",
       },
       {
         target: '[data-tour="menu-customers"]',
         content:
-          "Este acceso abre la gestion de clientes y vehiculos.",
+          "Este acceso abre la gestión de clientes y vehículos.",
       },
       {
         target: '[data-tour="menu-suppliers"]',
@@ -65,7 +65,7 @@ const tourCatalog = {
       {
         target: '[data-tour="menu-alerts"]',
         content:
-          "Las alertas de clientes tambien estan disponibles desde el menu.",
+          "Las alertas de clientes también están disponibles desde el menú.",
       },
     ],
   },
@@ -85,12 +85,12 @@ const tourCatalog = {
       {
         target: '[data-tour="home-customers"]',
         content:
-          "Gestiona clientes y sus vehiculos desde el modulo de clientes.",
+          "Gestiona clientes y sus vehículos desde el módulo de clientes.",
       },
       {
         target: '[data-tour="home-suppliers"]',
         content:
-          "Accede a proveedores, repuestos o materiales facturados desde este modulo.",
+          "Accede a proveedores, repuestos o materiales facturados desde este módulo.",
       },
       {
         target: '[data-tour="home-balance"]',
@@ -110,12 +110,12 @@ const tourCatalog = {
       {
         target: '[data-tour="work-order-customer-search"]',
         content:
-          "Busca un cliente por nombre, telefono, matricula o modelo antes de crear la orden.",
+          "Busca un cliente por nombre, teléfono, matrícula o modelo antes de crear la orden.",
       },
       {
         target: '[data-tour="work-order-form"]',
         content:
-          "Cuando selecciones cliente y vehiculo, completa aqui los datos de la orden.",
+          "Cuando selecciones cliente y vehículo, completa aquí los datos de la orden.",
       },
       {
         target: '[data-tour="work-order-save"]',
@@ -140,7 +140,7 @@ const tourCatalog = {
       {
         target: '[data-tour="customer-vehicles"]',
         content:
-          "Cuando editas un cliente, aqui puedes agregar o modificar sus vehiculos.",
+          "Cuando editas un cliente, aquí puedes agregar o modificar sus vehículos.",
       },
     ],
   },

@@ -762,7 +762,7 @@ export default function ReprintInvoice() {
                 value={rectForm.motivo}
                 onChange={(e) => handleRectFormChange("motivo", e.target.value)}
                 rows={3}
-                placeholder="Error en factura, devolucion, ajuste acordado..."
+                placeholder="Error en factura, devolución, ajuste acordado..."
                 className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-900 focus:border-rose-500 focus:outline-none focus:ring-2 focus:ring-rose-100"
                 required
               />

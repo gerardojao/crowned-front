@@ -51,7 +51,7 @@ export default function PurchasesDashboard({
             <Loader />
           </div>
         ) : pendingInvoices.length === 0 ? (
-          <EmptyState text="Todavia no hay facturas pendientes de proveedor." />
+          <EmptyState text="Todavía no hay facturas pendientes de proveedor." />
         ) : (
           <div className="divide-y divide-slate-100">
             {pendingInvoices.map((invoice) => (
@@ -83,7 +83,7 @@ export default function PurchasesDashboard({
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <div>
             <h3 className="text-sm font-bold text-slate-800">
-              Ultimos albaranes
+              Últimos albaranes
             </h3>
             <p className="text-xs text-slate-500">
               Entradas recientes de material.
@@ -103,7 +103,7 @@ export default function PurchasesDashboard({
             <Loader />
           </div>
         ) : recentNotes.length === 0 ? (
-          <EmptyState text="Todavia no hay albaranes registrados." />
+          <EmptyState text="Todavía no hay albaranes registrados." />
         ) : (
           <div className="divide-y divide-slate-100">
             {recentNotes.map((note) => (

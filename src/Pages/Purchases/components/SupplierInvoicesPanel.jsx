@@ -9,6 +9,12 @@ import {
   sumInvoiceLines,
 } from "../utils/purchaseCalculations";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
+import {
+  buildQuickProviderPayload,
+  emptyQuickProviderForm,
+  getCreatedProviderId,
+  validateQuickProviderForm,
+} from "../utils/supplierQuickCreate";
 
 const createEmptyLine = () => ({
   id: crypto.randomUUID(),
@@ -48,7 +54,11 @@ export default function SupplierInvoicesPanel({
   const [showForm, setShowForm] = useState(false);
   const [invoiceLines, setInvoiceLines] = useState([createEmptyLine()]);
   const [form, setForm] = useState(initialForm);
-  const { providers } = useProviders();
+  const [showQuickProvider, setShowQuickProvider] = useState(false);
+  const [quickProvider, setQuickProvider] = useState(emptyQuickProviderForm);
+  const [quickProviderErrors, setQuickProviderErrors] = useState({});
+  const [savingQuickProvider, setSavingQuickProvider] = useState(false);
+  const { providers, reloadProviders } = useProviders();
   const { expenseTypes } = useExpenseTypes();
 
   const invoiceTotals = sumInvoiceLines(invoiceLines);
@@ -86,6 +96,69 @@ export default function SupplierInvoicesPanel({
       proveedorId: selectedId,
       proveedor: providerName,
     }));
+  };
+
+  const setQuickProviderField = (name, value) => {
+    setQuickProvider((prev) => ({ ...prev, [name]: value }));
+    if (quickProviderErrors[name]) {
+      setQuickProviderErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  const resetQuickProvider = () => {
+    setQuickProvider(emptyQuickProviderForm);
+    setQuickProviderErrors({});
+  };
+
+  const handleQuickProviderCreate = async () => {
+    if (savingQuickProvider) return;
+
+    const errors = validateQuickProviderForm(quickProvider);
+    setQuickProviderErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    const payload = buildQuickProviderPayload(quickProvider);
+
+    try {
+      setSavingQuickProvider(true);
+      const res = await api.post("/Proveedor", payload);
+
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(
+          res?.data?.message ||
+            res?.data?.Message ||
+            "No se pudo registrar el proveedor.",
+        );
+      }
+
+      const createdId = getCreatedProviderId(res?.data);
+      const updatedProviders = await reloadProviders();
+      const createdProvider =
+        updatedProviders.find((provider) => {
+          const id = provider.id ?? provider.Id;
+          return String(id) === String(createdId);
+        }) || null;
+
+      setForm((prev) => ({
+        ...prev,
+        proveedorId: createdId ? String(createdId) : prev.proveedorId,
+        proveedor:
+          createdProvider?.nombre ??
+          createdProvider?.Nombre ??
+          payload.nombre,
+      }));
+      resetQuickProvider();
+      setShowQuickProvider(false);
+    } catch (err) {
+      alert(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo registrar el proveedor.",
+      );
+    } finally {
+      setSavingQuickProvider(false);
+    }
   };
 
   const setInvoiceLineField = (id, field, value) => {
@@ -272,7 +345,7 @@ export default function SupplierInvoicesPanel({
               />
             </div>
 
-            <div className="md:col-span-2">
+            <div className="relative md:col-span-2">
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Proveedor
               </label>
@@ -299,15 +372,168 @@ export default function SupplierInvoicesPanel({
 
                 <button
                   type="button"
-                  onClick={() =>
-                    alert("Aquí abriremos el alta rápida de proveedor.")
-                  }
+                  onClick={() => setShowQuickProvider(true)}
                   className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-50"
                 >
                   + Nuevo
                 </button>
               </div>
 
+              {showQuickProvider && (
+                <>
+                  <button
+                    type="button"
+                    aria-label="Cerrar alta rapida de proveedor"
+                    onClick={() => {
+                      resetQuickProvider();
+                      setShowQuickProvider(false);
+                    }}
+                    className="fixed inset-0 z-20 cursor-default bg-black/35"
+                  />
+
+                  <div className="absolute left-0 right-0 top-0 z-30 -mt-1 rounded-2xl bg-white p-4 shadow-xl ring-1 ring-slate-200">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-base font-bold text-slate-900">
+                        Alta rapida de proveedor
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Crea el proveedor y seleccionalo en esta factura.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        resetQuickProvider();
+                        setShowQuickProvider(false);
+                      }}
+                      className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                    >
+                      Cerrar
+                    </button>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        Nombre *
+                      </label>
+                      <input
+                        type="text"
+                        value={quickProvider.nombre}
+                        onChange={(e) =>
+                          setQuickProviderField("nombre", e.target.value)
+                        }
+                        className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                          quickProviderErrors.nombre
+                            ? "border-rose-400 ring-1 ring-rose-200"
+                            : "border-slate-300"
+                        }`}
+                        placeholder="Nombre del proveedor"
+                      />
+                      {quickProviderErrors.nombre && (
+                        <p className="mt-1 text-xs text-rose-600">
+                          {quickProviderErrors.nombre}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        Telefono *
+                      </label>
+                      <input
+                        type="text"
+                        value={quickProvider.telefono}
+                        onChange={(e) =>
+                          setQuickProviderField("telefono", e.target.value)
+                        }
+                        className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                          quickProviderErrors.telefono
+                            ? "border-rose-400 ring-1 ring-rose-200"
+                            : "border-slate-300"
+                        }`}
+                        placeholder="Telefono"
+                      />
+                      {quickProviderErrors.telefono && (
+                        <p className="mt-1 text-xs text-rose-600">
+                          {quickProviderErrors.telefono}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        NIF/CIF
+                      </label>
+                      <input
+                        type="text"
+                        value={quickProvider.nifCif}
+                        onChange={(e) =>
+                          setQuickProviderField("nifCif", e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="B12345678"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        Categoria
+                      </label>
+                      <input
+                        type="text"
+                        value={quickProvider.categoria}
+                        onChange={(e) =>
+                          setQuickProviderField("categoria", e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="Repuestos, pintura, servicios..."
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-slate-700">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={quickProvider.email}
+                        onChange={(e) =>
+                          setQuickProviderField("email", e.target.value)
+                        }
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="correo@email.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex justify-end gap-3">
+                    <button
+                      type="button"
+                      disabled={savingQuickProvider}
+                      onClick={() => {
+                        resetQuickProvider();
+                        setShowQuickProvider(false);
+                      }}
+                      className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      Cancelar
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={savingQuickProvider}
+                      onClick={handleQuickProviderCreate}
+                      className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                    >
+                      {savingQuickProvider ? "Guardando..." : "Crear proveedor"}
+                    </button>
+                  </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <div>
@@ -349,7 +575,7 @@ export default function SupplierInvoicesPanel({
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               >
                 <option value="Factura">Factura</option>
-                <option value="Ticket">Ticket</option>
+                <option value="Ticket">Factura simplificada</option>
                 <option value="Rappel">Rappel</option>
                 <option value="Abono">Abono</option>
               </select>

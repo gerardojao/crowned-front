@@ -473,9 +473,9 @@ export default function AccountsReceivable() {
                     label="Vence"
                     value={dateOnly(factura.fechaVencimiento ?? factura.FechaVencimiento)}
                   />
-                  <Info label="Matricula" value={factura.matricula ?? factura.Matricula ?? "-"} />
+                  <Info label="Matrícula" value={factura.matricula ?? factura.Matricula ?? "-"} />
                   {atraso > 0 && (
-                    <Info label="Dias atraso" value={`${atraso} dia${atraso === 1 ? "" : "s"}`} />
+                    <Info label="Días atraso" value={`${atraso} día${atraso === 1 ? "" : "s"}`} />
                   )}
                   <Info
                     label="Total"

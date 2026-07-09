@@ -529,7 +529,7 @@ export default function PrintBudget() {
                     <td>{budget.estado || "PENDIENTE"}</td>
                   </tr>
                   <tr>
-                    <th>Tipo Operacion</th>
+                    <th>Tipo Operación</th>
                     <td>{operationType}</td>
                   </tr>
                 </tbody>
@@ -587,7 +587,7 @@ export default function PrintBudget() {
               <tr>
                 <td>-</td>
                 <td>{formatDateShort(budget.fecha)}</td>
-                <td>12 dias</td>
+                <td>12 días</td>
                 <td>{budget.kilometraje || "-"}</td>
                 <td>-</td>
                 <td>{[budget.marca, budget.modelo].filter(Boolean).join(" ") || "-"}</td>
@@ -600,7 +600,7 @@ export default function PrintBudget() {
               <tr>
                 <th>Matricula</th>
                 <th>Nº peritacion</th>
-                <th>F. matriculacion</th>
+                <th>F. matriculación</th>
                 <th>Nº de chasis</th>
                 <th>Nº motor</th>
                 <th>Estado</th>
@@ -638,8 +638,8 @@ export default function PrintBudget() {
           </section>
 
           <div className="budget-mt-validity">
-            Este presupuesto tiene una validez de 12 dias habiles a partir del
-            dia siguiente en el que es entregado al cliente.
+            Este presupuesto tiene una validez de 12 días hábiles a partir del
+            día siguiente en el que es entregado al cliente.
           </div>
           <div className="budget-mt-pending">
             {budget.observaciones || "Pendiente configurar"}
@@ -825,7 +825,7 @@ export default function PrintBudget() {
               <p className="font-extrabold">CONDICIONES DEL PRESUPUESTO</p>
 
               <p className="mt-2 italic font-semibold leading-5">
-                Este presupuesto tiene validez de 15 dias desde su fecha de
+                Este presupuesto tiene validez de 15 días desde su fecha de
                 emision. La aceptacion del presupuesto autoriza el inicio de los
                 trabajos indicados.
               </p>

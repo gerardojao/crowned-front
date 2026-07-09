@@ -589,7 +589,7 @@ export default function InvoiceHistory() {
                 type="text"
                 value={invoiceNumber}
                 onChange={(e) => setInvoiceNumber(e.target.value)}            
-                placeholder="Cliente, factura, matricula..."
+                placeholder="Cliente, factura, matrícula..."
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
             </div> */}
@@ -601,7 +601,7 @@ export default function InvoiceHistory() {
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Factura, matricula, cliente..."
+              placeholder="Factura, matrícula, cliente..."
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
             />
           </div>

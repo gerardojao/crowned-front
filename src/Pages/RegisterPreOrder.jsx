@@ -57,7 +57,7 @@ function ensureOk(res) {
   const data = res?.data;
   if (data?.ok === 0 || data?.Ok === 0) {
     throw new Error(
-      data?.message || data?.Message || "La operacion no se pudo completar.",
+      data?.message || data?.Message || "La operación no se pudo completar.",
     );
   }
   return data;
@@ -322,7 +322,7 @@ export default function RegisterPreOrder() {
       setTotal(pickTotal(res));
     } catch (err) {
       console.error(err);
-      setError("No se pudieron cargar las pre-ordenes.");
+      setError("No se pudieron cargar las pre-órdenes.");
     } finally {
       setLoading(false);
     }
@@ -426,7 +426,7 @@ export default function RegisterPreOrder() {
       );
       if (exact.length > 1) {
         throw new Error(
-          "Hay varios clientes con ese nombre. Selecciona el cliente desde el buscador antes de guardar el vehiculo.",
+          "Hay varios clientes con ese nombre. Selecciona el cliente desde el buscador antes de guardar el vehículo.",
         );
       }
       if (exact.length === 1) return exact[0];
@@ -581,7 +581,7 @@ export default function RegisterPreOrder() {
         await fillCustomerOnlyForNewVehicle(customer);
         setShowNewCustomer(true);
         setQuickCreateNotice(
-          "Cliente seleccionado. Completa los datos del nuevo vehiculo.",
+          "Cliente seleccionado. Completa los datos del nuevo vehículo.",
         );
         setWarningModal(
           "Este cliente no tiene coche asignado. Agrega un coche para poder completar la pre-orden.",
@@ -647,11 +647,11 @@ export default function RegisterPreOrder() {
       return setError("Indica el telefono del cliente para registrarlo.");
     if (!payload.matricula?.trim())
       return setError(
-        "Indica la matricula del vehiculo para registrar el cliente.",
+        "Indica la matrícula del vehículo para registrar el cliente.",
       );
     if (!payload.modelo?.trim())
       return setError(
-        "Indica el modelo del vehiculo para registrar el cliente.",
+        "Indica el modelo del vehículo para registrar el cliente.",
       );
 
     try {
@@ -677,10 +677,10 @@ export default function RegisterPreOrder() {
           );
           vehicle = normalizeVehicle(firstResponseItem(createdVehicle) || {});
           setNotice(
-            "Cliente existente cargado y vehiculo agregado a la pre-orden.",
+            "Cliente existente cargado y vehículo agregado a la pre-orden.",
           );
         } else {
-          setNotice("Cliente y vehiculo existentes cargados en la pre-orden.");
+          setNotice("Cliente y vehículo existentes cargados en la pre-orden.");
         }
 
         await fillFromCustomer(existingCustomer, vehicle);
@@ -939,10 +939,10 @@ export default function RegisterPreOrder() {
           <div className="mt-2 mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="text-2xl font-semibold text-slate-900">
-                Pre-ordenes
+                Pre-órdenes
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Recepcion inicial del vehiculo antes de convertirla en orden de
+                Recepción inicial del vehículo antes de convertirla en orden de
                 trabajo.
               </p>
             </div>
@@ -969,7 +969,7 @@ export default function RegisterPreOrder() {
 
           <section className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-3">
             <Metric label="Pendientes en pantalla" value={pendingCount} />
-            <Metric label="Total pre-ordenes" value={total} />
+            <Metric label="Total pre-órdenes" value={total} />
             <Metric label="Pagina" value={`${page}/${totalPages}`} />
           </section>
 
@@ -994,7 +994,7 @@ export default function RegisterPreOrder() {
                   value={customerSearch}
                   onChange={(event) => setCustomerSearch(event.target.value)}
                   className={`${cls} pl-10`}
-                  placeholder="Nombre, telefono, matricula o modelo"
+                  placeholder="Nombre, teléfono, matrícula o modelo"
                 />
                 <Search
                   size={16}
@@ -1047,14 +1047,14 @@ export default function RegisterPreOrder() {
 
               {loadingCustomerVehicles && (
                 <p className="mt-3 text-sm text-slate-500">
-                  Cargando vehiculos del cliente...
+                  Cargando vehículos del cliente...
                 </p>
               )}
 
               {selectedCustomerForVehicles && customerVehicles.length > 1 && (
                 <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3">
                   <p className="mb-2 text-sm font-semibold text-emerald-900">
-                    Selecciona el vehiculo de{" "}
+                    Selecciona el vehículo de{" "}
                     {selectedCustomerForVehicles.Nombre}
                   </p>
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -1068,7 +1068,7 @@ export default function RegisterPreOrder() {
                         className="rounded-xl border border-emerald-200 bg-white p-3 text-left text-sm hover:border-emerald-400 hover:bg-emerald-50"
                       >
                         <span className="block font-semibold text-slate-900">
-                          {vehicle.Matricula || "Sin matricula"}
+                          {vehicle.Matricula || "Sin matrícula"}
                         </span>
                         <span className="mt-1 block text-slate-600">
                           {vehicle.Marca || "-"} {vehicle.Modelo || ""}
@@ -1102,14 +1102,14 @@ export default function RegisterPreOrder() {
                 >
                   <UserPlus size={17} />
                   {showNewCustomer
-                    ? "Ocultar alta rapida"
+                    ? "Ocultar alta rápida"
                     : form.ClienteId
-                      ? "Agregar otro vehiculo"
+                      ? "Agregar otro vehículo"
                       : "Registrar nuevo"}
                 </button>
                 {showNewCustomer && form.ClienteId && (
                   <p className="mt-2 text-xs font-medium text-emerald-700">
-                    Se guardara como nuevo vehiculo de {form.Cliente}.
+                    Se guardará como nuevo vehículo de {form.Cliente}.
                   </p>
                 )}
                 {showNewCustomer && (
@@ -1122,7 +1122,7 @@ export default function RegisterPreOrder() {
                     {savingCustomer
                       ? "Guardando..."
                       : form.ClienteId
-                        ? "Guardar vehiculo en cliente"
+                        ? "Guardar vehículo en cliente"
                         : "Guardar cliente nuevo"}
                   </button>
                 )}
@@ -1381,7 +1381,7 @@ export default function RegisterPreOrder() {
           <section className="rounded-2xl bg-white/80 p-4 shadow-sm ring-1 ring-slate-200 md:p-6">
             <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <h3 className="text-lg font-semibold text-slate-800">
-                Pre-ordenes recientes
+                Pre-órdenes recientes
               </h3>
               <div className="relative w-full md:max-w-sm">
                 <Search
@@ -1396,7 +1396,7 @@ export default function RegisterPreOrder() {
                     setSearch(event.target.value);
                   }}
                   className={`${cls} pl-10`}
-                  placeholder="Buscar cliente, matricula, motivo..."
+                  placeholder="Buscar cliente, matrícula, motivo..."
                 />
               </div>
             </div>
@@ -1527,13 +1527,13 @@ export default function RegisterPreOrder() {
 
               {!loading && items.length === 0 && (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center text-slate-500 lg:col-span-2">
-                  No hay pre-ordenes para mostrar.
+                  No hay pre-órdenes para mostrar.
                 </div>
               )}
 
               {loading && (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-10 text-center text-slate-500 lg:col-span-2">
-                  Cargando pre-ordenes...
+                  Cargando pre-órdenes...
                 </div>
               )}
             </div>
@@ -1570,7 +1570,7 @@ export default function RegisterPreOrder() {
           open={!!photoTarget}
           onClose={closePhotosModal}
           preOrderId={photoTarget.Id}
-          title="Fotos del vehiculo"
+          title="Fotos del vehículo"
           subtitle={`${photoTarget.Matricula || ""} - ${photoTarget.Cliente || ""}`}
           canUpload={!photoTarget.ConvertidaEnOrden}
           context={{

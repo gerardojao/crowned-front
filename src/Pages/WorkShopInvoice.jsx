@@ -557,7 +557,7 @@ export default function WorkshopInvoice() {
 
   const setTipoPago = (tipoPago) => {
     if (tipoPago === "Credito" && !accountsReceivableEnabled) {
-      setError("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+      setError("El módulo de cuentas por cobrar no está habilitado para este taller.");
       return;
     }
 
@@ -707,7 +707,7 @@ const saveIssuedInvoice = async () => {
     );
 
   if (billableItems.length === 0) {
-    throw new Error("La factura debe tener al menos una linea con importe mayor que 0.");
+    throw new Error("La factura debe tener al menos una línea con importe mayor que 0.");
   }
 
   const payload = {
@@ -749,7 +749,7 @@ const printInvoice = async () => {
     }
 
     if (isCredit && !accountsReceivableEnabled) {
-      throw new Error("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+      throw new Error("El módulo de cuentas por cobrar no está habilitado para este taller.");
     }
 
     if (!isCredit && !hasPaymentMethods) {
@@ -1064,7 +1064,7 @@ const printInvoice = async () => {
             />
             <input
               className={clientFieldsLocked ? lockedInputCls : inputCls}
-              placeholder="Codigo postal"
+              placeholder="Código postal"
               value={invoice.codigoPostalCliente}
               readOnly={clientFieldsLocked}
               onChange={(e) =>
@@ -1190,8 +1190,8 @@ const printInvoice = async () => {
                       setInvoiceField("plazoCreditoDias", Number(e.target.value))
                     }
                   >
-                    <option value={30}>30 dias</option>
-                    <option value={60}>60 dias</option>
+                    <option value={30}>30 días</option>
+                    <option value={60}>60 días</option>
                   </select>
                 </label>
 
@@ -1304,7 +1304,7 @@ const printInvoice = async () => {
             <PartPicker
               onSelect={addPartItem}
               placeholder="Buscar repuesto"
-              buttonLabel="Agregar linea"
+              buttonLabel="Agregar línea"
               className="w-full sm:w-80"
             />
 
@@ -1339,7 +1339,7 @@ const printInvoice = async () => {
               className="inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 bg-slate-700 text-white hover:bg-slate-800 transition text-sm"
             >
               <Plus size={16} />
-              Anadir linea
+              Añadir línea
             </button>
           </div>
         </div>
@@ -1389,7 +1389,7 @@ const printInvoice = async () => {
                   <>
                     <input
                       className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Codigo"
+                      placeholder="Código"
                       value={item.codigo || ""}
                       onChange={(e) => setItemField(index, "codigo", e.target.value)}
                     />

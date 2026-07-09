@@ -13,6 +13,12 @@ import {
   X,
 } from "lucide-react";
 import api from "../Components/api";
+import {
+  buildQuickProviderPayload,
+  emptyQuickProviderForm,
+  getCreatedProviderId,
+  validateQuickProviderForm,
+} from "./Purchases/utils/supplierQuickCreate";
 
 const eur = new Intl.NumberFormat("es-ES", {
   style: "currency",
@@ -127,6 +133,10 @@ export default function StockParts() {
   const [form, setForm] = useState(emptyPartForm);
   const [editingPartId, setEditingPartId] = useState(null);
   const [savingPart, setSavingPart] = useState(false);
+  const [showQuickProvider, setShowQuickProvider] = useState(false);
+  const [quickProvider, setQuickProvider] = useState(emptyQuickProviderForm);
+  const [quickProviderErrors, setQuickProviderErrors] = useState({});
+  const [savingQuickProvider, setSavingQuickProvider] = useState(false);
   const [quantityModal, setQuantityModal] = useState({
     open: false,
     row: null,
@@ -170,10 +180,72 @@ export default function StockParts() {
       const res = await api.get("/Proveedor", {
         params: { page: 1, pageSize: 100 },
       });
-      setProviders(res?.data?.data?.[0]?.items || []);
+      const items = res?.data?.data?.[0]?.items || [];
+      setProviders(items);
+      return items;
     } catch (err) {
       console.error(err);
       setProviders([]);
+      return [];
+    }
+  };
+
+  const setQuickProviderField = (name, value) => {
+    setQuickProvider((prev) => ({ ...prev, [name]: value }));
+    if (quickProviderErrors[name]) {
+      setQuickProviderErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
+  };
+
+  const resetQuickProvider = () => {
+    setQuickProvider(emptyQuickProviderForm);
+    setQuickProviderErrors({});
+  };
+
+  const createQuickProvider = async () => {
+    if (savingQuickProvider) return;
+
+    const errors = validateQuickProviderForm(quickProvider);
+    setQuickProviderErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    const payload = buildQuickProviderPayload(quickProvider);
+
+    try {
+      setSavingQuickProvider(true);
+      const res = await api.post("/Proveedor", payload);
+
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(
+          res?.data?.message ||
+            res?.data?.Message ||
+            "No se pudo registrar el proveedor.",
+        );
+      }
+
+      const createdId = getCreatedProviderId(res?.data);
+      await loadProviders();
+
+      if (createdId) {
+        setForm((current) => ({
+          ...current,
+          idProveedor: String(createdId),
+        }));
+      }
+
+      resetQuickProvider();
+      setShowQuickProvider(false);
+    } catch (err) {
+      setNotice({
+        type: "error",
+        text:
+          err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo registrar el proveedor.",
+      });
+    } finally {
+      setSavingQuickProvider(false);
     }
   };
 
@@ -580,7 +652,7 @@ export default function StockParts() {
     if (!numeroFactura) {
       setNotice({
         type: "error",
-        text: "Indica factura o albaran antes de marcar como pagado.",
+        text: "Indica factura o albarán antes de marcar como pagado.",
       });
       return;
     }
@@ -681,7 +753,7 @@ export default function StockParts() {
       cancelBilledEdit();
       setNotice({
         type: "success",
-        text: "Linea de rentabilidad actualizada correctamente.",
+        text: "Línea de rentabilidad actualizada correctamente.",
       });
     } catch (err) {
       console.error(err);
@@ -690,7 +762,7 @@ export default function StockParts() {
         text:
           err?.response?.data?.message ||
           err?.message ||
-          "No se pudo actualizar la linea.",
+          "No se pudo actualizar la línea.",
       });
     } finally {
       setSavingBilled(false);
@@ -710,7 +782,7 @@ export default function StockParts() {
           <p className="mt-1 text-sm text-slate-500">
             {!isInventoryView
               ? "Margen real por concepto vendido desde facturas emitidas."
-              : "Inventario, stock mÃ­nimo y rentabilidad de repuestos facturados."}
+              : "Inventario, stock mínimo y rentabilidad de repuestos facturados."}
           </p>
         </div>
 
@@ -807,7 +879,7 @@ export default function StockParts() {
                 }
               />
               <Input
-                label="Factura / albaran"
+                label="Factura / albarán"
                 value={form.numeroFactura}
                 onChange={(v) => setForm((f) => ({ ...f, numeroFactura: v }))}
               />
@@ -822,7 +894,7 @@ export default function StockParts() {
                 onChange={(v) => setForm((f) => ({ ...f, marca: v }))}
               />
               <Input
-                label="Categoria"
+                label="Categoría"
                 value={form.categoria}
                 onChange={(v) => setForm((f) => ({ ...f, categoria: v }))}
               />
@@ -836,7 +908,7 @@ export default function StockParts() {
               <Input
                 type="number"
                 step="1"
-                label="Stock minimo"
+                label="Stock mínimo"
                 value={form.stockMinimo}
                 onChange={(v) => setForm((f) => ({ ...f, stockMinimo: v }))}
               />
@@ -860,26 +932,194 @@ export default function StockParts() {
                 onChange={(v) => setForm((f) => ({ ...f, ubicacion: v }))}
               />
 
-              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                Proveedor
-                <select
-                  value={form.idProveedor}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, idProveedor: e.target.value }))
-                  }
-                  className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                >
-                  <option value="">Sin proveedor</option>
-                  {providers.map((provider) => {
-                    const id = getProviderId(provider);
-                    return (
-                      <option key={id} value={id}>
-                        {getProviderName(provider)}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
+              <div className="relative flex flex-col gap-1 text-sm font-medium text-slate-700">
+                <span>Proveedor</span>
+                <div className="flex gap-2">
+                  <select
+                    value={form.idProveedor}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, idProveedor: e.target.value }))
+                    }
+                    className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  >
+                    <option value="">Sin proveedor</option>
+                    {providers.map((provider) => {
+                      const id = getProviderId(provider);
+                      return (
+                        <option key={id} value={id}>
+                          {getProviderName(provider)}
+                        </option>
+                      );
+                    })}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickProvider(true)}
+                    className="shrink-0 rounded-xl bg-white px-3 py-2 text-sm font-semibold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-50"
+                  >
+                    + Nuevo
+                  </button>
+                </div>
+
+                {showQuickProvider && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Cerrar alta rapida de proveedor"
+                      onClick={() => {
+                        resetQuickProvider();
+                        setShowQuickProvider(false);
+                      }}
+                      className="fixed inset-0 z-20 cursor-default bg-black/35"
+                    />
+
+                    <div className="absolute right-0 top-0 z-30 -mt-1 w-[min(42rem,calc(100vw-2rem))] rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <h3 className="text-base font-bold text-slate-900">
+                            Alta rapida de proveedor
+                          </h3>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Crea el proveedor y seleccionalo en este repuesto.
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetQuickProvider();
+                            setShowQuickProvider(false);
+                          }}
+                          className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                        >
+                          Cerrar
+                        </button>
+                      </div>
+
+                      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">
+                            Nombre *
+                          </label>
+                          <input
+                            type="text"
+                            value={quickProvider.nombre}
+                            onChange={(e) =>
+                              setQuickProviderField("nombre", e.target.value)
+                            }
+                            className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                              quickProviderErrors.nombre
+                                ? "border-rose-400 ring-1 ring-rose-200"
+                                : "border-slate-300"
+                            }`}
+                            placeholder="Nombre del proveedor"
+                          />
+                          {quickProviderErrors.nombre && (
+                            <p className="mt-1 text-xs text-rose-600">
+                              {quickProviderErrors.nombre}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">
+                            Telefono *
+                          </label>
+                          <input
+                            type="text"
+                            value={quickProvider.telefono}
+                            onChange={(e) =>
+                              setQuickProviderField("telefono", e.target.value)
+                            }
+                            className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                              quickProviderErrors.telefono
+                                ? "border-rose-400 ring-1 ring-rose-200"
+                                : "border-slate-300"
+                            }`}
+                            placeholder="Telefono"
+                          />
+                          {quickProviderErrors.telefono && (
+                            <p className="mt-1 text-xs text-rose-600">
+                              {quickProviderErrors.telefono}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">
+                            NIF/CIF
+                          </label>
+                          <input
+                            type="text"
+                            value={quickProvider.nifCif}
+                            onChange={(e) =>
+                              setQuickProviderField("nifCif", e.target.value)
+                            }
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                            placeholder="B12345678"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">
+                            Categoria
+                          </label>
+                          <input
+                            type="text"
+                            value={quickProvider.categoria}
+                            onChange={(e) =>
+                              setQuickProviderField("categoria", e.target.value)
+                            }
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                            placeholder="Repuestos, pintura, servicios..."
+                          />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="mb-1 block text-xs font-medium text-slate-700">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            value={quickProvider.email}
+                            onChange={(e) =>
+                              setQuickProviderField("email", e.target.value)
+                            }
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                            placeholder="correo@email.com"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex justify-end gap-3">
+                        <button
+                          type="button"
+                          disabled={savingQuickProvider}
+                          onClick={() => {
+                            resetQuickProvider();
+                            setShowQuickProvider(false);
+                          }}
+                          className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Cancelar
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={savingQuickProvider}
+                          onClick={createQuickProvider}
+                          className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
+                        >
+                          {savingQuickProvider
+                            ? "Guardando..."
+                            : "Crear proveedor"}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
 
               <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 lg:col-span-2">
                 Observaciones
@@ -929,7 +1169,7 @@ export default function StockParts() {
                   />
                   <input
                     type="search"
-                    placeholder="Buscar factura, albaran, referencia, nombre, marca, categoria o proveedor..."
+                    placeholder="Buscar factura, albarán, referencia, nombre, marca, categoría o proveedor..."
                     value={inventorySearch}
                     onChange={(e) => {
                       setInventoryPage(1);
@@ -1146,7 +1386,7 @@ export default function StockParts() {
           <section className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5">
             <div className="mb-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <h3 className="text-lg font-semibold text-slate-800">
-                Lineas facturadas
+                Líneas facturadas
               </h3>
 
               <div className="grid grid-cols-1 gap-2 md:grid-cols-[160px_160px_minmax(260px,1fr)_auto]">
@@ -1177,7 +1417,7 @@ export default function StockParts() {
                   />
                   <input
                     type="search"
-                    placeholder="Buscar factura, cliente, matricula o concepto..."
+                    placeholder="Buscar factura, cliente, matrícula o concepto..."
                     value={billedSearch}
                     onChange={(e) => {
                       setBilledPage(1);
@@ -1398,7 +1638,7 @@ export default function StockParts() {
                         colSpan={13}
                         className="py-8 text-center text-slate-500"
                       >
-                        No hay lineas facturadas para mostrar.
+                        No hay líneas facturadas para mostrar.
                       </td>
                     </tr>
                   )}
@@ -1636,7 +1876,7 @@ function PaymentModal({
         </div>
         <div className="mt-4 grid grid-cols-1 gap-3">
           <Input
-            label="Factura / albaran *"
+            label="Factura / albarán *"
             value={numeroFactura}
             onChange={onChangeNumero}
           />

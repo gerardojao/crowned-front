@@ -230,7 +230,7 @@ export default function RegisterCustomer() {
         text:
           err?.response?.data?.message ||
           err?.message ||
-          "No se pudieron cargar los vehiculos del cliente.",
+          "No se pudieron cargar los vehículos del cliente.",
       });
     } finally {
       setVehiclesLoading(false);
@@ -267,7 +267,7 @@ export default function RegisterCustomer() {
         ) {
           setNotice({
             type: "error",
-            text: "Para registrar el coche indica matricula y modelo.",
+            text: "Para registrar el coche indica matrícula y modelo.",
           });
           return;
         }
@@ -531,7 +531,7 @@ export default function RegisterCustomer() {
     ) {
       setNotice({
         type: "error",
-        text: "La matricula y el modelo del vehiculo son requeridos.",
+        text: "La matrícula y el modelo del vehículo son requeridos.",
       });
       return;
     }
@@ -571,7 +571,7 @@ export default function RegisterCustomer() {
         type: "success",
         text:
           vehicleModal.mode === "edit"
-            ? "Vehiculo actualizado correctamente."
+            ? "Vehículo actualizado correctamente."
             : "Vehiculo agregado correctamente.",
       });
     } catch (err) {
@@ -581,7 +581,7 @@ export default function RegisterCustomer() {
         text:
           err?.response?.data?.message ||
           err?.message ||
-          "No se pudo guardar el vehiculo.",
+          "No se pudo guardar el vehículo.",
       });
       setVehicleModal((current) => ({ ...current, saving: false }));
     }
@@ -814,7 +814,7 @@ export default function RegisterCustomer() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Codigo postal
+                    Código postal
                   </label>
                   <input
                     type="text"
@@ -970,7 +970,7 @@ export default function RegisterCustomer() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Fecha matriculacion
+                      Fecha matriculación
                     </label>
                     <input
                       type="date"
@@ -1108,15 +1108,15 @@ export default function RegisterCustomer() {
                   onClick={openVehicleCreate}
                   className="inline-flex items-center rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900"
                 >
-                  Agregar vehiculo
+                  Agregar vehículo
                 </button>
               </div>
 
               {vehiclesLoading ? (
-                <p className="text-sm text-slate-500">Cargando vehiculos...</p>
+                <p className="text-sm text-slate-500">Cargando vehículos...</p>
               ) : vehicles.length === 0 ? (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
-                  Este cliente no tiene vehiculos asociados todavia.
+                  Este cliente no tiene vehículos asociados todavía.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
@@ -1185,7 +1185,7 @@ export default function RegisterCustomer() {
               <h3 className="text-lg font-semibold text-slate-800">
                 {search.trim()
                   ? "Clientes registrados"
-                  : `Ultimos ${pageSize} clientes registrados`}
+                  : `Últimos ${pageSize} clientes registrados`}
               </h3>
               {!search.trim() && (
                 <p className="text-sm text-slate-500">

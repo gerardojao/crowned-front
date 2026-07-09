@@ -214,7 +214,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     if (invoiceSubmitting) return;
 
     if (selectedNotes.length === 0) {
-      alert("Selecciona al menos un albaran.");
+      alert("Selecciona al menos un albarán.");
       return;
     }
 
@@ -294,14 +294,14 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     }
 
     if (!header.numeroAlbaran.trim()) {
-      alert("Indica el numero de albaran.");
+      alert("Indica el número de albarán.");
       return;
     }
 
     const validLines = lines.filter((line) => line.nombre.trim());
 
     if (validLines.length === 0) {
-      alert("Agrega al menos una linea valida.");
+      alert("Agrega al menos una línea válida.");
       return;
     }
 
@@ -313,7 +313,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     );
 
     if (invalidLine) {
-      alert("Revisa cantidades y precios de las lineas.");
+      alert("Revisa cantidades y precios de las líneas.");
       return;
     }
 
@@ -343,7 +343,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
         throw new Error(
           res?.data?.message ||
             res?.data?.Message ||
-            "No se pudo guardar el albaran.",
+            "No se pudo guardar el albarán.",
         );
       }
 
@@ -357,7 +357,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
           err?.response?.data?.Message ||
           err?.response?.data?.detail ||
           err?.message ||
-          "No se pudo guardar el albaran.",
+          "No se pudo guardar el albarán.",
       );
     } finally {
       setSubmitting(false);
@@ -368,7 +368,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     if (!isPendingInvoice(note) || cancellingNoteId) return;
 
     const reason = window.prompt(
-      `Motivo de anulacion del albaran ${note.numeroAlbaran}:`,
+      `Motivo de anulación del albarán ${note.numeroAlbaran}:`,
     );
     if (!reason?.trim()) return;
 
@@ -385,7 +385,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
         err?.response?.data?.detail ||
           err?.response?.data?.message ||
           err?.response?.data?.Message ||
-          "No se pudo anular el albaran.",
+          "No se pudo anular el albarán.",
       );
     } finally {
       setCancellingNoteId(null);
@@ -412,7 +412,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
           >
             <Plus size={17} />
-            {showForm ? "Ocultar formulario" : "Nuevo albaran"}
+            {showForm ? "Ocultar formulario" : "Nuevo albarán"}
           </button>
         </div>
       </div>
@@ -453,7 +453,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                Numero albaran
+                Número albarán
               </label>
               <input
                 type="text"
@@ -505,14 +505,14 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
           <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between bg-slate-50 px-4 py-3">
               <h4 className="text-sm font-bold text-slate-800">
-                Lineas del albaran
+                Líneas del albarán
               </h4>
               <button
                 type="button"
                 onClick={addLine}
                 className="rounded-lg bg-white px-3 py-2 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-50"
               >
-                + Agregar linea
+                + Agregar línea
               </button>
             </div>
 
@@ -654,7 +654,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
               disabled={submitting}
               className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
             >
-              {submitting ? "Guardando..." : "Guardar albaran"}
+              {submitting ? "Guardando..." : "Guardar albarán"}
             </button>
             <button
               type="button"
@@ -676,7 +676,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold">
-                {selectedNotes.length} albaran(es) seleccionados · Total{" "}
+                {selectedNotes.length} albarán(es) seleccionados · Total{" "}
                 {formatCurrency(selectedTotals.total)}
               </p>
               <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold text-sky-800">
@@ -733,7 +733,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 Crear factura desde albaranes
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                {selectedNotes.length} albaran(es) · Total{" "}
+                {selectedNotes.length} albarán(es) · Total{" "}
                 {formatCurrency(selectedTotals.total)}
               </p>
               <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-700 sm:grid-cols-4">
@@ -890,7 +890,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 <th className="px-4 py-3 text-left">Sel.</th>
                 <th className="px-4 py-3 text-left">Fecha</th>
                 <th className="px-4 py-3 text-left">Proveedor</th>
-                <th className="px-4 py-3 text-left">Numero albaran</th>
+                <th className="px-4 py-3 text-left">Número albarán</th>
                 <th className="px-4 py-3 text-right">Base</th>
                 <th className="px-4 py-3 text-right">IVA</th>
                 <th className="px-4 py-3 text-right">Total</th>
@@ -910,10 +910,10 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 <tr>
                   <td colSpan={9} className="px-4 py-10 text-center">
                     <p className="text-sm font-semibold text-slate-700">
-                      Todavia no hay albaranes registrados.
+                      Todavía no hay albaranes registrados.
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Registra el primer albaran para controlar entradas de
+                      Registra el primer albarán para controlar entradas de
                       material.
                     </p>
                   </td>

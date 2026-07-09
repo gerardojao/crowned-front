@@ -11,9 +11,12 @@ export function useProviders() {
       const res = await api.get("/Proveedor", {
         params: { page: 1, pageSize: 100 },
       });
-      setProviders(res?.data?.data?.[0]?.items || []);
+      const items = res?.data?.data?.[0]?.items || [];
+      setProviders(items);
+      return items;
     } catch {
       setProviders([]);
+      return [];
     } finally {
       setLoadingProviders(false);
     }

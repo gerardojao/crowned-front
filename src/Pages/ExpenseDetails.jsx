@@ -49,7 +49,7 @@ function getExpenseAmount(row) {
 function getExpenseTypeName(row) {
   const type = row?.tipo ?? row?.Tipo ?? row?.nombre ?? row?.Nombre;
   if (type === "Transporte") return "Gastos Casa";
-  return type ?? "â€”";
+  return type ?? "—";
 }
 
 function getMovementBadge(row) {

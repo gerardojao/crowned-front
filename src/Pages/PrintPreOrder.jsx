@@ -157,7 +157,7 @@ export default function PrintPreOrder() {
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
   const actionTitle = "Pre-orden";
   const actionSubtitle =
-    "Revisa la recepcion inicial del vehiculo antes de convertirla en orden.";
+    "Revisa la recepción inicial del vehículo antes de convertirla en orden.";
 
   if (!preOrderModuleEnabled) {
     return (
@@ -580,7 +580,7 @@ export default function PrintPreOrder() {
                   <td>PENDIENTE</td>
                 </tr>
                 <tr>
-                  <th>Tipo de Operacion</th>
+                  <th>Tipo de Operación</th>
                   <td>{operationType}</td>
                 </tr>
               </tbody>
@@ -596,7 +596,7 @@ export default function PrintPreOrder() {
                         "-"}{" "}
                     </strong>
                     <br />
-                    <span>Matricula:</span>
+                    <span>Matrícula:</span>
                     <strong>{preOrder.matricula || "-"} </strong>
                     <br />
                     <span>CHASIS: </span>
@@ -644,7 +644,7 @@ export default function PrintPreOrder() {
             <tr>
               <th>Matricula</th>
               <th>Nº peritacion</th>
-              <th>F. matriculacion</th>
+              <th>F. matriculación</th>
               <th>Nº de chasis</th>
               <th>Nº motor</th>
               <th>Recepcion</th>

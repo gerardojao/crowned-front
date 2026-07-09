@@ -101,7 +101,7 @@ export default function PurchasesModuleScreen() {
         <div>
           <h2 className="text-2xl font-semibold text-slate-900">Compras</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Gestion de facturas recibidas, cuentas por pagar, pagos, albaranes
+            Gestión de facturas recibidas, cuentas por pagar, pagos, albaranes
             y libro de compras.
           </p>
         </div>
@@ -149,7 +149,7 @@ export default function PurchasesModuleScreen() {
               className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
             >
               <Plus size={17} />
-              Nuevo albaran
+              Nuevo albarán
             </button>
 
             <button
