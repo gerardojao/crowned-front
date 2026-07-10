@@ -662,7 +662,7 @@ export default function Layout({ children }) {
                     <>
                       <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4 text-center shadow-sm">
                         <p className="text-sm font-black text-slate-950">
-                          ¿Todavía no usas ZagaPro?
+                          ¿Todavía no usas ZagaPro-qa?
                         </p>
                         <p className="mx-auto mt-1 max-w-xl text-sm leading-6 text-slate-600">
                           Solicita una demo gratuita de 15 minutos y descubre
