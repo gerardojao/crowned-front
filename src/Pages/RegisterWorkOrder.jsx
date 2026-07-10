@@ -103,6 +103,12 @@ const getStateStyles = (estado) => {
     case "Esperando repuesto":
       return "border-orange-500 bg-orange-50/40";
 
+    case "Repuesto Recibido":
+      return "bg-indigo-50 text-indigo-700 ring-indigo-200";
+
+    case "Repuesto devuelto":
+      return "border-rose-300 bg-rose-50/40";
+
     case "Terminado":
       return "border-emerald-300 bg-emerald-50/40";
 
