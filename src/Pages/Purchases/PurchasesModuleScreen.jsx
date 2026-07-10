@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BookOpen, Plus } from "lucide-react";
 import AccountsPayablePanel from "./components/AccountsPayablePanel";
+import MiscExpensesPanel from "./components/MiscExpensesPanel";
 import PurchaseBookPanel from "./components/PurchaseBookPanel";
 import PurchasesDashboard from "./components/PurchasesDashboard";
 import PurchasesTabs from "./components/PurchasesTabs";
@@ -154,6 +155,15 @@ export default function PurchasesModuleScreen() {
 
             <button
               type="button"
+              onClick={() => setActiveTab("gastos-varios")}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+            >
+              <Plus size={17} />
+              Nuevo gasto vario
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("libro")}
               className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
             >
@@ -192,6 +202,8 @@ export default function PurchasesModuleScreen() {
               onInvoicesChanged={loadSupplierInvoices}
             />
           )}
+
+          {activeTab === "gastos-varios" && <MiscExpensesPanel />}
 
           {activeTab === "libro" && (
             <PurchaseBookPanel
