@@ -700,7 +700,7 @@ export default function PrintBudget() {
       <PrintActions
         title={labels.budgetTitle}
         subtitle={`Presupuesto ${budget.numeroPresupuesto}`}
-        backTo="/register-budget"
+        backTo="/presupuestos"
         printLabel="Imprimir"
       />
 
