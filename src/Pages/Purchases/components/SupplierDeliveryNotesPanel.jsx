@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
 import { useBankAccounts } from "../hooks/useBankAccounts";
 import { useDeliveryNotes } from "../hooks/useDeliveryNotes";
-import { useExpenseTypes } from "../hooks/useExpenseTypes";
 import { useProviders } from "../hooks/useProviders";
 import {
   calcDeliveryLine,
@@ -95,7 +94,6 @@ function buildVatBuckets(notes) {
 export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
   const { notes, loadingNotes, loadNotes } = useDeliveryNotes();
   const { bankAccounts } = useBankAccounts();
-  const { expenseTypes } = useExpenseTypes();
   const { providers } = useProviders();
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -110,7 +108,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     fecha: new Date().toISOString().slice(0, 10),
     referencia: "",
     descripcion: "",
-    tipoGastoId: "",
     estado: "Pendiente de pago",
     bankAccountId: "",
   });
@@ -133,16 +130,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     () => buildVatBuckets(selectedNotes),
     [selectedNotes],
   );
-
-  useEffect(() => {
-    if (!invoiceForm.tipoGastoId && expenseTypes.length > 0) {
-      const first = expenseTypes[0];
-      setInvoiceForm((prev) => ({
-        ...prev,
-        tipoGastoId: String(first.id ?? first.Id ?? ""),
-      }));
-    }
-  }, [expenseTypes, invoiceForm.tipoGastoId]);
 
   const resetForm = () => {
     setHeader(initialHeader);
@@ -223,11 +210,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
       return;
     }
 
-    if (!invoiceForm.tipoGastoId) {
-      alert("Selecciona el tipo de gasto.");
-      return;
-    }
-
     if (invoiceForm.estado === "Pagada" && !invoiceForm.bankAccountId) {
       alert("Selecciona el banco para registrar la factura pagada.");
       return;
@@ -239,7 +221,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
       numeroFactura: invoiceForm.numeroFactura.trim(),
       referencia: invoiceForm.referencia.trim() || null,
       descripcion: invoiceForm.descripcion.trim() || null,
-      tipoGastoId: Number(invoiceForm.tipoGastoId),
       estado: invoiceForm.estado,
       bankAccountId:
         invoiceForm.estado === "Pagada"
@@ -777,28 +758,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
               </label>
 
               <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-                Tipo de gasto *
-                <select
-                  value={invoiceForm.tipoGastoId}
-                  onChange={(e) =>
-                    setInvoiceField("tipoGastoId", e.target.value)
-                  }
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">Selecciona</option>
-                  {expenseTypes.map((type) => {
-                    const id = type.id ?? type.Id;
-                    const name = type.nombre ?? type.Nombre ?? "Gasto";
-                    return (
-                      <option key={id} value={id}>
-                        {name}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
                 Estado *
                 <select
                   value={invoiceForm.estado}
@@ -887,15 +846,15 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500">
               <tr>
-                <th className="px-4 py-3 text-left">Sel.</th>
-                <th className="px-4 py-3 text-left">Fecha</th>
-                <th className="px-4 py-3 text-left">Proveedor</th>
-                <th className="px-4 py-3 text-left">Número albarán</th>
-                <th className="px-4 py-3 text-right">Base</th>
-                <th className="px-4 py-3 text-right">IVA</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3 text-left">Estado</th>
-                <th className="px-4 py-3 text-right">Acciones</th>
+                <th className="px-4 py-3 text-center">Sel.</th>
+                <th className="px-4 py-3 text-center">Fecha</th>
+                <th className="px-4 py-3 text-center">Proveedor</th>
+                <th className="px-4 py-3 text-center">Número albarán</th>
+                <th className="px-4 py-3 text-center">Base</th>
+                <th className="px-4 py-3 text-center">IVA</th>
+                <th className="px-4 py-3 text-center">Total</th>
+                <th className="px-4 py-3 text-center">Estado</th>
+                <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
 
