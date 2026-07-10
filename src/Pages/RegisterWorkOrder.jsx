@@ -1631,7 +1631,7 @@ export default function RegisterWorkOrder() {
               onClick={() => {
                 saveReadyOrderAlert(readyWhatsappOrder, workshopName);
                 setReadyWhatsappOrder(null);
-                setNotice("Notificación guardada en la campanita.");
+                setNotice("Notificación guardada.");
               }}
               className="rounded-xl bg-white px-4 py-2 text-sm font-bold text-green-700 ring-1 ring-green-200 hover:bg-green-100"
             >
