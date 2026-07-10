@@ -3,6 +3,8 @@ export const WORK_ORDER_STATES = [
   "Diagnóstico",
   "Reparando",
   "Esperando repuesto",
+  "Repuesto Recibido",
+  "Repuesto devuelto",
   "Terminado",
   "Entregado",
 ];
@@ -10,8 +12,10 @@ export const WORK_ORDER_STATES = [
 const transitions = {
   Recibido: ["Diagnóstico", "Reparando"],
   Diagnóstico: ["Reparando", "Esperando repuesto"],
-  Reparando: ["Esperando repuesto", "Terminado"],
-  "Esperando repuesto": ["Reparando", "Terminado"],
+  Reparando: ["Esperando repuesto","Repuesto Recibido", "Terminado"],
+  "Esperando repuesto": ["Repuesto Recibido","Reparando"],
+  "Repuesto Recibido": ["Repuesto devuelto", "Reparando", "Terminado"],
+  "Repuesto devuelto": ["Repuesto Recibido"],
   Terminado: ["Entregado"],
   Entregado: [],
 };
