@@ -1,9 +1,10 @@
-import { BookOpen, FileText, Truck, WalletCards } from "lucide-react";
+import { BookOpen, FileText, ReceiptText, Truck, WalletCards } from "lucide-react";
 
 const tabs = [
   { id: "dashboard", label: "Dashboard", icon: WalletCards },
   { id: "facturas", label: "Facturas proveedor", icon: FileText },
   { id: "cxp", label: "Cuentas por pagar", icon: WalletCards },
+  { id: "gastos-varios", label: "Gastos varios", icon: ReceiptText },
   { id: "libro", label: "Libro de compras", icon: BookOpen },
   { id: "albaranes", label: "Albaranes", icon: Truck },
 ];

@@ -89,10 +89,14 @@ const getEstadoBadge = (estado) => {
       return "bg-amber-50 text-amber-700 ring-amber-200";
     case "Esperando repuesto":
       return "bg-orange-50 text-orange-700 ring-orange-200";
+    case "Repuesto Recibido":
+      return "bg-indigo-50 text-indigo-700 ring-indigo-200";
     case "Terminado":
       return "bg-emerald-50 text-emerald-700 ring-emerald-200";
     case "Entregado":
       return "bg-slate-100 text-slate-700 ring-slate-300";
+    case "Repuesto devuelto":
+      return "bg-rose-50 text-rose-700 ring-rose-200";
     default:
       return "bg-slate-50 text-slate-700 ring-slate-200";
   }
@@ -843,4 +847,5 @@ export default function Home() {
     </>
   );
 }
+
 

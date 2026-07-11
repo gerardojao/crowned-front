@@ -1,204 +1,190 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Edit3,
+  Filter,
+  RotateCcw,
+  Search,
+  Trash2,
+  XCircle,
+} from "lucide-react";
 import api from "../Components/api";
 import Loader from "../Components/Loader";
-import { Link, useNavigate, useLocation } from "react-router-dom";
 import { soloFecha } from "../utils/date";
-import {
-  Search, RotateCcw, ArrowLeft, CalendarDays, XCircle,
-} from "lucide-react";
 
-const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
-const ymd = (d) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const eur = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+});
 
-function getExpenseBase(row) {
-  return Number(row?.baseImponible ?? row?.BaseImponible ?? row?.importe ?? row?.Importe ?? 0) || 0;
+const ymd = (date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
+function read(row, camel, pascal, fallback = "") {
+  return row?.[camel] ?? row?.[pascal] ?? fallback;
 }
 
-function getExpenseIvaPct(row) {
-  const pct = Number(row?.ivaPct ?? row?.IvaPct ?? 0) || 0;
-  return pct;
+function amount(row) {
+  return Number(read(row, "importe", "Importe", read(row, "total", "Total", 0))) || 0;
 }
 
-function getExpenseIva(row) {
-  const direct = row?.iva ?? row?.Iva;
-  if (direct !== undefined && direct !== null) return Number(direct) || 0;
-  return roundMoney(getExpenseBase(row) * (getExpenseIvaPct(row) / 100));
+function typeName(row) {
+  const value = read(row, "nombre", "Nombre", read(row, "tipo", "Tipo", ""));
+  return value === "Transporte" ? "Gastos Casa" : value || "-";
 }
 
-function getExpenseTotal(row) {
-  const direct = row?.total ?? row?.Total;
-  if (direct !== undefined && direct !== null) return Number(direct) || 0;
-  return roundMoney(getExpenseBase(row) + getExpenseIva(row));
+function providerName(row) {
+  return read(row, "proveedorNombre", "ProveedorNombre", "");
 }
 
-function isFiscalExpense(row) {
-  const direct = row?.esFiscal ?? row?.EsFiscal;
-  if (direct !== undefined && direct !== null) return Boolean(direct);
-
-  const type = row?.tipoMovimiento ?? row?.TipoMovimiento;
-  return !type || type === "Egreso";
+function description(row) {
+  return read(row, "descripcion", "Descripcion", "");
 }
 
-function getExpenseAmount(row) {
-  if (isFiscalExpense(row)) return getExpenseTotal(row);
-  return Number(row?.importe ?? row?.Importe ?? row?.total ?? row?.Total ?? 0) || 0;
+function invoiceNumber(row) {
+  return read(row, "numeroFactura", "NumeroFactura", "");
 }
 
-function getExpenseTypeName(row) {
-  const type = row?.tipo ?? row?.Tipo ?? row?.nombre ?? row?.Nombre;
-  if (type === "Transporte") return "Gastos Casa";
-  return type ?? "—";
-}
-
-function getMovementBadge(row) {
-  if (isFiscalExpense(row)) {
-    return {
-      label: "Gasto fiscal",
-      className: "bg-rose-50 text-rose-700 ring-rose-200",
-    };
-  }
-
-  const movementType = row?.tipoMovimiento ?? row?.TipoMovimiento;
-  return {
-    label: movementType === "PagoFacturaProveedor" ? "Pago proveedor" : "No fiscal",
-    className: "bg-sky-50 text-sky-700 ring-sky-200",
-  };
-}
-
-/** Banner superior para éxito/error (igual que Register/RegisterIncome) */
-const Banner = ({ type = "success", text, onClose, actionLabel, onAction }) => {
-  if (!text) return null;
-  const map = {
-    success: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    error: "bg-rose-50 text-rose-700 ring-rose-200",
-  };
+function Banner({ notice, onClose }) {
+  if (!notice?.text) return null;
+  const className =
+    notice.type === "error"
+      ? "bg-rose-50 text-rose-700 ring-rose-200"
+      : "bg-emerald-50 text-emerald-700 ring-emerald-200";
   return (
-    <div role="alert" aria-live="polite" className={`mb-4 rounded-xl p-3 text-sm ring-1 ${map[type]}`}>
+    <div className={`mb-4 rounded-xl p-3 text-sm ring-1 ${className}`}>
       <div className="flex items-start justify-between gap-3">
-        <span>{text}</span>
-        <div className="flex items-center gap-3">
-          {actionLabel && onAction && (
-            <button
-              type="button"
-              onClick={onAction}
-              className="rounded-lg px-2.5 py-1 text-xs ring-1 ring-current/20 hover:bg-white/60"
-            >
-              {actionLabel}
-            </button>
-          )}
-          <button type="button" onClick={onClose} className="text-xs underline underline-offset-2">
-            Cerrar
-          </button>
-        </div>
+        <span>{notice.text}</span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs underline underline-offset-2"
+        >
+          Cerrar
+        </button>
       </div>
     </div>
   );
-};
+}
 
-/** Modal de confirmación sencillo y accesible */
-const ConfirmModal = ({ open, title, message, confirmLabel = "Sí", cancelLabel = "No", loading = false, onConfirm, onCancel }) => {
-  if (!open) return null;
+function Stat({ label, value, tone = "slate" }) {
+  const toneClass =
+    tone === "rose"
+      ? "bg-rose-50 text-rose-700 ring-rose-100"
+      : "bg-slate-50 text-slate-700 ring-slate-100";
+  return (
+    <div className={`rounded-xl px-4 py-3 ring-1 ${toneClass}`}>
+      <div className="text-xs font-semibold uppercase tracking-wide opacity-70">
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-bold">{value}</div>
+    </div>
+  );
+}
+
+function ActionButton({ label, icon: Icon, tone = "slate", onClick }) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-200 text-red-600 hover:bg-red-50"
+      : "border-slate-200 text-slate-600 hover:bg-slate-100";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-white transition ${toneClass}`}
+      title={label}
+      aria-label={label}
+    >
+      <Icon size={15} />
+    </button>
+  );
+}
+
+function ConfirmModal({ row, loading, onConfirm, onCancel }) {
+  if (!row) return null;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="confirm-title"
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/40" onClick={loading ? undefined : onCancel} />
-      {/* Dialog */}
-      <div className="relative z-10 w-[92%] max-w-md rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
-        <h3 id="confirm-title" className="text-lg font-semibold text-slate-900">{title}</h3>
-        <p className="mt-2 text-sm text-slate-600">{message}</p>
+      <div className="relative z-10 w-[92%] max-w-md rounded-xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-50 text-rose-600">
+            <Trash2 size={19} />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">
+              Eliminar gasto
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              Esta accion ocultara el gasto del detalle.
+            </p>
+          </div>
+        </div>
         <div className="mt-4 flex justify-end gap-2">
           <button
             type="button"
-            className="rounded-xl px-4 py-2.5 bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            className="rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
             onClick={onCancel}
             disabled={loading}
           >
-            {cancelLabel}
+            Cancelar
           </button>
           <button
             type="button"
-            className="rounded-xl px-4 py-2.5 bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
             onClick={onConfirm}
             disabled={loading}
             autoFocus
           >
-            {loading ? "Eliminando..." : confirmLabel}
+            <Trash2 size={16} />
+            {loading ? "Eliminando..." : "Eliminar"}
           </button>
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default function ExpenseDetails() {
   const navigate = useNavigate();
   const location = useLocation();
 
   const [rows, setRows] = useState([]);
+  const [types, setTypes] = useState([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [tipoId, setTipoId] = useState("");
-  const [tipos, setTipos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteRow, setDeleteRow] = useState(null);
 
-  // Banner global
-  const [notice, setNotice] = useState(null); // { type, text, actionLabel?, onAction?, onClose?, autocloseMs? }
-  const autoTimerRef = useRef(null);
-
-  // Estado del modal de confirmación
-  const [confirmState, setConfirmState] = useState({
-    open: false,
-    row: null,
-    loading: false,
-  });
-
-  const totals = useMemo(
-    () =>
-      rows.reduce(
-        (acc, row) => {
-          if (isFiscalExpense(row)) {
-            acc.base += getExpenseBase(row);
-            acc.iva += getExpenseIva(row);
-            acc.total += getExpenseTotal(row);
-          } else {
-            acc.financial += getExpenseAmount(row);
-          }
-          return acc;
-        },
-        { base: 0, iva: 0, total: 0, financial: 0 },
-      ),
+  const total = useMemo(
+    () => rows.reduce((sum, row) => sum + amount(row), 0),
     [rows],
   );
 
-  const loadTipos = useCallback(async () => {
-    const NAME_MAP = {
-    "Transporte": "Gastos Casa",   
-  };
+  const loadTypes = useCallback(async () => {
     try {
       const res = await api.get("/Egreso");
-      const rawData = res.data?.data ?? [];
-      const translatedData = rawData.map(item => {
-      const originalName = item.nombre ?? item.nombreEgreso;
-
-      return {
-        ...item,
-        nombre: NAME_MAP[originalName] || originalName 
-      }
-      });
-      setTipos(translatedData);
+      const list = res.data?.data ?? [];
+      setTypes(
+        list.map((item) => ({
+          id: item.id ?? item.Id,
+          nombre:
+            (item.nombre ?? item.Nombre) === "Transporte"
+              ? "Gastos Casa"
+              : item.nombre ?? item.Nombre,
+        })),
+      );
     } catch {
-      setTipos([]);
-      setNotice({
-        type: "error",
-        text: "No se pudieron cargar los tipos de gasto.",
-      });
+      setTypes([]);
+      setNotice({ type: "error", text: "No se pudieron cargar los tipos de gasto." });
     }
   }, []);
 
@@ -206,461 +192,356 @@ export default function ExpenseDetails() {
     async (opts = {}) => {
       setLoading(true);
       try {
-        const f = opts.from ?? from;
-        const t = opts.to ?? to;
-        const tid = opts.tipoId ?? tipoId;
-
         const params = new URLSearchParams();
-        if (f) params.set("fechaInicio", f);
-        if (t) params.set("fechaFin", t);
-        if (tid) params.set("tipoId", tid);
+        const nextFrom = opts.from ?? from;
+        const nextTo = opts.to ?? to;
+        const nextType = opts.tipoId ?? tipoId;
+        if (nextFrom) params.set("fechaInicio", nextFrom);
+        if (nextTo) params.set("fechaFin", nextTo);
+        if (nextType) params.set("tipoId", nextType);
 
         const res = await api.get(`/Egreso/detalle?${params.toString()}`);
         const list = res.data?.data?.[0] ?? [];
         setRows(Array.isArray(list) ? list : []);
       } catch {
         setRows([]);
-        setNotice({
-          type: "error",
-          text: "No se pudo obtener el detalle de gastos.",
-        });
+        setNotice({ type: "error", text: "No se pudo obtener el detalle de gastos." });
       } finally {
         setLoading(false);
       }
     },
-    [from, to, tipoId]
+    [from, to, tipoId],
   );
 
   useEffect(() => {
-    loadTipos();
+    loadTypes();
     fetchData();
-  }, [loadTipos, fetchData]);
+  }, [loadTypes, fetchData]);
 
-  // Soporte para "flash" al llegar desde otra pantalla
   useEffect(() => {
     const flash = location.state?.flash;
     if (flash?.text) {
-      setNotice({
-        type: flash.type || "success",
-        text: flash.text,
-        autocloseMs: flash.autocloseMs ?? 2500,
-        onClose: () => setNotice(null),
-      });
+      setNotice({ type: flash.type || "success", text: flash.text });
       navigate(location.pathname, { replace: true, state: null });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [location.pathname, location.state, navigate]);
 
-  // Autocierre de banners
-  useEffect(() => {
-    if (autoTimerRef.current) {
-      clearTimeout(autoTimerRef.current);
-      autoTimerRef.current = null;
-    }
-    if (notice?.autocloseMs && typeof notice?.onClose === "function") {
-      autoTimerRef.current = setTimeout(() => {
-        notice.onClose();
-      }, notice.autocloseMs);
-    }
-    return () => {
-      if (autoTimerRef.current) {
-        clearTimeout(autoTimerRef.current);
-        autoTimerRef.current = null;
-      }
-    };
-  }, [notice]);
-
-  const onSubmit = (e) => {
-    e.preventDefault();
+  const onSubmit = (event) => {
+    event.preventDefault();
     fetchData();
   };
-  const onClear = () => {
+
+  const clearFilters = () => {
     setFrom("");
     setTo("");
     setTipoId("");
     fetchData({ from: "", to: "", tipoId: "" });
   };
 
-  // Rangos rápidos
   const setThisMonth = () => {
     const now = new Date();
-    const f = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
-    const t = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
-    setFrom(f);
-    setTo(t);
-    fetchData({ from: f, to: t });
+    const start = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+    const end = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    setFrom(start);
+    setTo(end);
+    fetchData({ from: start, to: end });
   };
+
   const setLast30 = () => {
-    const now = new Date();
-    const past = new Date();
-    past.setDate(now.getDate() - 30);
-    const f = ymd(past), t = ymd(now);
-    setFrom(f);
-    setTo(t);
-    fetchData({ from: f, to: t });
-  };
-  const setThisYear = () => {
-    const now = new Date();
-    const f = ymd(new Date(now.getFullYear(), 0, 1));
-    const t = ymd(new Date(now.getFullYear(), 11, 31));
-    setFrom(f);
-    setTo(t);
-    fetchData({ from: f, to: t });
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 30);
+    setFrom(ymd(start));
+    setTo(ymd(end));
+    fetchData({ from: ymd(start), to: ymd(end) });
   };
 
-  // Acciones
-  const onEdit = (row) => navigate("/register-expense", { state: { edit: true, record: row } });
-
-  // Abrir modal de confirmación
-  const onDeleteClick = (row) => {
-    setConfirmState({ open: true, row, loading: false });
-  };
-
-  // Confirmar eliminación
   const confirmDelete = async () => {
-    const row = confirmState.row;
-    if (!row) return;
+    if (!deleteRow) return;
     try {
-      setConfirmState((s) => ({ ...s, loading: true }));
-      await api.delete(`/FichaEgreso/detalle/${row.id}`);
-      setRows((prev) => prev.filter((x) => x.id !== row.id));
-      setConfirmState({ open: false, row: null, loading: false });
-      setNotice({
-        type: "success",
-        text: "Gasto eliminado correctamente.",
-        autocloseMs: 2000,
-        onClose: () => setNotice(null),
-      });
+      setDeleting(true);
+      const id = deleteRow.id ?? deleteRow.Id;
+      await api.delete(`/FichaEgreso/detalle/${id}`);
+      setRows((current) => current.filter((row) => (row.id ?? row.Id) !== id));
+      setDeleteRow(null);
+      setNotice({ type: "success", text: "Gasto eliminado correctamente." });
     } catch {
-      setConfirmState({ open: false, row: null, loading: false });
-      setNotice({
-        type: "error",
-        text: "No se pudo eliminar el gasto.",
-      });
+      setNotice({ type: "error", text: "No se pudo eliminar el gasto." });
+    } finally {
+      setDeleting(false);
     }
   };
-  const getDisplayName = (originalName) => {
-      if (originalName === "Transporte") {
-        return "Gastos Casa";
-      }    
-      return originalName;
-    };
 
   return (
     <>
-      {/* Header + volver */}
-      <div className="flex items-center justify-between gap-3 mt-2 mb-6 md:mb-8">
-        <h2 className="text-2xl font-semibold text-slate-900">Detalle de gastos</h2>
+      <div className="mb-5 flex flex-col gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Egresos
+          </div>
+          <h2 className="mt-1 text-2xl font-bold text-slate-900">
+            Detalle de gastos
+          </h2>
+        </div>
         <Link
           to="/"
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-700 text-white hover:bg-slate-800 transition"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-900"
         >
           <ArrowLeft size={18} /> Volver
         </Link>
       </div>
 
-      {/* Banner global */}
-      <Banner
-        type={notice?.type}
-        text={notice?.text}
-        onClose={() => {
-          if (typeof notice?.onClose === "function") {
-            notice.onClose();
-          } else {
-            setNotice(null);
-          }
-        }}
-        actionLabel={notice?.actionLabel}
-        onAction={notice?.onAction}
-      />
+      <Banner notice={notice} onClose={() => setNotice(null)} />
 
-      {/* Filtros */}
       <form
-        className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 mb-6"
+        className="mb-5 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:p-5"
         onSubmit={onSubmit}
       >
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="from">
-              Desde
-            </label>
+        <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-800">
+          <Filter size={17} className="text-slate-500" />
+          Filtros
+        </div>
+        <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1.2fr_auto]">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Desde
             <input
-              id="from"
               type="date"
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
               value={from}
-              onChange={(e) => setFrom(e.target.value)}
+              onChange={(event) => setFrom(event.target.value)}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="to">
-              Hasta
-            </label>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Hasta
             <input
-              id="to"
               type="date"
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(event) => setTo(event.target.value)}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="tipo">
-              Tipo
-            </label>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Tipo
             <select
-              id="tipo"
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
               value={tipoId}
-              onChange={(e) => setTipoId(e.target.value)}
+              onChange={(event) => setTipoId(event.target.value)}
             >
               <option value="">Todos</option>
-              {tipos.map((t) => {
-                const originalName = t.nombre ?? t.nombreEgreso;
-                
-                return (
-                  <option key={t.id} value={t.id}>
-                    {getDisplayName(originalName)}
-                  </option>
-                );
-              })}
-              
+              {types.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.nombre}
+                </option>
+              ))}
             </select>
-          </div>
-
+          </label>
           <div className="flex gap-2">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-emerald-600 text-white hover:bg-emerald-700 transition"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700"
             >
               <Search size={18} /> {loading ? "Buscando..." : "Buscar"}
             </button>
             <button
               type="button"
-              onClick={onClear}
-              className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 ring-1 ring-slate-200 transition"
+              onClick={clearFilters}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-50"
+              title="Limpiar filtros"
             >
-              <RotateCcw size={18} /> Limpiar
+              <RotateCcw size={18} />
             </button>
           </div>
         </div>
 
-        {/* Rangos rápidos */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-slate-500 flex items-center gap-2">
-            <CalendarDays size={16} /> Rápidos:
+          <span className="flex items-center gap-2 text-sm text-slate-500">
+            <CalendarDays size={16} /> Rapidos:
           </span>
           <button
             type="button"
             onClick={setThisMonth}
-            className="rounded-full px-3 py-1 text-sm bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition"
+            className="rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700 ring-1 ring-sky-100 transition hover:bg-sky-100"
           >
             Este mes
           </button>
           <button
             type="button"
             onClick={setLast30}
-            className="rounded-full px-3 py-1 text-sm bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100 transition"
+            className="rounded-full bg-sky-50 px-3 py-1 text-sm font-medium text-sky-700 ring-1 ring-sky-100 transition hover:bg-sky-100"
           >
-            Últimos 30 días
+            Ultimos 30 dias
           </button>
-
           <button
             type="button"
-            onClick={onClear}
-            className="rounded-full px-3 py-1 text-sm bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 transition"
+            onClick={clearFilters}
+            className="rounded-full bg-rose-50 px-3 py-1 text-sm text-rose-700 ring-1 ring-rose-200 transition hover:bg-rose-100"
           >
             <XCircle size={14} className="inline -mt-0.5" /> Quitar filtro
           </button>
         </div>
       </form>
 
-      {/* LISTA MÓVIL */}
+      <section className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Stat label="Resultados" value={rows.length} />
+        <Stat label="Total" value={eur.format(total)} tone="rose" />
+      </section>
+
       <section className="md:hidden space-y-3">
         {loading ? (
-          <div className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4">
+          <div className="rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <Loader />
           </div>
-        ) : (          
-<>
-      {/* Resumen (Resultados + Total) */}
-      <div className="flex items-center justify-between mb-1 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-3">
-        <div className="text-sm text-slate-500">
-          Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
-        </div>
-        <div className="text-right text-sm font-medium text-slate-600">
-          <div>Fiscal: <span className="text-slate-900">{eur.format(totals.total)}</span></div>
-          {totals.financial !== 0 && (
-            <div>Pagos proveedor: <span className="text-sky-700">{eur.format(totals.financial)}</span></div>
-          )}
-        </div>
-      </div>
-
-      {/* Lista / vacío */}
-      {rows.length === 0 ? (
-        <div className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 text-slate-500">
-          Sin resultados
-        </div>
-      ) : (
-            rows.map((r) => {
-              const fiscal = isFiscalExpense(r);
-              const badge = getMovementBadge(r);
-              return (
-              <article key={r.id} className="rounded-2xl border border-slate-200 bg-white/70 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-slate-800">
-                      {r.fecha ? soloFecha(r.fecha) : "—"}
-                      <span className={`ml-2 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${badge.className}`}>
-                        {badge.label}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-500 mt-0.5">
-                      {getExpenseTypeName(r)} · {r.mes ?? "—"}
-                    </div>
-                    <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
-                    {r.numeroFactura && (
-                      <div className="text-xs text-slate-500 mt-1">Factura: {r.numeroFactura}</div>
-                    )}
+        ) : rows.length === 0 ? (
+          <div className="rounded-xl bg-white p-4 text-slate-500 shadow-sm ring-1 ring-slate-200">
+            Sin resultados
+          </div>
+        ) : (
+          rows.map((row) => (
+            <article
+              key={row.id ?? row.Id}
+              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-800">
+                    {row.fecha ? soloFecha(row.fecha) : "-"}
                   </div>
-                  <div className="shrink-0 text-right">
-                    <div className="text-xs text-slate-500">Base {fiscal ? eur.format(getExpenseBase(r)) : "—"}</div>
-                    <div className="text-xs text-slate-500">IVA {fiscal ? eur.format(getExpenseIva(r)) : "—"}</div>
-                    <div className={`font-semibold ${fiscal ? "text-rose-700" : "text-sky-700"}`}>
-                      {eur.format(getExpenseAmount(r))}
-                    </div>
+                  <div className="mt-0.5 text-xs text-slate-500">
+                    {typeName(row)} - {row.mes ?? row.Mes ?? "-"}
                   </div>
+                  {providerName(row) && (
+                    <div className="mt-1 text-xs text-slate-500">
+                      Proveedor: {providerName(row)}
+                    </div>
+                  )}
+                  <div className="mt-1 truncate text-sm text-slate-700">
+                    {description(row) || "-"}
+                  </div>
+                  {invoiceNumber(row) && (
+                    <div className="mt-1 text-xs text-slate-500">
+                      Comprobante: {invoiceNumber(row)}
+                    </div>
+                  )}
                 </div>
-              </article>
-              );
-            })
-          )}
-        </>
+                <div className="shrink-0 text-right font-semibold text-rose-700">
+                  {eur.format(amount(row))}
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end gap-2 border-t border-slate-100 pt-3">
+                <ActionButton
+                  label="Editar gasto"
+                  icon={Edit3}
+                  onClick={() =>
+                    navigate("/register-expense", {
+                      state: { edit: true, record: row },
+                    })
+                  }
+                />
+                <ActionButton
+                  label="Eliminar gasto"
+                  icon={Trash2}
+                  tone="danger"
+                  onClick={() => setDeleteRow(row)}
+                />
+              </div>
+            </article>
+          ))
         )}
       </section>
 
-      {/* TABLA DESKTOP */}
-      <section className="hidden md:block rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6">
+      <section className="hidden rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200 md:block">
         {loading ? (
           <Loader />
         ) : (
-          <>
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-slate-500">
-                Resultados: <span className="font-medium text-slate-700">{rows.length}</span>
-              </div>
-              <div className="text-right text-sm font-medium text-slate-600">
-                <div>Fiscal: <span className="text-slate-900">{eur.format(totals.total)}</span></div>
-                {totals.financial !== 0 && (
-                  <div>Pagos proveedor: <span className="text-sky-700">{eur.format(totals.financial)}</span></div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-slate-200 overflow-hidden">
-              <div className="max-h-[520px] overflow-y-auto">
-                <table className="min-w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur">
-                    <tr className="text-left text-slate-600">
-                      <th className="py-2.5 px-3 font-semibold text-center">Fecha</th>
-                      <th className="py-2.5 px-3 font-semibold text-center"> </th>
-                      <th className="py-2.5 px-3 font-semibold text-center">Tipo</th>
-                      <th className="py-2.5 px-3 font-semibold text-center">Nº Factura</th>
-                      <th className="py-2.5 px-3 font-semibold text-center">Descripción</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Base imponible</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">IVA</th>
-                      <th className="py-2.5 px-3 font-semibold text-right">Total importe</th>
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="max-h-[520px] overflow-y-auto">
+              <table className="min-w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-xs uppercase text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Fecha</th>
+                    <th className="px-4 py-3 text-left font-semibold">Tipo</th>
+                    <th className="px-4 py-3 text-left font-semibold">Comprobante</th>
+                    <th className="px-4 py-3 text-left font-semibold">Proveedor</th>
+                    <th className="px-4 py-3 text-left font-semibold">Descripcion</th>
+                    <th className="px-4 py-3 text-right font-semibold">Importe</th>
+                    <th className="px-4 py-3 text-right font-semibold">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td className="px-4 py-10 text-center text-slate-500" colSpan={7}>
+                        Sin resultados
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {rows.length === 0 ? (
-                      <tr>
-                        <td className="py-6 px-3 text-slate-500" colSpan={8}>
-                          Sin resultados
+                  ) : (
+                    rows.map((row) => (
+                      <tr key={row.id ?? row.Id} className="hover:bg-slate-50">
+                        <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-800">
+                          {row.fecha ? soloFecha(row.fecha) : "-"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {typeName(row)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {invoiceNumber(row) || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {providerName(row) || "-"}
+                        </td>
+                        <td className="max-w-[320px] px-4 py-3 text-slate-700">
+                          {description(row) || "-"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right font-bold text-rose-700">
+                          {eur.format(amount(row))}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <ActionButton
+                              label="Editar gasto"
+                              icon={Edit3}
+                              onClick={() =>
+                                navigate("/register-expense", {
+                                  state: { edit: true, record: row },
+                                })
+                              }
+                            />
+                            <ActionButton
+                              label="Eliminar gasto"
+                              icon={Trash2}
+                              tone="danger"
+                              onClick={() => setDeleteRow(row)}
+                            />
+                          </div>
                         </td>
                       </tr>
-                    ) : (
-                      rows.map((r) => {
-                        const fiscal = isFiscalExpense(r);
-                        const badge = getMovementBadge(r);
-                        return (
-                        <tr key={r.id} className="hover:bg-slate-50">
-                          <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-                            {r.fecha ? soloFecha(r.fecha) : "—"}
-                          </td>
-                          <td className="py-2.5 px-3 text-right">{""}</td>
-                          <td className="py-2.5 px-3">
-                            <div>{getExpenseTypeName(r)}</div>
-                            <span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${badge.className}`}>
-                              {badge.label}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-3 text-slate-700">{r.numeroFactura ?? "—"}</td>
-                          <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
-                          <td className="py-2.5 px-3 text-right font-semibold text-slate-700 whitespace-nowrap">
-                            {fiscal ? eur.format(getExpenseBase(r)) : "—"}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-slate-700 whitespace-nowrap">
-                            {fiscal ? (
-                              <>
-                                {eur.format(getExpenseIva(r))}
-                                <span className="ml-1 text-xs text-slate-400">
-                                  ({getExpenseIvaPct(r)}%)
-                                </span>
-                              </>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td className={`py-2.5 px-3 text-right font-semibold whitespace-nowrap ${fiscal ? "text-rose-700" : "text-sky-700"}`}>
-                            {eur.format(getExpenseAmount(r))}
-                          </td>
-                        </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                  <tfoot className="bg-slate-50">
-                    <tr>
-                      <th className="py-2.5 px-3 text-right font-semibold" colSpan={5}>
-                        Total fiscal
-                      </th>
-                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.base)}</th>
-                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.iva)}</th>
-                      <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(totals.total)}</th>
-                    </tr>
-                    {totals.financial !== 0 && (
-                      <tr>
-                        <th className="py-2.5 px-3 text-right font-semibold text-sky-700" colSpan={5}>
-                          Pagos proveedor / movimientos no fiscales
-                        </th>
-                        <th className="py-2.5 px-3 text-right font-bold text-slate-400">—</th>
-                        <th className="py-2.5 px-3 text-right font-bold text-slate-400">—</th>
-                        <th className="py-2.5 px-3 text-right font-bold text-sky-700">{eur.format(totals.financial)}</th>
-                      </tr>
-                    )}
-                  </tfoot>
-                </table>
-              </div>
+                    ))
+                  )}
+                </tbody>
+                <tfoot className="bg-slate-50 text-sm">
+                  <tr>
+                    <th className="px-4 py-3 text-right font-semibold text-slate-700" colSpan={5}>
+                      Total
+                    </th>
+                    <th className="px-4 py-3 text-right font-bold text-slate-900">
+                      {eur.format(total)}
+                    </th>
+                    <th />
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-          </>
+          </div>
         )}
       </section>
 
-      {/* Modal de confirmación */}
       <ConfirmModal
-        open={confirmState.open}
-        title="Confirmar eliminación"
-        message={
-          confirmState.row
-            ? `¿Estás seguro de eliminar el gasto “${confirmState.row.descripcion ?? "Sin nombre"}”?`
-            : "¿Estás seguro de eliminar este gasto?"
-        }
-        confirmLabel="Sí"
-        cancelLabel="No"
-        loading={confirmState.loading}
+        row={deleteRow}
+        loading={deleting}
         onConfirm={confirmDelete}
-        onCancel={() => setConfirmState({ open: false, row: null, loading: false })}
+        onCancel={() => setDeleteRow(null)}
       />
     </>
   );
