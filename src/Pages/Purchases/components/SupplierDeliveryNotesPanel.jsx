@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Eye, Plus, X } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
 import { useBankAccounts } from "../hooks/useBankAccounts";
@@ -92,7 +92,7 @@ function buildVatBuckets(notes) {
 }
 
 export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
-  const { notes, loadingNotes, loadNotes } = useDeliveryNotes();
+  const { notes, loadingNotes, loadNotes, loadNoteDetail } = useDeliveryNotes();
   const { bankAccounts } = useBankAccounts();
   const { providers } = useProviders();
   const [showForm, setShowForm] = useState(false);
@@ -102,6 +102,9 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
   const [header, setHeader] = useState(initialHeader);
   const [lines, setLines] = useState([createEmptyLine()]);
   const [selectedNoteIds, setSelectedNoteIds] = useState([]);
+  const [detailNote, setDetailNote] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [invoiceForm, setInvoiceForm] = useState({
     open: false,
     numeroFactura: "",
@@ -190,6 +193,32 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
   const closeInvoiceForm = () => {
     if (invoiceSubmitting) return;
     setInvoiceForm((prev) => ({ ...prev, open: false }));
+  };
+
+  const openDetail = async (note) => {
+    setDetailNote(note);
+    setDetailError("");
+    setDetailLoading(true);
+
+    try {
+      const detail = await loadNoteDetail(note.id);
+      setDetailNote(detail);
+    } catch (err) {
+      setDetailError(
+        err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          "No se pudo cargar el detalle del albaran.",
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeDetail = () => {
+    if (detailLoading) return;
+    setDetailNote(null);
+    setDetailError("");
   };
 
   const setInvoiceField = (field, value) => {
@@ -841,6 +870,166 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
         </div>
       )}
 
+      {detailNote && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="absolute inset-0 bg-slate-900/45"
+            onClick={closeDetail}
+          />
+
+          <div className="relative z-10 flex max-h-[88vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">
+                  Detalle del albaran
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {detailNote.proveedor} - {detailNote.numeroAlbaran || "-"} -{" "}
+                  {formatDate(detailNote.fecha)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeDetail}
+                disabled={detailLoading}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-500 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+                aria-label="Cerrar detalle"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto p-5">
+              {detailLoading ? (
+                <div className="py-12 text-center">
+                  <Loader />
+                </div>
+              ) : detailError ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+                  {detailError}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">
+                        Estado
+                      </p>
+                      <p className="mt-1 font-semibold text-slate-800">
+                        {detailNote.estado}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">
+                        Base
+                      </p>
+                      <p className="mt-1 font-semibold text-slate-800">
+                        {formatCurrency(detailNote.base)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">
+                        IVA
+                      </p>
+                      <p className="mt-1 font-semibold text-slate-800">
+                        {formatCurrency(detailNote.iva)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase text-slate-400">
+                        Total
+                      </p>
+                      <p className="mt-1 text-base font-bold text-slate-900">
+                        {formatCurrency(detailNote.total)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {detailNote.observaciones && (
+                    <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
+                      <span className="font-bold">Observaciones: </span>
+                      {detailNote.observaciones}
+                    </div>
+                  )}
+
+                  <div className="overflow-hidden rounded-xl border border-slate-200">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                          <tr>
+                            <th className="px-4 py-3 text-left">Referencia</th>
+                            <th className="px-4 py-3 text-left">Concepto</th>
+                            <th className="px-4 py-3 text-left">Marca</th>
+                            <th className="px-4 py-3 text-right">Cant.</th>
+                            <th className="px-4 py-3 text-right">Precio</th>
+                            <th className="px-4 py-3 text-right">IVA %</th>
+                            <th className="px-4 py-3 text-right">Base</th>
+                            <th className="px-4 py-3 text-right">IVA</th>
+                            <th className="px-4 py-3 text-right">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {detailNote.lineas.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={9}
+                                className="px-4 py-8 text-center text-sm font-semibold text-slate-600"
+                              >
+                                Este albaran no tiene lineas registradas.
+                              </td>
+                            </tr>
+                          ) : (
+                            detailNote.lineas.map((line) => (
+                              <tr
+                                key={line.id}
+                                className="border-t border-slate-100"
+                              >
+                                <td className="px-4 py-3">
+                                  {line.codigoReferencia || "-"}
+                                </td>
+                                <td className="px-4 py-3 font-semibold text-slate-800">
+                                  {line.nombre || "-"}
+                                </td>
+                                <td className="px-4 py-3">
+                                  {line.marca || "-"}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {line.cantidad}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {formatCurrency(line.precioCompra)}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {line.ivaPct}%
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {formatCurrency(line.base)}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {formatCurrency(line.iva)}
+                                </td>
+                                <td className="px-4 py-3 text-right font-bold text-slate-900">
+                                  {formatCurrency(line.total)}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -921,6 +1110,15 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openDetail(note)}
+                            className="inline-flex items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+                          >
+                            <Eye size={14} className="mr-1.5" />
+                            Ver
+                          </button>
                         {selectable && (
                           <button
                             type="button"
@@ -933,6 +1131,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                               : "Anular"}
                           </button>
                         )}
+                        </div>
                       </td>
                     </tr>
                   );

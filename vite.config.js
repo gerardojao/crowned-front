@@ -11,6 +11,7 @@ export default defineConfig(({ command }) => {
     registerType: 'autoUpdate',
     workbox: {
       cleanupOutdatedCaches: true,
+      maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
     },
     manifest: {
       name: 'ZagaPro',
