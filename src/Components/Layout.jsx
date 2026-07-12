@@ -486,7 +486,7 @@ export default function Layout({ children }) {
                           <span className={mobileLinkText}>
                             <span className={mobileLinkTitle}>Compras</span>
                             <span className={mobileLinkHint}>
-                              Facturas recibidas y CxP
+                              Facturas recibidas, albaranes y gastos.
                             </span>
                           </span>
                         </NavLink>
