@@ -88,6 +88,7 @@ export default function WorkshopInvoice() {
   const [frequentServices, setFrequentServices] = useState([]);
   const [newServiceName, setNewServiceName] = useState(SERVICE_PREFIX);
   const [savingService, setSavingService] = useState(false);
+  const [issuingInvoice, setIssuingInvoice] = useState(false);
 
   const [order, setOrder] = useState(null);
 
@@ -520,7 +521,28 @@ const saveIssuedInvoice = async () => {
 };
 
 const printInvoice = async () => {
+  if (issuingInvoice) return;
+
+  const emittingKey = id ? `tc:invoice-emitting:order:${id}` : "";
+  const issuedKey = id ? `tc:invoice-issued:order:${id}` : "";
+
+  if (emittingKey && sessionStorage.getItem(emittingKey)) {
+    setError("La factura de esta orden ya se esta emitiendo. Espera unos segundos.");
+    return;
+  }
+
+  if (issuedKey && sessionStorage.getItem(issuedKey)) {
+    setError(
+      "Esta orden ya tiene una factura emitida en esta sesion. Vuelve a ordenes y usa Reimprimir factura.",
+    );
+    return;
+  }
+
   try {
+    setIssuingInvoice(true);
+    setError("");
+    if (emittingKey) sessionStorage.setItem(emittingKey, "1");
+
     if (!hasPaymentMethods) {
       throw new Error("Selecciona al menos un metodo de pago.");
     }
@@ -559,6 +581,8 @@ const printInvoice = async () => {
       issuedAt: new Date().toISOString(),
     };
 
+    if (issuedKey) sessionStorage.setItem(issuedKey, numeroFactura);
+
     setInvoice((prev) => ({
       ...prev,
       numero: numeroFactura,
@@ -584,6 +608,9 @@ const printInvoice = async () => {
         err?.message ||
         "No se pudo guardar la factura.",
     );
+  } finally {
+    if (emittingKey) sessionStorage.removeItem(emittingKey);
+    setIssuingInvoice(false);
   }
 };
 
@@ -613,10 +640,11 @@ const printInvoice = async () => {
           <button
             type="button"
             onClick={printInvoice}
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-700 transition"
+            disabled={issuingInvoice}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-700 transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Printer size={18} />
-            Imprimir
+            {issuingInvoice ? "Emitiendo..." : "Imprimir"}
           </button>
 
           <Link
