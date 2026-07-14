@@ -125,6 +125,8 @@ export default function PrintPreOrder() {
         repuestosNecesarios: valueOf(data, "repuestosNecesarios"),
         observaciones: valueOf(data, "observaciones"),
         bastidor: valueOf(data, "bastidor"),
+        fechaMatriculacion: valueOf(data, "fechaMatriculacion"),
+        numeroMotor: valueOf(data, "numeroMotor") || valueOf(data, "motor"),
       });
     } catch (err) {
       console.error(err);
@@ -150,6 +152,8 @@ export default function PrintPreOrder() {
         {error || "No se encontro la pre-orden."}
       </div>
     );
+
+ 
 
   const useZaga = usesZagaInvoiceTemplate(taller);
   const preOrderModuleEnabled =
@@ -600,7 +604,7 @@ export default function PrintPreOrder() {
                     <strong>{preOrder.matricula || "-"} </strong>
                     <br />
                     <span>CHASIS: </span>
-                    <strong>{preOrder.bastidor || "123456789"}</strong>
+                    <strong>{preOrder.bastidor || "-"}</strong>
                     <br />
                   </div>
                 </>
@@ -654,9 +658,9 @@ export default function PrintPreOrder() {
             <tr>
               <td>{preOrder.matricula || "-"}</td>
               <td>-</td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
+              <td>{formatDate(preOrder.fechaMatriculacion) || "-"}</td>
+              <td>{preOrder.bastidor || "-"}</td>
+              <td>{preOrder.numeroMotor || "-"}</td>
               <td>{operationType}</td>
             </tr>
           </tbody>
@@ -677,7 +681,7 @@ export default function PrintPreOrder() {
                 : ["Sin motivo indicado."]
               ).map((line, index) => (
                 <p key={`${line}-${index}`} className="po-line">
-              <strong style={{ fontSize: '14px',textTransform: 'uppercase' }}> *MOTIVO: {line}</strong>
+              <strong style={{ fontSize: '14px',textTransform: 'uppercase' }}> *{line}</strong>
                 </p>
               ))}
             </div>

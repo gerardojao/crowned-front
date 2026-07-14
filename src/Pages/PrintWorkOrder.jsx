@@ -43,6 +43,13 @@ function normalizeText(value) {
   return String(value || "").trim();
 }
 
+function getPreOrderReasonStorageKeys(order) {
+  return [order?.id, order?.matricula]
+    .map((value) => normalizeText(value))
+    .filter(Boolean)
+    .map((value) => `zaga:preorden:motivoRecepcion:${value}`);
+}
+
 function parseItems(itemsJson) {
   if (!itemsJson) return [];
 
@@ -174,18 +181,6 @@ export default function PrintWorkOrder() {
     resetKey: `${id}:${documentType}`,
   });
 
-  useEffect(() => {
-    if (!shouldAutoPrint || !order) return;
-
-    const key = `zaga:preorden:motivoRecepcion:${order.matricula}`;
-
-    const timer = setTimeout(() => {
-      localStorage.removeItem(key);
-    }, 50000);
-
-    return () => clearTimeout(timer);
-  }, [shouldAutoPrint, order]);
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -236,6 +231,9 @@ export default function PrintWorkOrder() {
         kilometraje: valueOf(data, "kilometraje"),
         fecha: valueOf(data, "fecha"),
         fechaPrevistaEntrega: valueOf(data, "fechaPrevistaEntrega"),
+        fechaMatriculacion: valueOf(data, "fechaMatriculacion"),
+        bastidor: valueOf(data, "bastidor"),
+        motor: valueOf(data, "motor"),
         tiempoEstimadoHoras: valueOf(data, "tiempoEstimadoHoras"),
         tipoOperacion: valueOf(data, "tipoOperacion", "Mecanica"),
         trabajo: valueOf(data, "trabajo"),
@@ -324,9 +322,10 @@ export default function PrintWorkOrder() {
     );
   }
 
-  const storageKeyToDelete = `zaga:preorden:motivoRecepcion:${order.matricula}`;
-
-  const motivoRecepcion = localStorage.getItem(storageKeyToDelete) || "";
+  const motivoRecepcion =
+    getPreOrderReasonStorageKeys(order)
+      .map((key) => localStorage.getItem(key))
+      .find(Boolean) || "";
 
   return (
     <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -792,9 +791,9 @@ export default function PrintWorkOrder() {
             <tr>
               <td>{order.matricula || "-"}</td>
               <td>-</td>
-              <td>-</td>
-              <td>-</td>
-              <td>-</td>
+              <td>{formatDate(order.fechaMatriculacion) || "-"}</td>
+              <td>{order.bastidor || "-"}</td>
+              <td>{order.motor || "-"}</td>
               <td>{order.estado || "-"}</td>
             </tr>
           </tbody>

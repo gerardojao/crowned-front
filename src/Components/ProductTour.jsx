@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ACTIONS, EVENTS, Joyride, STATUS } from "react-joyride";
 
 const TOUR_VERSION = "2026-07-workflow-v1";
 const STORAGE_PREFIX = "zagapro:tour";
+const EMPTY_STEPS = [];
 
 const baseStyles = {
   options: {
@@ -196,11 +197,11 @@ export default function ProductTour({
     [menuOpen, pathname],
   );
   const tourId = activeTour?.[0] ?? "";
-  const steps = activeTour?.[1]?.steps ?? [];
+  const steps = activeTour?.[1]?.steps ?? EMPTY_STEPS;
 
   useEffect(() => {
-    setRun(false);
-    setReadySteps([]);
+    setRun((current) => (current ? false : current));
+    setReadySteps((current) => (current.length ? [] : current));
 
     if (!isAuthed || disabled || !tourId || steps.length === 0) return;
     if (localStorage.getItem(storageKey(tourId)) === "done") return;
@@ -210,28 +211,46 @@ export default function ProductTour({
       if (availableSteps.length > 0) {
         markTourAsSeen(tourId);
         setReadySteps(availableSteps);
-        setRun(true);
+        setRun((current) => (current ? current : true));
       }
     }, 500);
 
     return () => window.clearTimeout(timer);
   }, [disabled, isAuthed, menuOpen, pathname, steps, tourId]);
 
-  useEffect(() => {
-    const restart = () => {
+  const restart = useCallback(() => {
       if (!tourId || steps.length === 0) return;
       localStorage.removeItem(storageKey(tourId));
       const availableSteps = getAvailableSteps(steps);
       if (availableSteps.length > 0) {
         markTourAsSeen(tourId);
         setReadySteps(availableSteps);
-        setRun(true);
+        setRun((current) => (current ? current : true));
       }
-    };
+  }, [steps, tourId]);
 
+  const handleCallback = useCallback(
+    ({ action, status, step, type }) => {
+      if (step?.target && [EVENTS.STEP_BEFORE, EVENTS.TOOLTIP].includes(type)) {
+        scrollTargetIntoView(step.target);
+      }
+
+      if (
+        [STATUS.FINISHED, STATUS.SKIPPED].includes(status) ||
+        action === ACTIONS.CLOSE
+      ) {
+        markTourAsSeen(tourId);
+        setRun((current) => (current ? false : current));
+        setReadySteps((current) => (current.length ? [] : current));
+      }
+    },
+    [tourId],
+  );
+
+  useEffect(() => {
     window.addEventListener("tc:product-tour:restart", restart);
     return () => window.removeEventListener("tc:product-tour:restart", restart);
-  }, [steps, tourId]);
+  }, [restart]);
 
   if (!isAuthed || disabled || readySteps.length === 0) return null;
 
@@ -252,20 +271,7 @@ export default function ProductTour({
         skip: "Omitir",
       }}
       styles={baseStyles}
-      callback={({ action, status, step, type }) => {
-        if (step?.target && [EVENTS.STEP_BEFORE, EVENTS.TOOLTIP].includes(type)) {
-          scrollTargetIntoView(step.target);
-        }
-
-        if (
-          [STATUS.FINISHED, STATUS.SKIPPED].includes(status) ||
-          action === ACTIONS.CLOSE
-        ) {
-          markTourAsSeen(tourId);
-          setRun(false);
-          setReadySteps([]);
-        }
-      }}
+      callback={handleCallback}
     />
   );
 }

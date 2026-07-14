@@ -158,8 +158,11 @@ export default function WorkshopInvoice() {
     poblacion: o.poblacion ?? o.Poblacion ?? "",
     provincia: o.provincia ?? o.Provincia ?? "",
     matricula: o.matricula ?? o.Matricula ?? "",
+    bastidor: o.bastidor ?? o.Bastidor ?? "",
     marca: o.marca ?? o.Marca ?? "",
     modelo: o.modelo ?? o.Modelo ?? "",
+    fechaMatriculacion: o.fechaMatriculacion ?? o.FechaMatriculacion ?? "",
+    motor: o.motor ?? o.Motor ?? "",
     kilometraje: o.kilometraje ?? o.Kilometraje ?? "",
     tipoOperacion: o.tipoOperacion ?? o.TipoOperacion ?? "Mecanica",
     trabajo: o.trabajo ?? o.Trabajo ?? "",
@@ -359,6 +362,13 @@ export default function WorkshopInvoice() {
         franquiciaImporte: "",
         telefonoCliente: o.telefono,
         matricula: o.matricula,
+        chasis: o.bastidor,
+        bastidor: o.bastidor,
+        motor: o.motor,
+        marca: o.marca,
+        modelo: o.modelo,
+        marcaModelo: [o.marca, o.modelo].filter(Boolean).join(" "),
+        fechaMatriculacion: o.fechaMatriculacion,
         km: o.kilometraje || "",
         observaciones: o.observaciones || "",
         tipoOperacion: o.tipoOperacion || "Mecanica",
@@ -469,7 +479,11 @@ export default function WorkshopInvoice() {
   const accountsReceivableEnabled = Boolean(taller.enableAccountsReceivable);
   const paymentDetailText = useMemo(() => {
     if (isCredit) return "Pago a credito";
-    const selectedLabels = selectedPaymentMethods.map((method) => method.label).join(" / ");
+    const selectedLabels = selectedPaymentMethods
+      .map((method) =>
+        method.amount > 0 ? `${method.label} ${formatMoney(method.amount)}` : method.label,
+      )
+      .join(" / ");
     if (selectedLabels) return selectedLabels;
     return invoice.tipoPago === "Contado" ? "Efectivo" : invoice.tipoPago;
   }, [invoice.tipoPago, isCredit, selectedPaymentMethods]);
@@ -1503,7 +1517,14 @@ const printInvoice = async () => {
           invoice={{
             ...invoice,
             idOrdenTrabajo: id || "",
-            marcaModelo: [order?.marca, order?.modelo].filter(Boolean).join(" "),
+            chasis: invoice.chasis || invoice.bastidor || order?.bastidor || "",
+            bastidor: invoice.bastidor || order?.bastidor || "",
+            motor: invoice.motor || order?.motor || "",
+            marcaModelo:
+              invoice.marcaModelo ||
+              [order?.marca, order?.modelo].filter(Boolean).join(" "),
+            fechaMatriculacion:
+              invoice.fechaMatriculacion || order?.fechaMatriculacion || "",
             franquiciaImporte: franchiseAmount,
             totalAbonado: isCredit ? paymentTotal : companyPayable,
             saldoPendiente: Math.max(0, paymentDifference),

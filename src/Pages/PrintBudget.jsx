@@ -94,6 +94,8 @@ export default function PrintBudget() {
         marca: p.marca ?? p.Marca ?? "",
         modelo: p.modelo ?? p.Modelo ?? "",
         bastidor: p.bastidor ?? p.Bastidor ?? "",
+        motor: p.motor ?? p.Motor ?? "",
+        fechaMatriculacion: p.fechaMatriculacion ?? p.FechaMatriculacion ?? "",
         kilometraje: p.kilometraje ?? p.Kilometraje ?? "",
         fecha: p.fecha ?? p.Fecha,
         tipoOperacion: p.tipoOperacion ?? p.TipoOperacion ?? "Mecanica",
@@ -610,9 +612,9 @@ export default function PrintBudget() {
               <tr>
                 <td>{budget.matricula || "-"}</td>
                 <td>-</td>
-                <td>-</td>
+                <td>{formatDateShort(budget.fechaMatriculacion) || "-"}</td>
                 <td>{budget.bastidor || "-"}</td>
-                <td>-</td>
+                <td>{budget.motor || "-"}</td>
                 <td>{budget.estado || "-"}</td>
               </tr>
             </tbody>

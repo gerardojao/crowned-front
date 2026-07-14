@@ -1675,9 +1675,14 @@ export default function RegisterBudget() {
                 </select>
               </div>
 
+                             <h3 className="text-lg font-semibold text-slate-800 mb-4">
+            Trabajo y costes
+          </h3>
+
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-3">
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto]">
+  
+                <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 md:col-span-4">
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
                     <div className="relative">
                       <Wrench
                         size={16}
@@ -1728,10 +1733,18 @@ export default function RegisterBudget() {
                     >
                       {savingService ? "Guardando..." : "Guardar servicio"}
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={addManualDetailLine}
+                      className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+                    >
+                      Agregar línea
+                    </button>
                   </div>
                 </div>
 
-                <textarea
+                {/* <textarea
                   name="Trabajo"
                   value={budget.Trabajo}
                   onChange={handleChange}
@@ -1739,23 +1752,13 @@ export default function RegisterBudget() {
                   rows={3}
                   placeholder="Trabajo presupuestado *"
                   required
-                />
+                /> */}
 
-                <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                {/* <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
                   Líneas de detalle / costes
-                </div>
+                </div> */}
 
-                <div className="md:col-span-4 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={addManualDetailLine}
-                    className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
-                  >
-                    Agregar línea
-                  </button>
-                </div>
-
-                <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+                <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 md:col-span-4">
                   <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Repuesto
                   </label>
@@ -1763,22 +1766,6 @@ export default function RegisterBudget() {
                     onSelect={addPartToBudget}
                     placeholder="Buscar pieza o repuesto"
                     buttonLabel="Agregar"
-                  />
-                </div>
-
-                <div className="space-y-2 rounded-r-xl border border-l-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-600">
-                    Mano de obra (EUR)
-                  </label>
-                  <input
-                    name="ManoObra"
-                    type="number"
-                    step="0.01"
-                    value={budget.ManoObra}
-                    onChange={handleChange}
-                    onBlur={(e) => upsertLaborItem(e.target.value)}
-                    className={cls}
-                    placeholder="Mano de obra EUR"
                   />
                 </div>
 

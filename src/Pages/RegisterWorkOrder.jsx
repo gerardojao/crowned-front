@@ -37,6 +37,7 @@ import {
   isWorkOrderEditLocked,
   normalizeWorkOrderState,
   requiresCompletionConfirmation,
+  WORK_ORDER_STATES,
 } from "../utils/workOrderWorkflow";
 
 const EMPTY_ORDER = {
@@ -72,6 +73,18 @@ const EMPTY_ORDER = {
   Estado: "Recibido",
   Observaciones: "",
 };
+
+function rememberPreOrderReceptionReason({ matricula, orderId, motivo }) {
+  const reason = String(motivo || "").trim();
+  if (!reason) return;
+
+  [matricula, orderId]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .forEach((value) => {
+      localStorage.setItem(`zaga:preorden:motivoRecepcion:${value}`, reason);
+    });
+}
 
 const DEFAULT_FREQUENT_SERVICES = [
   "Servicio cambio de aceite y filtro",
@@ -241,6 +254,8 @@ export default function RegisterWorkOrder() {
   const [editingId, setEditingId] = useState(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [billedFilter, setBilledFilter] = useState("");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
@@ -267,6 +282,7 @@ export default function RegisterWorkOrder() {
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [photoTarget, setPhotoTarget] = useState(null);
   const [preOrderSourceId, setPreOrderSourceId] = useState(null);
+  const [preOrderReceptionReason, setPreOrderReceptionReason] = useState("");
   const orderPageSize = 10;
   const detailItems = Array.isArray(order.Items) ? order.Items : [];
 
@@ -1115,12 +1131,49 @@ export default function RegisterWorkOrder() {
       setError("");
 
       const search = plateSearch.trim();
+      const baseParams = {
+        matricula: search || null,
+        estado: statusFilter || null,
+        fechaDesde: dateFrom || null,
+        fechaHasta: dateTo || null,
+      };
+
+      if (billedFilter) {
+        const pageSize = 100;
+        let apiPage = 1;
+        let apiTotal = 0;
+        const allItems = [];
+
+        do {
+          const pageRes = await api.get("/OrdenTrabajo", {
+            params: {
+              ...baseParams,
+              page: apiPage,
+              pageSize,
+            },
+          });
+          const pageItems = getItemsFromResponse(pageRes).map(normalizeOrder);
+          const paging = getPagingFromResponse(pageRes);
+          allItems.push(...pageItems);
+          apiTotal = paging.total;
+          if (pageItems.length === 0) break;
+          apiPage += 1;
+        } while (allItems.length < apiTotal);
+
+        const billedItems = allItems.filter((item) => {
+          const isBilled = Boolean(item.Facturada || item.facturada);
+          return billedFilter === "facturadas" ? isBilled : !isBilled;
+        });
+        const start = (page - 1) * orderPageSize;
+        setOrders(billedItems.slice(start, start + orderPageSize));
+        setOrderTotal(billedItems.length);
+        setOrderPage(page);
+        return;
+      }
 
       const res = await api.get("/OrdenTrabajo", {
         params: {
-          matricula: search || null,
-          fechaDesde: dateFrom || null,
-          fechaHasta: dateTo || null,
+          ...baseParams,
           page,
           pageSize: orderPageSize,
         },
@@ -1166,18 +1219,19 @@ export default function RegisterWorkOrder() {
         const data = res?.data?.data?.[0];
         if (!alive || !data) return;
 
-        const motivo = data.motivoRecepcion ?? data.MotivoRecepcion ?? "";
         const diagnostico =
           data.diagnosticoMecanico ?? data.DiagnosticoMecanico ?? "";
         const repuestos =
           data.repuestosNecesarios ?? data.RepuestosNecesarios ?? "";
+        const motivoRecepcion =
+          data.motivoRecepcion ?? data.MotivoRecepcion ?? "";
+        const matricula = data.matricula ?? data.Matricula ?? "";
         const fechaPrevista =
           data.fechaPrevistaEntrega ?? data.FechaPrevistaEntrega ?? "";
         const tiempoEstimado =
           data.tiempoEstimadoHoras ?? data.TiempoEstimadoHoras ?? "";
         const tiempoEstimadoNumero = Number(tiempoEstimado || 0);
         const observaciones = [
-          motivo ? `Motivo recibido: ${motivo}` : "",
           repuestos ? `Repuestos indicados en pre-orden: ${repuestos}` : "",
           data.observaciones ?? data.Observaciones ?? "",
         ]
@@ -1185,6 +1239,11 @@ export default function RegisterWorkOrder() {
           .join("\n");
 
         setPreOrderSourceId(preOrdenId);
+        setPreOrderReceptionReason(motivoRecepcion);
+        rememberPreOrderReceptionReason({
+          matricula,
+          motivo: motivoRecepcion,
+        });
         setEditingId(null);
         setOrder({
           ...EMPTY_ORDER,
@@ -1194,7 +1253,7 @@ export default function RegisterWorkOrder() {
           Dni: data.dni ?? data.Dni ?? "",
           Telefono: data.telefono ?? data.Telefono ?? "",
           Direccion: data.direccion ?? data.Direccion ?? "",
-          Matricula: data.matricula ?? data.Matricula ?? "",
+          Matricula: matricula,
           Marca: data.marca ?? data.Marca ?? "",
           Modelo: data.modelo ?? data.Modelo ?? "",
           Kilometraje: data.kilometraje ?? data.Kilometraje ?? "",
@@ -1204,12 +1263,12 @@ export default function RegisterWorkOrder() {
             : "",
           TiempoEstimadoHoras: tiempoEstimado ?? "",
           TipoOperacion: data.tipoOperacion ?? data.TipoOperacion ?? "Mecanica",
-          Trabajo: diagnostico || motivo,
+          Trabajo: diagnostico,
           Items:
-            tiempoEstimadoNumero > 0
+            diagnostico && tiempoEstimadoNumero > 0
               ? [
                   createDetailItem(
-                    diagnostico || motivo || "Trabajo mecánico",
+                    diagnostico,
                     tiempoEstimadoNumero,
                     0,
                     {
@@ -1306,7 +1365,7 @@ export default function RegisterWorkOrder() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateSearch, dateFrom, dateTo, showOrders]);
+  }, [plateSearch, statusFilter, billedFilter, dateFrom, dateTo, showOrders]);
 
   useEffect(() => {
     if (window.location.hash) {
@@ -1510,15 +1569,22 @@ export default function RegisterWorkOrder() {
         await api.put(`/PreOrdenTrabajo/${preOrderSourceId}/convertida`, {
           idOrdenTrabajo: savedOrderId,
         });
+        rememberPreOrderReceptionReason({
+          matricula: order.Matricula,
+          orderId: savedOrderId,
+          motivo: preOrderReceptionReason,
+        });
         setSuccessModal(
           "Orden registrada y pre-orden marcada como convertida.",
         );
         setPreOrderSourceId(null);
+        setPreOrderReceptionReason("");
         setSearchParams({});
       }
 
       setOrder(EMPTY_ORDER);
       setEditingId(null);
+      setPreOrderReceptionReason("");
       setCustomerSearch("");
       setCustomerMatches([]);
       setShowNewCustomer(false);
@@ -2122,7 +2188,7 @@ export default function RegisterWorkOrder() {
             Trabajo y costes
           </h3>
 
-          <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 lg:grid-cols-[1fr_1fr_auto]">
+          <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-200 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
             <div className="relative">
               <Wrench
                 size={16}
@@ -2173,10 +2239,20 @@ export default function RegisterWorkOrder() {
             >
               {savingService ? "Guardando..." : "Guardar servicio"}
             </button>
+
+            {detailedRepairLinesEnabled && (
+              <button
+                type="button"
+                onClick={addManualDetailLine}
+                className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+              >
+                Agregar línea
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <textarea
+            {/* <textarea
               name="Trabajo"
               value={order.Trabajo}
               onChange={handleChange}
@@ -2188,21 +2264,9 @@ export default function RegisterWorkOrder() {
 
             <div className="md:col-span-4 text-xs font-semibold uppercase tracking-wide text-slate-600">
               Líneas de detalle / costes
-            </div>
+            </div> */}
 
-            {detailedRepairLinesEnabled && (
-              <div className="md:col-span-4 flex justify-end">
-                <button
-                  type="button"
-                  onClick={addManualDetailLine}
-                  className="inline-flex items-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-bold text-white hover:bg-slate-800"
-                >
-                  Agregar línea
-                </button>
-              </div>
-            )}
-
-            <div className="space-y-2 rounded-l-xl border border-r-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
+            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/80 p-3 md:col-span-4">
               <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Repuesto
               </label>
@@ -2210,22 +2274,6 @@ export default function RegisterWorkOrder() {
                 onSelect={addPartToOrder}
                 placeholder="Buscar pieza o repuesto"
                 buttonLabel="Agregar"
-              />
-            </div>
-
-            <div className="space-y-2 rounded-r-xl border border-l-0 border-slate-200 bg-slate-50/80 p-3 md:col-span-2">
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Mano de obra (EUR)
-              </label>
-              <input
-                name="ManoObra"
-                type="number"
-                step="0.01"
-                value={order.ManoObra}
-                onChange={handleChange}
-                onBlur={(e) => upsertLaborItem(e.target.value)}
-                className={cls}
-                placeholder="Mano de obra"
               />
             </div>
 
@@ -2473,6 +2521,7 @@ export default function RegisterWorkOrder() {
               setOrder(EMPTY_ORDER);
               setEditingId(null);
               setPreOrderSourceId(null);
+              setPreOrderReceptionReason("");
               setSearchParams({});
               setCustomerSearch("");
               setCustomerMatches([]);
@@ -2508,7 +2557,7 @@ export default function RegisterWorkOrder() {
           id="ordenes-recientes"
           className="mt-4 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6"
         >
-          <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,320px)_auto_auto_auto] md:items-end">
+          <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,280px)_auto_auto_auto_auto_auto] md:items-end">
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-slate-800">
                 Órdenes recientes
@@ -2526,6 +2575,29 @@ export default function RegisterWorkOrder() {
               placeholder={labels.referenceSearchPlaceholder}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              aria-label="Filtrar por estado"
+            >
+              <option value="">Todos los estados</option>
+              {WORK_ORDER_STATES.map((state) => (
+                <option key={state} value={state}>
+                  {state}
+                </option>
+              ))}
+            </select>
+            <select
+              value={billedFilter}
+              onChange={(e) => setBilledFilter(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              aria-label="Filtrar por facturación"
+            >
+              <option value="">Todas</option>
+              <option value="pendientes">Sin facturar</option>
+              <option value="facturadas">Facturadas</option>
+            </select>
             <input
               type="date"
               value={dateFrom}
@@ -2539,11 +2611,13 @@ export default function RegisterWorkOrder() {
               onChange={(e) => setDateTo(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
-            {(plateSearch || dateFrom || dateTo) && (
+            {(plateSearch || statusFilter || billedFilter || dateFrom || dateTo) && (
               <button
                 type="button"
                 onClick={() => {
                   setPlateSearch("");
+                  setStatusFilter("");
+                  setBilledFilter("");
                   setDateFrom("");
                   setDateTo("");
                   setOrderPage(1);
@@ -2734,13 +2808,13 @@ export default function RegisterWorkOrder() {
                 </div>
 
                 <h4 className="mt-4 text-lg font-semibold text-slate-800">
-                  {plateSearch || dateFrom || dateTo
+                  {plateSearch || statusFilter || billedFilter || dateFrom || dateTo
                     ? "No se encontraron órdenes"
                     : "No hay órdenes registradas"}
                 </h4>
 
                 <p className="mt-2 text-sm text-slate-500">
-                  {plateSearch
+                  {plateSearch || statusFilter || billedFilter || dateFrom || dateTo
                     ? "Prueba buscando otra matrícula."
                     : "Las nuevas órdenes aparecerán aquí automáticamente."}
                 </p>

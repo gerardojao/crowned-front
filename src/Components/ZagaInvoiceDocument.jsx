@@ -253,6 +253,9 @@ export function usesZagaInvoiceTemplate(taller) {
 
 function VehicleTable({ invoice, paymentText }) {
   const operationType = String(invoice.tipoOperacion || "Mecanica").toUpperCase();
+  const marcaModelo =
+    invoice.marcaModelo || [invoice.marca, invoice.modelo].filter(Boolean).join(" ");
+  const chasis = invoice.chasis || invoice.bastidor || "";
 
   return (
     <div className="mt-2 text-[10px] uppercase">
@@ -270,7 +273,7 @@ function VehicleTable({ invoice, paymentText }) {
         <div>{invoice.matricula}</div>
         <div />
         <div>{invoice.km}</div>
-        <div>{invoice.marcaModelo || ""}</div>
+        <div>{marcaModelo}</div>
       </div>
       <div className="mt-1 grid grid-cols-5 bg-[#a7a7a7] text-center font-bold">
         <div>Núm. de Chasis</div>
@@ -280,7 +283,7 @@ function VehicleTable({ invoice, paymentText }) {
         <div>Recepción</div>
       </div>
       <div className="grid grid-cols-5 text-center">
-        <div>{invoice.chasis || ""}</div>
+        <div>{chasis}</div>
         <div>{invoice.motor || ""}</div>
         <div>{formatDateShort(invoice.fecha)}</div>
         <div>{formatDateShort(invoice.fecha)}</div>
@@ -536,7 +539,11 @@ function getPaymentDisplayText(invoice, selectedPaymentMethods) {
   }
 
   const labels = selectedPaymentMethods
-    .map((method) => method.label)
+    .map((method) => {
+      const label = method.label;
+      const amount = Number(method.amount || 0);
+      return label && amount > 0 ? `${label} ${eur.format(amount)}` : label;
+    })
     .filter(Boolean)
     .join(" / ");
   if (labels) return labels;

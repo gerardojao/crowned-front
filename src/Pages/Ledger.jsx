@@ -38,10 +38,14 @@ const defaultTypeForAccount = (account) =>
 
 const accountLabel = (account) =>
   ({
+    Cliente: "Ventas",
     Proveedor: "Compras/Gastos",
     IvaSoportado: "IVA soportado",
     IvaRepercutido: "IVA repercutido",
   })[account] || account;
+
+const isNoVatSummaryAccount = (account) =>
+  account === "Cliente" || account === "Proveedor";
 
 export default function Ledger() {
   const [moduleEnabled, setModuleEnabled] = useState(false);
@@ -500,7 +504,16 @@ export default function Ledger() {
                         key={account}
                         className="rounded-2xl border border-slate-200 bg-white p-4"
                       >
-                        <p className="font-bold text-slate-900">{accountLabel(account)}</p>
+                        <div className="flex items-center justify-center gap-2">
+                          <p className="font-bold text-slate-900">
+                            {accountLabel(account)}
+                          </p>
+                          {isNoVatSummaryAccount(account) && (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 ring-1 ring-slate-200">
+                              Sin IVA
+                            </span>
+                          )}
+                        </div>
                         <p className="mt-2 text-xs font-bold uppercase text-slate-400">
                           Saldo
                         </p>

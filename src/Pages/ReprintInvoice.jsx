@@ -10,6 +10,7 @@ import {
   currentFiscalYearStart,
   localDateInputValue,
 } from "../utils/date";
+import { getBusinessTerminology } from "../utils/businessTerminology";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -21,12 +22,47 @@ const DEFAULT_TALLER = {
   iban: "ES69 2100 4014 9122 0012 3843",
   logoUrl: "",
   documentTemplateKey: "",
+  terminologyProfile: "",
+  businessType: "",
 };
 
 const eur = new Intl.NumberFormat("es-ES", {
   style: "currency",
   currency: "EUR",
 });
+
+function firstNonEmpty(...values) {
+  return values.find((value) => String(value ?? "").trim()) ?? "";
+}
+
+function normalizeOrderVehicleData(row) {
+  if (!row) {
+    return {
+      matricula: "",
+      bastidor: "",
+      motor: "",
+      marca: "",
+      modelo: "",
+      marcaModelo: "",
+      km: "",
+      tipoOperacion: "",
+    };
+  }
+
+  const marca = row.marca ?? row.Marca ?? "";
+  const modelo = row.modelo ?? row.Modelo ?? "";
+
+  return {
+    matricula: row.matricula ?? row.Matricula ?? "",
+    bastidor: row.bastidor ?? row.Bastidor ?? "",
+    motor: row.motor ?? row.Motor ?? "",
+    marca,
+    modelo,
+    marcaModelo: [marca, modelo].filter(Boolean).join(" "),
+    km: row.kilometraje ?? row.Kilometraje ?? "",
+    tipoOperacion: row.tipoOperacion ?? row.TipoOperacion ?? "",
+  };
+}
 
 export default function ReprintInvoice() {
   const { idOrden, numeroFactura } = useParams();
@@ -123,6 +159,12 @@ export default function ReprintInvoice() {
           data.documentTemplateKey ??
           data.DocumentTemplateKey ??
           DEFAULT_TALLER.documentTemplateKey,
+        terminologyProfile:
+          data.terminologyProfile ??
+          data.TerminologyProfile ??
+          DEFAULT_TALLER.terminologyProfile,
+        businessType:
+          data.businessType ?? data.BusinessType ?? DEFAULT_TALLER.businessType,
       });
     } catch {
       setTaller(DEFAULT_TALLER);
@@ -168,10 +210,21 @@ export default function ReprintInvoice() {
       const ivaPct = subtotal > 0 ? Math.round((iva / subtotal) * 100) : 21;
       const tipoFactura = f.tipoFactura ?? f.TipoFactura ?? "Normal";
       const rectificativas = f.rectificativas ?? f.Rectificativas ?? [];
+      const linkedOrderId = f.idOrdenTrabajo ?? f.IdOrdenTrabajo ?? idOrden ?? "";
+      let orderVehicle = normalizeOrderVehicleData(null);
+
+      if (linkedOrderId) {
+        try {
+          const orderRes = await api.get(`/OrdenTrabajo/${linkedOrderId}`);
+          orderVehicle = normalizeOrderVehicleData(orderRes?.data?.data?.[0]);
+        } catch (err) {
+          console.error(err);
+        }
+      }
 
       setInvoice({
         id: f.id ?? f.Id ?? null,
-        idOrdenTrabajo: f.idOrdenTrabajo ?? f.IdOrdenTrabajo ?? "",
+        idOrdenTrabajo: linkedOrderId,
         idCliente: f.idCliente ?? f.IdCliente ?? "",
         numeroCliente: f.numeroCliente ?? f.NumeroCliente ?? f.idCliente ?? f.IdCliente ?? "",
         numero: f.numeroFactura ?? f.NumeroFactura ?? "",
@@ -185,12 +238,39 @@ export default function ReprintInvoice() {
         telefonoCliente: f.telefonoCliente ?? f.TelefonoCliente ?? "",
         clasificacionCliente: f.clasificacionCliente ?? f.ClasificacionCliente ?? "Particular",
         franquiciaImporte: f.franquiciaImporte ?? f.FranquiciaImporte ?? 0,
-        matricula: f.matricula ?? f.Matricula ?? "",
-        km: f.km ?? f.Km ?? "",
+        matricula: firstNonEmpty(
+          f.matricula,
+          f.Matricula,
+          orderVehicle.matricula,
+        ),
+        chasis: firstNonEmpty(
+          f.chasis,
+          f.Chasis,
+          f.bastidor,
+          f.Bastidor,
+          orderVehicle.bastidor,
+        ),
+        bastidor: firstNonEmpty(
+          f.bastidor,
+          f.Bastidor,
+          f.chasis,
+          f.Chasis,
+          orderVehicle.bastidor,
+        ),
+        motor: firstNonEmpty(f.motor, f.Motor, orderVehicle.motor),
+        marca: firstNonEmpty(f.marca, f.Marca, orderVehicle.marca),
+        modelo: firstNonEmpty(f.modelo, f.Modelo, orderVehicle.modelo),
+        marcaModelo:
+          firstNonEmpty(f.marcaModelo, f.MarcaModelo) ||
+          orderVehicle.marcaModelo,
+        km: firstNonEmpty(f.km, f.Km, orderVehicle.km),
         observaciones: f.observaciones ?? f.Observaciones ?? "",
         tipoOperacion:
-          f.tipoOperacion ??
-          f.TipoOperacion ??
+          firstNonEmpty(
+            f.tipoOperacion,
+            f.TipoOperacion,
+            orderVehicle.tipoOperacion,
+          ) ||
           (tipoFactura === "Recambio" ? "Recambio" : "Mecanica"),
         ivaPct,
         tipoPago: f.tipoPago ?? f.TipoPago ?? "",
@@ -239,6 +319,11 @@ export default function ReprintInvoice() {
   const isFreshlyIssued = searchParams.get("autoprint") === "1";
 
   const isRectificativa = invoice.tipoFactura === "Rectificativa";
+  const isWorkshopDuplicate =
+    !isFreshlyIssued &&
+    !isRectificativa &&
+    !["Recambio", "Rapel", "SinIva"].includes(invoice.tipoFactura);
+  const labels = getBusinessTerminology(taller);
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
   const documentTaller = {
     ...taller,
@@ -454,6 +539,8 @@ export default function ReprintInvoice() {
           totals={totals}
           isRectificativa={isRectificativa}
           isDuplicate={!isFreshlyIssued}
+          warrantyTitle={isWorkshopDuplicate ? labels.warrantyTitle : ""}
+          warrantyText={isWorkshopDuplicate ? labels.warrantyText : ""}
         />
       )}
 

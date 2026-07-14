@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { PackageSearch } from "lucide-react";
+import { PackageSearch, Plus, X } from "lucide-react";
 import api from "./api";
 
 const money = new Intl.NumberFormat("es-ES", {
@@ -41,20 +41,22 @@ export function getPartProviderName(part) {
   return getPartValue(part, "nombreProveedor", "");
 }
 
-// export default function PartPicker({
-//   onSelect,
-//   placeholder = "Buscar repuesto",
-//   buttonLabel = "Usar repuesto",
-//   className = "",
-//   allowCreate = true,
-// }) {
+const emptyPartForm = {
+  nombre: "",
+  precioVenta: "",
+  precioCompra: "",
+  marca: "",
+  codigoReferencia: "",
+  numeroFactura: "",
+  idProveedor: "",
+};
+
 export default function PartPicker({
   onSelect,
   placeholder = "Buscar repuesto",
   buttonLabel = "Usar repuesto",
   className = "",
   allowCreate = true,
-
 }) {
   const [accountsPayableEnabled, setAccountsPayableEnabled] = useState(false);
   const [query, setQuery] = useState("");
@@ -65,15 +67,7 @@ export default function PartPicker({
   const [createOpen, setCreateOpen] = useState(false);
   const [providers, setProviders] = useState([]);
   const [createError, setCreateError] = useState("");
-  const [newPart, setNewPart] = useState({
-    nombre: "",
-    precioVenta: "",
-    precioCompra: "",
-    marca: "",
-    codigoReferencia: "",
-    numeroFactura: "",
-    idProveedor: "",
-  });
+  const [newPart, setNewPart] = useState(emptyPartForm);
   const wrapperRef = useRef(null);
   const inputRef = useRef(null);
   const panelRef = useRef(null);
@@ -95,7 +89,6 @@ export default function PartPicker({
     const viewportLeft = visualViewport?.offsetLeft || 0;
     const gap = 6;
     const margin = 12;
-    
 
     if (viewportWidth < 640) {
       setPanelStyle({
@@ -133,36 +126,35 @@ export default function PartPicker({
   }, []);
 
   useEffect(() => {
-  let alive = true;
+    let alive = true;
 
-  const loadSettings = async () => {
-    try {
-      const res = await api.get("/WorkshopSettings");
+    const loadSettings = async () => {
+      try {
+        const res = await api.get("/WorkshopSettings");
+        const enabled =
+          res?.data?.enableStockPayments ??
+          res?.data?.EnableStockPayments ??
+          res?.data?.data?.enableStockPayments ??
+          res?.data?.data?.EnableStockPayments ??
+          false;
 
-      const enabled =
-        res?.data?.enableStockPayments ??
-        res?.data?.EnableStockPayments ??
-        res?.data?.data?.enableStockPayments ??
-        res?.data?.data?.EnableStockPayments ??
-        false;
-
-      if (alive) {
-        setAccountsPayableEnabled(Boolean(enabled));
+        if (alive) {
+          setAccountsPayableEnabled(Boolean(enabled));
+        }
+      } catch (err) {
+        console.error("No se pudo validar EnableStockPayments", err);
+        if (alive) {
+          setAccountsPayableEnabled(false);
+        }
       }
-    } catch (err) {
-      console.error("No se pudo validar EnableStockPayments", err);
-      if (alive) {
-        setAccountsPayableEnabled(false);
-      }
-    }
-  };
+    };
 
-  loadSettings();
+    loadSettings();
 
-  return () => {
-    alive = false;
-  };
-}, []);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const onClickOutside = (event) => {
@@ -198,7 +190,7 @@ export default function PartPicker({
       window.removeEventListener("resize", updatePanelPosition);
       window.removeEventListener("scroll", onPageScroll, true);
     };
-  }, [open, createOpen, parts.length, updatePanelPosition]);
+  }, [open, parts.length, updatePanelPosition]);
 
   useEffect(() => {
     let alive = true;
@@ -232,7 +224,7 @@ export default function PartPicker({
   }, [trimmedQuery]);
 
   useEffect(() => {
-    if (!createOpen) return;
+    if (!createOpen) return undefined;
 
     let alive = true;
     api
@@ -262,6 +254,13 @@ export default function PartPicker({
     if (!parts.length) return "No hay repuestos para mostrar.";
     return "Selecciona un repuesto para traer sus precios.";
   }, [loading, parts.length]);
+
+  const openCreateModal = () => {
+    setOpen(false);
+    setCreateError("");
+    setCreateOpen(true);
+    setNewPart((prev) => ({ ...prev, nombre: prev.nombre || query }));
+  };
 
   const selectPart = (part) => {
     onSelect?.(part);
@@ -307,57 +306,32 @@ export default function PartPicker({
       return;
     }
 
-    // if (!newPart.numeroFactura.trim()) {
-    //   setCreateError("Indica el Nº Factura del repuesto.");
-    //   return;
-    // }
-
     if (!accountsPayableEnabled && !newPart.numeroFactura.trim()) {
-  setCreateError("Indica el Nº Factura del repuesto.");
-  return;
-}
+      setCreateError("Indica el Nº Factura del repuesto.");
+      return;
+    }
 
     try {
       setCreating(true);
       setCreateError("");
-      // const idProveedor = await ensureProvider();
-      // const payload = {
-      //   nombre,
-      //   codigoReferencia: newPart.codigoReferencia.trim() || null,
-      //   numeroFactura: newPart.numeroFactura.trim(),
-      //   marca: newPart.marca.trim() || null,
-      //   categoria: "Repuestos",
-      //   cantidad: 0,
-      //   stockMinimo: 3,
-      //   precioCompra: Number(newPart.precioCompra || 0),
-      //   precioVenta,
-      //   ubicacion: null,
-      //   observaciones: "Registrado desde presupuesto, orden o factura.",
-      //   idProveedor,
-      // };
-
       const idProveedor = accountsPayableEnabled ? null : await ensureProvider();
 
-const payload = {
-  nombre,
-  codigoReferencia: newPart.codigoReferencia.trim() || null,
-  numeroFactura: accountsPayableEnabled
-    ? null
-    : newPart.numeroFactura.trim(),
-  marca: newPart.marca.trim() || null,
-  categoria: "Repuestos",
-  cantidad: 0,
-  stockMinimo: 3,
-  precioCompra: accountsPayableEnabled
-    ? 0
-    : Number(newPart.precioCompra || 0),
-  precioVenta,
-  ubicacion: null,
-  observaciones: accountsPayableEnabled
-    ? "Artículo registrado desde selector. Coste y proveedor se asignarán desde albarán."
-    : "Registrado desde presupuesto, orden o factura.",
-  idProveedor,
-};
+      const payload = {
+        nombre,
+        codigoReferencia: newPart.codigoReferencia.trim() || null,
+        numeroFactura: accountsPayableEnabled ? null : newPart.numeroFactura.trim(),
+        marca: newPart.marca.trim() || null,
+        categoria: "Repuestos",
+        cantidad: 0,
+        stockMinimo: 3,
+        precioCompra: accountsPayableEnabled ? 0 : Number(newPart.precioCompra || 0),
+        precioVenta,
+        ubicacion: null,
+        observaciones: accountsPayableEnabled
+          ? "Artículo registrado desde selector. Coste y proveedor se asignarán desde albarán."
+          : "Registrado desde presupuesto, orden o factura.",
+        idProveedor,
+      };
 
       const res = await api.post("/RepuestoStock", payload);
       const createdId = res?.data?.data?.[0]?.id ?? res?.data?.data?.[0]?.Id;
@@ -370,15 +344,7 @@ const payload = {
       };
 
       selectPart(createdPart);
-      setNewPart({
-        nombre: "",
-        precioVenta: "",
-        precioCompra: "",
-        marca: "",
-        codigoReferencia: "",
-        numeroFactura: "",
-        idProveedor: "",
-      });
+      setNewPart(emptyPartForm);
       setCreateOpen(false);
     } catch (err) {
       console.error(err);
@@ -395,201 +361,218 @@ const payload = {
 
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
-      <PackageSearch
-        size={16}
-        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-      />
-      <input
-        ref={inputRef}
-        type="search"
-        value={query}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQuery(e.target.value);
-          setOpen(true);
-        }}
-        className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-700"
-        placeholder={placeholder}
-      />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative min-w-0 flex-1">
+          <PackageSearch
+            size={16}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            ref={inputRef}
+            type="search"
+            value={query}
+            onFocus={() => setOpen(true)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-700"
+            placeholder={placeholder}
+          />
+        </div>
 
-      {open && panelStyle && createPortal(
-        <div
-          ref={panelRef}
-          style={panelStyle}
-          className="overflow-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-2xl"
-        >
-          <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
-            {helperText}
-          </div>
+        {allowCreate && (
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white hover:bg-slate-800"
+          >
+            <Plus size={16} />
+            {accountsPayableEnabled ? "Nuevo artículo" : "Nuevo recambio"}
+          </button>
+        )}
+      </div>
 
-          {parts.length > 0 && (
-            <div className="max-h-64 overflow-auto">
-              {parts.map((part) => {
-                const id = getPartValue(part, "id");
-                const name = getPartDisplayName(part);
-                const price = getPartSalePrice(part);
-                const provider = getPartValue(part, "nombreProveedor");
-
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => selectPart(part)}
-                    className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left hover:bg-orange-50"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-slate-800">
-                        {name || "Repuesto sin nombre"}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-slate-500">
-                        {provider ? `Proveedor: ${provider}` : "Referencia de repuesto"}
-                      </span>
-                    </span>
-                    <span className="shrink-0 text-right">
-                      <span className="block text-sm font-extrabold text-emerald-700">
-                        {money.format(price)}
-                      </span>
-                      <span className="text-[11px] font-semibold text-orange-700">
-                        {buttonLabel}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
+      {open &&
+        panelStyle &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={panelStyle}
+            className="overflow-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-2xl"
+          >
+            <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+              {helperText}
             </div>
-          )}
 
-          {allowCreate && (
-            <div className="border-t border-slate-200 bg-slate-50 p-3">
-              {!createOpen ? (
+            {parts.length > 0 && (
+              <div className="max-h-64 overflow-auto">
+                {parts.map((part) => {
+                  const id = getPartValue(part, "id");
+                  const name = getPartDisplayName(part);
+                  const price = getPartSalePrice(part);
+                  const provider = getPartValue(part, "nombreProveedor");
+
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => selectPart(part)}
+                      className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left hover:bg-orange-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-slate-800">
+                          {name || "Repuesto sin nombre"}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-slate-500">
+                          {provider ? `Proveedor: ${provider}` : "Referencia de repuesto"}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-right">
+                        <span className="block text-sm font-extrabold text-emerald-700">
+                          {money.format(price)}
+                        </span>
+                        <span className="text-[11px] font-semibold text-orange-700">
+                          {buttonLabel}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
+
+      {createOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100001] flex items-center justify-center bg-slate-900/40 p-4"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    {accountsPayableEnabled ? "Nuevo artículo" : "Nuevo recambio"}
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Registra el repuesto y úsalo en esta línea.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setCreateOpen(true);
-                    setNewPart((prev) => ({ ...prev, nombre: prev.nombre || query }));
-                  }}
-                  className="w-full rounded-lg bg-slate-800 px-3 py-2 text-sm font-bold text-white hover:bg-slate-900"
+                  onClick={() => setCreateOpen(false)}
+                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  aria-label="Cerrar"
                 >
-                  {accountsPayableEnabled ? "Registrar artículo" : "Registrar nuevo recambio"}
+                  <X size={18} />
                 </button>
-              ) : (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              </div>
+
+              <div className="space-y-3 px-5 py-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <input
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Referencia opcional"
+                    value={newPart.codigoReferencia}
+                    onChange={(e) => setNewPartField("codigoReferencia", e.target.value)}
+                  />
+                  {!accountsPayableEnabled && (
                     <input
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Referencia opcional"
-                      value={newPart.codigoReferencia}
-                      onChange={(e) => setNewPartField("codigoReferencia", e.target.value)}
-                    />
-                    {/* <input
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Nº Factura / Albaran"
-                      value={newPart.numeroFactura}
-                      onChange={(e) => setNewPartField("numeroFactura", e.target.value)}
-                    /> */}
-                    {!accountsPayableEnabled && (
-                    <input
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Nº Factura / Albaran"
+                      placeholder="Nº Factura / Albarán"
                       value={newPart.numeroFactura}
                       onChange={(e) => setNewPartField("numeroFactura", e.target.value)}
                     />
                   )}
+                  <input
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Nombre del repuesto"
+                    value={newPart.nombre}
+                    onChange={(e) => setNewPartField("nombre", e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Precio venta"
+                    value={newPart.precioVenta}
+                    onChange={(e) => setNewPartField("precioVenta", e.target.value)}
+                  />
+                  {!accountsPayableEnabled && (
                     <input
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Nombre del repuesto"
-                      value={newPart.nombre}
-                      onChange={(e) => setNewPartField("nombre", e.target.value)}
-                    />
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Precio venta."
-                      value={newPart.precioVenta}
-                      onChange={(e) => setNewPartField("precioVenta", e.target.value)}
-                    />
-                    {/* <input
                       type="number"
                       step="0.01"
                       className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       placeholder="Precio compra opcional"
                       value={newPart.precioCompra}
                       onChange={(e) => setNewPartField("precioCompra", e.target.value)}
-                    /> */}
-                    {!accountsPayableEnabled && (
-  <input
-    type="number"
-    step="0.01"
-    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-    placeholder="Precio compra opcional"
-    value={newPart.precioCompra}
-    onChange={(e) => setNewPartField("precioCompra", e.target.value)}
-  />
-)}
-                    <input
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Marca opcional"
-                      value={newPart.marca}
-                      onChange={(e) => setNewPartField("marca", e.target.value)}
                     />
-{!accountsPayableEnabled && (
-  <select
-    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
-    value={newPart.idProveedor}
-    onChange={(e) => setNewPartField("idProveedor", e.target.value)}
-  >
-    {providers.length === 0 && (
-      <option value="">Proveedor por definir</option>
-    )}
-    {providers.map((provider) => (
-      <option
-        key={provider.id ?? provider.Id}
-        value={provider.id ?? provider.Id}
-      >
-        {provider.nombre ?? provider.Nombre}
-      </option>
-    ))}
-  </select>
-)}
-                  </div>
-
-      {accountsPayableEnabled && (
-  <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
-    En modo compras, el proveedor, el coste y el documento de compra se asignarán desde el albarán.
-  </p>
-)}            
-
-                  {createError && (
-                    <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
-                      {createError}
-                    </p>
                   )}
-
-                  <div className="flex flex-wrap justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCreateOpen(false)}
-                      className="rounded-lg bg-white px-3 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                  <input
+                    className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                    placeholder="Marca opcional"
+                    value={newPart.marca}
+                    onChange={(e) => setNewPartField("marca", e.target.value)}
+                  />
+                  {!accountsPayableEnabled && (
+                    <select
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                      value={newPart.idProveedor}
+                      onChange={(e) => setNewPartField("idProveedor", e.target.value)}
                     >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={createPart}
-                      disabled={creating}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
-                    >
-                      {creating ? "Guardando..." : "Guardar y usar"}
-                    </button>
-                  </div>
+                      {providers.length === 0 && (
+                        <option value="">Proveedor por definir</option>
+                      )}
+                      {providers.map((provider) => (
+                        <option
+                          key={provider.id ?? provider.Id}
+                          value={provider.id ?? provider.Id}
+                        >
+                          {provider.nombre ?? provider.Nombre}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
-              )}
+
+                {accountsPayableEnabled && (
+                  <p className="rounded-lg bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 ring-1 ring-sky-200">
+                    En modo compras, el proveedor, el coste y el documento de compra se asignarán desde el albarán.
+                  </p>
+                )}
+
+                {createError && (
+                  <p className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">
+                    {createError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => setCreateOpen(false)}
+                  className="rounded-lg bg-white px-4 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={createPart}
+                  disabled={creating}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {creating ? "Guardando..." : "Guardar y usar"}
+                </button>
+              </div>
             </div>
-          )}
-        </div>,
-        document.body,
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

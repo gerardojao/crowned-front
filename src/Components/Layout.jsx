@@ -884,7 +884,7 @@ export default function Layout({ children }) {
       <main
         className={
           isCompactRoute
-            ? "w-full flex-1 px-4 sm:px-6 lg:px-8 pb-12"
+            ? "mx-auto w-full max-w-screen-2xl flex-1 px-4 sm:px-6 lg:px-8 pb-12"
             : "mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 pb-12 space-y-6 flex-1"
         }
       >

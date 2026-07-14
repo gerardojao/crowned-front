@@ -111,6 +111,25 @@ function ensureOk(res) {
 
 export default function RegisterCustomer() {
   const labels = useBusinessTerminology();
+  const assetSingular = labels.assetSingular || "vehículo";
+  const assetPlural = labels.kind === "service" ? "equipos" : "vehículos";
+  const assetSingularTitle =
+    assetSingular.charAt(0).toUpperCase() + assetSingular.slice(1);
+  const assetPluralTitle =
+    assetPlural.charAt(0).toUpperCase() + assetPlural.slice(1);
+  const assetReferencePlaceholder =
+    labels.kind === "service" ? "CH-AC-001" : "1234ABC";
+  const assetModelPlaceholder =
+    labels.kind === "service" ? "Split, termo, caldera..." : "Corolla";
+  const assetMakePlaceholder = labels.kind === "service" ? "Daikin" : "Toyota";
+  const assetDateLabel =
+    labels.kind === "service" ? "Fecha instalación" : "Fecha matriculación";
+  const assetEnergyLabel = labels.kind === "service" ? "Tipo de energía" : "Combustible";
+  const assetEnergyPlaceholder =
+    labels.kind === "service" ? "Gas, aerotermia, eléctrico..." : "Gasolina, diesel, híbrido...";
+  const assetNotesPlaceholder = `Notas internas del ${assetSingular}...`;
+  const assetSerialLabel = labels.kind === "service" ? "Nº serie" : "Bastidor";
+  const assetMotorLabel = labels.kind === "service" ? "Sistema" : "Motor";
   const [customer, setCustomer] = useState(EMPTY_CUSTOMER);
   const [customers, setCustomers] = useState([]);
   const [viewMode, setViewMode] = useState("search");
@@ -230,7 +249,7 @@ export default function RegisterCustomer() {
         text:
           err?.response?.data?.message ||
           err?.message ||
-          "No se pudieron cargar los vehículos del cliente.",
+          `No se pudieron cargar los ${assetPlural} del cliente.`,
       });
     } finally {
       setVehiclesLoading(false);
@@ -267,7 +286,7 @@ export default function RegisterCustomer() {
         ) {
           setNotice({
             type: "error",
-            text: "Para registrar el coche indica matrícula y modelo.",
+            text: `${labels.referenceRequiredMessage} ${labels.modelRequiredMessage}`,
           });
           return;
         }
@@ -315,7 +334,7 @@ export default function RegisterCustomer() {
         setNotice({
           type: "success",
           text: includeVehicle
-            ? "Cliente registrado con coche correctamente."
+            ? `Cliente registrado con ${assetSingular} correctamente.`
             : "Cliente registrado correctamente.",
         });
       }
@@ -531,7 +550,7 @@ export default function RegisterCustomer() {
     ) {
       setNotice({
         type: "error",
-        text: "La matrícula y el modelo del vehículo son requeridos.",
+        text: `${labels.referenceRequiredMessage} ${labels.modelRequiredMessage}`,
       });
       return;
     }
@@ -571,8 +590,8 @@ export default function RegisterCustomer() {
         type: "success",
         text:
           vehicleModal.mode === "edit"
-            ? "Vehículo actualizado correctamente."
-            : "Vehiculo agregado correctamente.",
+            ? `${assetSingularTitle} actualizado correctamente.`
+            : `${assetSingularTitle} agregado correctamente.`,
       });
     } catch (err) {
       console.error(err);
@@ -581,7 +600,7 @@ export default function RegisterCustomer() {
         text:
           err?.response?.data?.message ||
           err?.message ||
-          "No se pudo guardar el vehículo.",
+          `No se pudo guardar el ${assetSingular}.`,
       });
       setVehicleModal((current) => ({ ...current, saving: false }));
     }
@@ -670,7 +689,7 @@ export default function RegisterCustomer() {
 
                 <input
                   type="text"
-                  placeholder="Nombre, teléfono, matrícula o modelo"
+                  placeholder={`Nombre, teléfono, ${labels.referenceLabel.toLowerCase()} o ${labels.modelLabel.toLowerCase()}`}
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -713,7 +732,7 @@ export default function RegisterCustomer() {
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
                     Una vez seleccionado o registrado, podrás asociarle uno o
-                    varios vehículos.
+                    varios {assetPlural}.
                   </p>
                 </div>
               </div>
@@ -876,11 +895,11 @@ export default function RegisterCustomer() {
                 <div>
                   <p className="text-sm font-semibold text-slate-800">
                     {includeVehicle
-                      ? "Coche incluido en el registro"
-                      : "Registrar coche ahora"}
+                      ? `${assetSingularTitle} incluido en el registro`
+                      : `Registrar ${assetSingular} ahora`}
                   </p>
                   <p className="text-xs text-slate-500">
-                    Puedes guardar solo el cliente y agregar coches despues.
+                    Puedes guardar solo el cliente y agregar {assetPlural} después.
                   </p>
                 </div>
                 <button
@@ -889,8 +908,8 @@ export default function RegisterCustomer() {
                   className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                 >
                   {includeVehicle
-                    ? "Quitar coche del registro"
-                    : "Agregar coche al cliente"}
+                    ? `Quitar ${assetSingular} del registro`
+                    : `Agregar ${assetSingular} al cliente`}
                 </button>
               </div>
             )}
@@ -914,9 +933,7 @@ export default function RegisterCustomer() {
                       value={customer.Matricula}
                       onChange={handleChange}
                       className={cls("Matricula")}
-                      placeholder={
-                        labels.kind === "service" ? "CH-AC-001" : "1234ABC"
-                      }
+                      placeholder={assetReferencePlaceholder}
                     />
                   </div>
 
@@ -931,13 +948,13 @@ export default function RegisterCustomer() {
                       value={customer.Marca}
                       onChange={handleChange}
                       className={cls("Marca")}
-                      placeholder="Toyota"
+                      placeholder={assetMakePlaceholder}
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Bastidor
+                      {assetSerialLabel}
                     </label>
                     <input
                       type="text"
@@ -960,17 +977,13 @@ export default function RegisterCustomer() {
                       value={customer.Modelo}
                       onChange={handleChange}
                       className={cls("Modelo")}
-                      placeholder={
-                        labels.kind === "service"
-                          ? "Split, termo, caldera..."
-                          : "Corolla"
-                      }
+                      placeholder={assetModelPlaceholder}
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Fecha matriculación
+                      {assetDateLabel}
                     </label>
                     <input
                       type="date"
@@ -983,7 +996,7 @@ export default function RegisterCustomer() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Motor
+                      {assetMotorLabel}
                     </label>
                     <input
                       type="text"
@@ -1027,7 +1040,7 @@ export default function RegisterCustomer() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                      Combustible
+                      {assetEnergyLabel}
                     </label>
                     <input
                       type="text"
@@ -1035,7 +1048,7 @@ export default function RegisterCustomer() {
                       value={customer.Combustible}
                       onChange={handleChange}
                       className={cls("Combustible")}
-                      placeholder="Gasolina, diesel, hibrido..."
+                      placeholder={assetEnergyPlaceholder}
                     />
                   </div>
 
@@ -1069,7 +1082,7 @@ export default function RegisterCustomer() {
                   : editingId
                     ? "Actualizar cliente"
                     : includeVehicle
-                      ? "Registrar cliente con coche"
+                      ? `Registrar cliente con ${assetSingular}`
                       : "Registrar solo cliente"}
               </button>
 
@@ -1097,10 +1110,10 @@ export default function RegisterCustomer() {
               <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-slate-800">
-                    Vehiculos del cliente
+                    {assetPluralTitle} del cliente
                   </h3>
                   <p className="text-sm text-slate-500">
-                    Agrega o edita coches asociados a este cliente.
+                    Agrega o edita {assetPlural} asociados a este cliente.
                   </p>
                 </div>
                 <button
@@ -1108,25 +1121,25 @@ export default function RegisterCustomer() {
                   onClick={openVehicleCreate}
                   className="inline-flex items-center rounded-xl bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-900"
                 >
-                  Agregar vehículo
+                  Agregar {assetSingular}
                 </button>
               </div>
 
               {vehiclesLoading ? (
-                <p className="text-sm text-slate-500">Cargando vehículos...</p>
+                <p className="text-sm text-slate-500">Cargando {assetPlural}...</p>
               ) : vehicles.length === 0 ? (
                 <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
-                  Este cliente no tiene vehículos asociados todavía.
+                  Este cliente no tiene {assetPlural} asociados todavía.
                 </p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-slate-200 text-slate-600">
-                        <th className="py-3 text-left">Matricula</th>
-                        <th className="py-3 text-left">Marca</th>
-                        <th className="py-3 text-left">Modelo</th>
-                        <th className="py-3 text-left">Bastidor</th>
+                        <th className="py-3 text-left">{labels.referenceLabel}</th>
+                        <th className="py-3 text-left">{labels.makeLabel}</th>
+                        <th className="py-3 text-left">{labels.modelLabel}</th>
+                        <th className="py-3 text-left">{assetSerialLabel}</th>
                         <th className="py-3 text-left">{labels.metricLabel}</th>
                         <th className="py-3 text-left"></th>
                       </tr>
@@ -1215,7 +1228,7 @@ export default function RegisterCustomer() {
                   <th className="text-left py-3">DNI/NIE</th>
                   <th className="text-left py-3">Teléfono</th>
                   <th className="text-left py-3">Clasificacion</th>
-                  <th className="text-left py-3">Coches registrados</th>
+                  <th className="text-left py-3">{assetPluralTitle} registrados</th>
                   <th className="text-left py-3">Acciones</th>
                 </tr>
               </thead>
@@ -1324,7 +1337,7 @@ export default function RegisterCustomer() {
             </p>
 
             <p className="mt-2 text-xs text-slate-500">
-              Se actualizarán solo los datos del cliente. Los coches asociados
+              Se actualizarán solo los datos del cliente. Los {assetPlural} asociados
               se gestionan desde su sección.
             </p>
 
@@ -1409,11 +1422,11 @@ export default function RegisterCustomer() {
               <div>
                 <h3 className="text-xl font-semibold text-slate-900">
                   {vehicleModal.mode === "edit"
-                    ? "Editar coche"
-                    : "Agregar coche"}
+                    ? `Editar ${assetSingular}`
+                    : `Agregar ${assetSingular}`}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
-                  Este coche quedará asociado al cliente seleccionado.
+                  Este {assetSingular} quedará asociado al cliente seleccionado.
                 </p>
               </div>
 
@@ -1438,14 +1451,14 @@ export default function RegisterCustomer() {
                     label={`${labels.referenceLabel} *`}
                     value={vehicleModal.form.Matricula}
                     onChange={(v) => setVehicleField("Matricula", v)}
-                    placeholder="1234 ABC"
+                    placeholder={assetReferencePlaceholder}
                   />
 
                                     <VehicleInput
                     label="Marca *"
                     value={vehicleModal.form.Marca}
                     onChange={(v) => setVehicleField("Marca", v)}
-                    placeholder="Toyota"
+                    placeholder={assetMakePlaceholder}
                     required
                   />
 
@@ -1453,7 +1466,7 @@ export default function RegisterCustomer() {
                     label={`${labels.modelLabel} *`}
                     value={vehicleModal.form.Modelo}
                     onChange={(v) => setVehicleField("Modelo", v)}
-                    placeholder="Corolla"
+                    placeholder={assetModelPlaceholder}
                     required
                   />
 
@@ -1475,25 +1488,25 @@ export default function RegisterCustomer() {
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <VehicleInput
-                    label="Motor"
+                    label={assetMotorLabel}
                     value={vehicleModal.form.Motor}
                     onChange={(v) => setVehicleField("Motor", v)}
                     placeholder="1.6 TDI"
                   />
 
                   <VehicleInput
-                    label="Combustible"
+                    label={assetEnergyLabel}
                     value={vehicleModal.form.Combustible}
                     onChange={(v) => setVehicleField("Combustible", v)}
-                    placeholder="Diésel"
+                    placeholder={labels.kind === "service" ? "Aerotermia" : "Diésel"}
                   />
 
                   <VehicleInput
                     type="number"
-                    label="Kilometraje"
+                    label={labels.metricLabel}
                     value={vehicleModal.form.Kilometraje}
                     onChange={(v) => setVehicleField("Kilometraje", v)}
-                    placeholder="120000"
+                    placeholder={labels.kind === "service" ? "4 años" : "120000"}
                   />
 
                   <div className="grid grid-cols-2 gap-4">
@@ -1524,7 +1537,7 @@ export default function RegisterCustomer() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <VehicleInput
                     type="date"
-                    label="Fecha matriculación"
+                    label={assetDateLabel}
                     value={vehicleModal.form.FechaMatriculacion}
                     onChange={(v) => setVehicleField("FechaMatriculacion", v)}
                   />
@@ -1538,7 +1551,7 @@ export default function RegisterCustomer() {
 
                   <VehicleInput
                     type="date"
-                    label="Próxima ITV"
+                    label={labels.kind === "service" ? "Próxima revisión" : "Próxima ITV"}
                     value={vehicleModal.form.ProximaItv}
                     onChange={(v) => setVehicleField("ProximaItv", v)}
                   />
@@ -1557,7 +1570,7 @@ export default function RegisterCustomer() {
                     onChange={(e) =>
                       setVehicleField("Observaciones", e.target.value)
                     }
-                    placeholder="Notas internas del vehículo..."
+                    placeholder={assetNotesPlaceholder}
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
                   />
                 </label>
@@ -1575,29 +1588,29 @@ export default function RegisterCustomer() {
                     label={`${labels.referenceLabel} *`}
                     value={vehicleModal.form.Matricula}
                     onChange={(v) => setVehicleField("Matricula", v)}
-                    placeholder="1234 ABC"
+                    placeholder={assetReferencePlaceholder}
                   />
 
                   <VehicleInput
                     label={labels.makeLabel}
                     value={vehicleModal.form.Marca}
                     onChange={(v) => setVehicleField("Marca", v)}
-                    placeholder="Toyota"
+                    placeholder={assetMakePlaceholder}
                   />
 
                   <VehicleInput
                     label={`${labels.modelLabel} *`}
                     value={vehicleModal.form.Modelo}
                     onChange={(v) => setVehicleField("Modelo", v)}
-                    placeholder="Corolla"
+                    placeholder={assetModelPlaceholder}
                   />
 
                   <VehicleInput
                     type="number"
-                    label="Kilometraje"
+                    label={labels.metricLabel}
                     value={vehicleModal.form.Kilometraje}
                     onChange={(v) => setVehicleField("Kilometraje", v)}
-                    placeholder="120000"
+                    placeholder={labels.kind === "service" ? "4 años" : "120000"}
                   />
 
                   <VehicleInput
@@ -1608,10 +1621,10 @@ export default function RegisterCustomer() {
                   />
 
                   <VehicleInput
-                    label="Combustible"
+                    label={assetEnergyLabel}
                     value={vehicleModal.form.Combustible}
                     onChange={(v) => setVehicleField("Combustible", v)}
-                    placeholder="Diésel"
+                    placeholder={labels.kind === "service" ? "Aerotermia" : "Diésel"}
                   />
                 </div>
               </section>
@@ -1638,7 +1651,7 @@ export default function RegisterCustomer() {
                 {showVehicleExtra && (
                   <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
                     <VehicleInput
-                      label="Bastidor"
+                      label={assetSerialLabel}
                       value={vehicleModal.form.Bastidor}
                       onChange={(v) => setVehicleField("Bastidor", v)}
                       placeholder="VF1..."
@@ -1664,7 +1677,7 @@ export default function RegisterCustomer() {
 
                     <VehicleInput
                       type="date"
-                      label="Fecha matriculación"
+                      label={assetDateLabel}
                       value={vehicleModal.form.FechaMatriculacion}
                       onChange={(v) => setVehicleField("FechaMatriculacion", v)}
                     />
@@ -1678,7 +1691,7 @@ export default function RegisterCustomer() {
 
                     <VehicleInput
                       type="date"
-                      label="Próxima ITV"
+                      label={labels.kind === "service" ? "Próxima revisión" : "Próxima ITV"}
                       value={vehicleModal.form.ProximaItv}
                       onChange={(v) => setVehicleField("ProximaItv", v)}
                     />
@@ -1698,7 +1711,7 @@ export default function RegisterCustomer() {
                     onChange={(e) =>
                       setVehicleField("Observaciones", e.target.value)
                     }
-                    placeholder="Notas internas del vehículo..."
+                    placeholder={assetNotesPlaceholder}
                     className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-200"
                   />
                 </label>
@@ -1721,7 +1734,7 @@ export default function RegisterCustomer() {
                 onClick={saveVehicle}
                 className="rounded-xl bg-slate-800 px-5 py-2.5 font-semibold text-white hover:bg-slate-900 disabled:opacity-60"
               >
-                {vehicleModal.saving ? "Guardando..." : "Guardar coche"}
+                {vehicleModal.saving ? "Guardando..." : `Guardar ${assetSingular}`}
               </button>
             </div>
           </div>

@@ -9,7 +9,7 @@ export default function useAutoPrint({
   const [printed, setPrinted] = useState(false);
 
   useEffect(() => {
-    setPrinted(false);
+    setPrinted((current) => (current ? false : current));
   }, [resetKey]);
 
   useEffect(() => {
