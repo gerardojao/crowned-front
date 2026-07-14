@@ -1796,7 +1796,7 @@ export default function RegisterBudget() {
                 {detailItems.length > 0 && (
                   <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600"></div>
-                    <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <div className="hidden lg:grid grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       <div>Código</div>
                       <div>Seccion</div>
                       <div>Detalle del presupuesto</div>
@@ -1814,7 +1814,7 @@ export default function RegisterBudget() {
                         return (
                           <div
                             key={item.id}
-                            className="grid grid-cols-1 gap-2 xl:grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px]"
+                            className="grid grid-cols-1 gap-2 lg:grid-cols-[85px_130px_minmax(0,1fr)_120px_115px_80px_120px_40px]"
                           >
                             <input
                               value={item.codigo || ""}

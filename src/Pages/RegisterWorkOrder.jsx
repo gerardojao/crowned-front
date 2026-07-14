@@ -2301,7 +2301,7 @@ export default function RegisterWorkOrder() {
             {detailItems.length > 0 && (
               <div className="md:col-span-4 rounded-xl border border-slate-200 bg-white p-3">
                 {detailedRepairLinesEnabled && (
-                  <div className="hidden xl:grid grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <div className="hidden lg:grid grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px] gap-2 px-1 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                     <div>Código</div>
                     <div>Seccion</div>
                     <div>Descripcion</div>
@@ -2332,7 +2332,7 @@ export default function RegisterWorkOrder() {
                         key={item.id}
                         className={
                           detailedRepairLinesEnabled
-                            ? "grid grid-cols-1 gap-2 xl:grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px]"
+                            ? "grid grid-cols-1 gap-2 lg:grid-cols-[85px_130px_minmax(0,1fr)_115px_95px_80px_75px_120px_40px]"
                             : "grid grid-cols-1 gap-2 lg:grid-cols-[100px_minmax(0,1fr)_150px_150px_40px]"
                         }
                       >
