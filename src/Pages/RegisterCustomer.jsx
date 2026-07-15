@@ -887,6 +887,19 @@ export default function RegisterCustomer() {
                     </option>
                   </select>
                 </div>
+                <div className="md:col-span-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Observaciones
+                  </label>
+                  <textarea
+                    name="Observaciones"
+                    value={customer.Observaciones}
+                    onChange={handleChange}
+                    className={cls("Observaciones")}
+                    rows={3}
+                    placeholder="Notas internas del cliente..."
+                  />
+                </div>
               </div>
             </div>
 
