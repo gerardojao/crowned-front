@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
@@ -158,10 +158,6 @@ function formatLineQuantity(value) {
 export default function PrintWorkOrder() {
   const { id } = useParams();
   const [params] = useSearchParams();
-  const documentType = String(
-    params.get("type") || params.get("tipo") || "orden",
-  ).toLowerCase();
-  const isCustody = documentType === "resguardo" || documentType === "deposito";
   const shouldAutoPrint = params.get("print") === "1";
 
   const [order, setOrder] = useState(null);
@@ -173,12 +169,12 @@ export default function PrintWorkOrder() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, documentType]);
+  }, [id]);
 
   useAutoPrint({
     enabled: shouldAutoPrint,
     ready: !loading && !error && Boolean(order),
-    resetKey: `${id}:${documentType}`,
+    resetKey: id,
   });
 
   const loadData = async () => {
@@ -293,11 +289,9 @@ export default function PrintWorkOrder() {
   }
 
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
-  const title = isCustody ? "RESGUARDO DE DEPOSITO" : "ORDEN DE TRABAJO";
+  const title = "ORDEN DE TRABAJO";
   const baseDocumentNumber = String(order.id || "").padStart(9, "0");
-  const documentNumber = isCustody
-    ? `R-${baseDocumentNumber}`
-    : baseDocumentNumber;
+  const documentNumber = baseDocumentNumber;
   const customerNumber = order.numeroCliente || order.idCliente || "-";
   const pageLabel = "Pag. 1";
   const operationType = String(order.tipoOperacion || "Mecanica").toUpperCase();
@@ -305,10 +299,9 @@ export default function PrintWorkOrder() {
     operationType.includes("CHAPA") || operationType.includes("PINTURA");
   const materialGroupTitle = isBodyPaintOperation ? "Materiales" : "Piezas";
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
-  const actionTitle = isCustody ? "Resguardo de deposito" : "Orden de trabajo";
-  const actionSubtitle = isCustody
-    ? "Emite el resguardo de depósito del vehículo recibido."
-    : "Registra trabajos, vehículo, estado y costes del servicio.";
+  const actionTitle = "Orden de trabajo";
+  const actionSubtitle =
+    "Registra trabajos, vehÃ­culo, estado y costes del servicio.";
 
   const clientSignatureSrc = getSignatureSrc(order.clientSignatureBase64);
   const workshopSignatureSrc = getSignatureSrc(order.workshopSignatureBase64);
@@ -689,7 +682,7 @@ export default function PrintWorkOrder() {
             <table className="wo-meta">
               <tbody>
                 <tr>
-                  <th>Nº Documento</th>
+                  <th>NÂº Documento</th>
                   <td>{documentNumber}</td>
                 </tr>
                 <tr>
@@ -706,10 +699,10 @@ export default function PrintWorkOrder() {
                 </tr>
                 <tr>
                   <th>Forma de Pago</th>
-                  <td>{isCustody ? "PENDIENTE" : "-"}</td>
+                  <td>-</td>
                 </tr>
                 <tr>
-                  <th>Tipo de Operación</th>
+                  <th>Tipo de OperaciÃ³n</th>
                   <td>{operationType}</td>
                 </tr>
               </tbody>
@@ -780,10 +773,10 @@ export default function PrintWorkOrder() {
           <thead>
             <tr>
               <th>Matricula</th>
-              <th>Nº peritación</th>
-              <th>F. matriculación</th>
-              <th>Nº de chasis</th>
-              <th>Nº motor</th>
+              <th>NÂº peritaciÃ³n</th>
+              <th>F. matriculaciÃ³n</th>
+              <th>NÂº de chasis</th>
+              <th>NÂº motor</th>
               <th>Recepcion</th>
             </tr>
           </thead>
@@ -801,14 +794,14 @@ export default function PrintWorkOrder() {
 
         <section className="wo-body">
           <div className="wo-section-head">
-            <span>Código operación</span>
+            <span>CÃ³digo operaciÃ³n</span>
             <span>Descripcion</span>
             <span />
           </div>
 
          <div className="wo-block">
           <p className="wo-op-line">
-            * MOTIVO RECEPCION: {motivoRecepcion || "Sin avería descrita por el cliente."}
+            * MOTIVO RECEPCION: {motivoRecepcion || "Sin averÃ­a descrita por el cliente."}
           </p>
         </div>
 
@@ -886,10 +879,10 @@ export default function PrintWorkOrder() {
         </section>
 
         <footer className="wo-footer">
-          {/* Recepción del vehículo */}
+          {/* RecepciÃ³n del vehÃ­culo */}
           <div className="wo-footer-cell">
             <div className="font-bold uppercase text-center">
-              RECEPCIÓN DEL VEHÍCULO
+              RECEPCIÃ“N DEL VEHÃCULO
             </div>
 
             <div className="wo-sign">
@@ -897,11 +890,11 @@ export default function PrintWorkOrder() {
                 <>
                   <img
                     src={clientSignatureSrc}
-                    alt="Firma recepción cliente"
+                    alt="Firma recepciÃ³n cliente"
                     className="mx-auto h-10 max-w-[120px] object-contain"
                   />
 
-                  <div className="mt-1">Firma recepción cliente</div>
+                  <div className="mt-1">Firma recepciÃ³n cliente</div>
 
                   {order.clientSignatureDate && (
                     <div className="mt-1 text-[6px] normal-case">
@@ -918,12 +911,12 @@ export default function PrintWorkOrder() {
             </div>
           </div>
 
-          {/* Autorización */}
+          {/* AutorizaciÃ³n */}
           <div className="wo-footer-cell">
             <div className="text-center">
-              AUTORIZO LA REPARACIÓN DESCRITA.
+              AUTORIZO LA REPARACIÃ“N DESCRITA.
               <br />
-              DESEO RECOGER PIEZAS SUSTITUIDAS: ☐ SÍ &nbsp;&nbsp; ☐ NO
+              DESEO RECOGER PIEZAS SUSTITUIDAS: â˜ SÃ &nbsp;&nbsp; â˜ NO
             </div>
 
             <div className="wo-sign">
@@ -931,7 +924,7 @@ export default function PrintWorkOrder() {
                 <>
                   <img
                     src={clientSignatureSrc}
-                    alt="Firma autorización cliente"
+                    alt="Firma autorizaciÃ³n cliente"
                     className="mx-auto h-10 max-w-[120px] object-contain"
                   />
                   <div className="mt-1">Conformidad del cliente</div>
@@ -942,9 +935,7 @@ export default function PrintWorkOrder() {
             </div>
 
             <div className="wo-footer-head" style={{ marginTop: "9mm" }}>
-              {isCustody
-                ? "RESGUARDO DE DEPÓSITO"
-                : "ACEPTO RENUNCIA PRESUPUESTO"}
+              ACEPTO RENUNCIA PRESUPUESTO
             </div>
 
             <div className="wo-sign">
@@ -963,14 +954,14 @@ export default function PrintWorkOrder() {
             </div>
           </div>
 
-          {/* Daños */}
+          {/* DaÃ±os */}
           <div className="wo-footer-cell">
-            <div>DAÑOS OBSERVADOS EN LA CARROCERÍA</div>
+            <div>DAÃ‘OS OBSERVADOS EN LA CARROCERÃA</div>
 
             <div className="wo-car-box">
               <img
                 src={vehicleDamageDiagram}
-                alt="Diagrama de daños observados en la carrocería"
+                alt="Diagrama de daÃ±os observados en la carrocerÃ­a"
                 className="wo-car-diagram"
               />
             </div>
@@ -1049,3 +1040,4 @@ function getSignatureSrc(value) {
 
   return `data:image/png;base64,${signature}`;
 }
+

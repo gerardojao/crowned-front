@@ -1477,6 +1477,14 @@ export default function RegisterPreOrder() {
                       <Printer size={16} />
                       Imprimir
                     </a>
+                    <a
+                      href={`/print-pre-order/${item.Id}?type=resguardo&print=1`}
+                      rel="noopener noreferrer"
+                      className="inline-flex justify-center gap-2 rounded-xl bg-slate-700 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                    >
+                      <Printer size={16} />
+                      Resguardo
+                    </a>
                     {receptionPhotosEnabled && (
                       <button
                         type="button"

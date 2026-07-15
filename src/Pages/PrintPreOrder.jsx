@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import api, { resolveApiAssetUrl } from "../Components/api";
 import logoTaller from "../assets/LogoTallerCrowned.png";
+import vehicleDamageDiagram from "../assets/vehicle-damage-diagram.png";
 import PrintActions from "../Components/PrintActions";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import useAutoPrint from "../hooks/useAutoPrint";
@@ -44,6 +45,15 @@ function lines(value) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function buildCustomerAddressLines(preOrder) {
+  const address = String(preOrder?.direccion || "")
+    .split(/\r?\n|,/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return address.length ? address : [];
 }
 
 export default function PrintPreOrder() {
@@ -112,6 +122,9 @@ export default function PrintPreOrder() {
         dni: valueOf(data, "dni"),
         telefono: valueOf(data, "telefono"),
         direccion: valueOf(data, "direccion"),
+        codigoPostal: valueOf(data, "codigoPostal"),
+        poblacion: valueOf(data, "poblacion"),
+        provincia: valueOf(data, "provincia"),
         matricula: valueOf(data, "matricula"),
         marca: valueOf(data, "marca"),
         modelo: valueOf(data, "modelo"),
@@ -127,6 +140,9 @@ export default function PrintPreOrder() {
         bastidor: valueOf(data, "bastidor"),
         fechaMatriculacion: valueOf(data, "fechaMatriculacion"),
         numeroMotor: valueOf(data, "numeroMotor") || valueOf(data, "motor"),
+        clientSignatureBase64: valueOf(data, "clientSignatureBase64"),
+        clientSignatureDate: valueOf(data, "clientSignatureDate"),
+        workshopSignatureBase64: valueOf(data, "workshopSignatureBase64"),
       });
     } catch (err) {
       console.error(err);
@@ -159,9 +175,11 @@ export default function PrintPreOrder() {
   const preOrderModuleEnabled =
     taller.enablePreOrders ?? taller.EnablePreOrders ?? true;
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
-  const actionTitle = "Pre-orden";
+  const isCustody =
+    params.get("type") === "resguardo" || params.get("type") === "deposito";
+  const actionTitle = isCustody ? "Resguardo de deposito" : "Pre-orden";
   const actionSubtitle =
-    "Revisa la recepción inicial del vehículo antes de convertirla en orden.";
+    "Emite el resguardo de depósito del vehículo recibido.";
 
   if (!preOrderModuleEnabled) {
     return (
@@ -195,7 +213,9 @@ export default function PrintPreOrder() {
                 alt="Logo taller"
                 className="mb-4 h-16 max-w-64 object-contain object-left"
               />
-              <h1 className="text-2xl font-bold uppercase">PRE-ORDEN</h1>
+              <h1 className="text-2xl font-bold uppercase">
+                {isCustody ? "RESGUARDO DE DEPOSITO" : "PRE-ORDEN"}
+              </h1>
               <p className="mt-1 text-lg">Pre-orden #{preOrder.id}</p>
             </div>
             <div className="text-right text-xs uppercase leading-tight">
@@ -220,18 +240,22 @@ export default function PrintPreOrder() {
             value={preOrder.motivoRecepcion}
             large
           />
-          <SimpleBlock
-            label="Trabajo a realizar por mecanico"
-            value={preOrder.diagnosticoMecanico}
-            large
-            blank
-          />
-          <SimpleBlock
-            label="Repuestos necesarios"
-            value={preOrder.repuestosNecesarios}
-            large
-            blank
-          />
+          {!isCustody && (
+            <>
+              <SimpleBlock
+                label="Trabajo a realizar por mecanico"
+                value={preOrder.diagnosticoMecanico}
+                large
+                blank
+              />
+              <SimpleBlock
+                label="Repuestos necesarios"
+                value={preOrder.repuestosNecesarios}
+                large
+                blank
+              />
+            </>
+          )}
         </section>
       </main>
     );
@@ -245,6 +269,9 @@ export default function PrintPreOrder() {
   const motivoLines = lines(preOrder.motivoRecepcion);
   const diagLines = lines(preOrder.diagnosticoMecanico);
   const partsLines = lines(preOrder.repuestosNecesarios);
+  const clientSignatureSrc = getSignatureSrc(preOrder.clientSignatureBase64);
+  const workshopSignatureSrc = getSignatureSrc(preOrder.workshopSignatureBase64);
+  const customerAddressLines = buildCustomerAddressLines(preOrder);
 
   return (
     <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -498,6 +525,38 @@ export default function PrintPreOrder() {
     margin: 13mm auto 0;
   }
 
+  .deposit-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.08fr;
+    border: 1px solid #111;
+    border-top: 0;
+    min-height: 46mm;
+  }
+
+  .deposit-footer-cell {
+    border-right: 1px solid #111;
+    padding: 1.5mm;
+    font-size: 7.2px;
+  }
+
+  .deposit-footer-cell:last-child {
+    border-right: 0;
+  }
+
+  .deposit-footer-head {
+    margin: -1.5mm -1.5mm 1.5mm;
+    padding: 1.4mm 1.5mm;
+    background: #b7b7b7;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .deposit-sign {
+    margin-top: 6mm;
+    font-size: 7px;
+    text-transform: uppercase;
+  }
+
   @media print {
     /* Forzar que los márgenes del navegador sean cero y controlar el tamaño real */
     @page { 
@@ -558,7 +617,9 @@ export default function PrintPreOrder() {
 
         <section className="po-title-row">
           <div>
-            <h1 className="po-title text-left">PRE-ORDEN</h1>
+            <h1 className="po-title text-left">
+              {isCustody ? "RESGUARDO DE DEPOSITO" : "PRE-ORDEN"}
+            </h1>
             <table className="po-meta text-left">
               <tbody>
                 <tr>
@@ -593,7 +654,38 @@ export default function PrintPreOrder() {
           <div>
             <div className="po-client-box text-left">
               <div className="po-client-corners" />
-              <>
+              {isCustody ? (
+                <div className="po-client-info">
+                  <strong>{preOrder.cliente || "-"}</strong>
+                  <br />
+                  {customerAddressLines.map((line, index) => (
+                    <React.Fragment key={`${line}-${index}`}>
+                      {line}
+                      <br />
+                    </React.Fragment>
+                  ))}
+                  {preOrder.codigoPostal && preOrder.poblacion && (
+                    <>
+                      {preOrder.codigoPostal} - {preOrder.poblacion}
+                      <br />
+                    </>
+                  )}
+                   {preOrder.provincia && (
+                    <>
+                      {preOrder.provincia}
+                      <br />
+                      
+                    </>
+                  )}
+                  {preOrder.telefono && (
+                    <>
+                      {preOrder.telefono}
+                      <br />
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
                   <div className="po-client-info">
                     <strong>
                       {[preOrder.marca, preOrder.modelo].filter(Boolean).join(" ") ||
@@ -608,6 +700,7 @@ export default function PrintPreOrder() {
                     <br />
                   </div>
                 </>
+              )}
             </div>
             <div className="po-page-label text-right">Pag. 1</div>
           </div>
@@ -667,6 +760,36 @@ export default function PrintPreOrder() {
         </table>
 
         <section className="po-body">
+          {isCustody ? (
+            <section className="wo-body">
+              <div
+                className="po-section-head"
+                style={{ gridTemplateColumns: "36mm 1fr" }}
+              >
+                <span>CODIGO OPERACION</span>
+                <span>DESCRIPCION</span>
+              </div>
+              <div className="po-block ">
+                {(motivoLines.length
+                  ? motivoLines
+                  : ["Sin motivo indicado."]
+                ).map((line, index) => (
+                  <p key={`${line}-${index}`} className="po-line">
+                    <strong
+                      style={{
+                        fontSize: "14px",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      * {line}
+                    </strong>
+                  </p>
+                ))}
+              </div>
+              <div className="wo-block large"></div>
+            </section>
+          ) : (
+            <>
           <section className="wo-body">
             <div className="po-section-head">
               <span>CÓDIGO OPERACIÓN</span>
@@ -703,8 +826,17 @@ export default function PrintPreOrder() {
               </p>
             </div>
           )}
+            </>
+          )}
         </section>
 
+        {isCustody ? (
+          <DepositFooter
+            clientSignatureSrc={clientSignatureSrc}
+            clientSignatureDate={preOrder.clientSignatureDate}
+            workshopSignatureSrc={workshopSignatureSrc}
+          />
+        ) : (
         <footer className="po-footer">
           <div className="po-footer-topbar" />
           <div className="po-departments">
@@ -742,6 +874,7 @@ export default function PrintPreOrder() {
             ))}
           </div>
         </footer>
+        )}
       </section>
     </main>
   );
@@ -754,6 +887,98 @@ function BlankLines({ count }) {
         <div key={index} />
       ))}
     </div>
+  );
+}
+
+function DepositFooter({
+  clientSignatureSrc,
+  clientSignatureDate,
+  workshopSignatureSrc,
+}) {
+  return (
+    <footer className="deposit-footer">
+      <div className="deposit-footer-cell">
+        <div className="font-bold uppercase text-center">
+          RECEPCION DEL VEHICULO
+        </div>
+
+        <div className="deposit-sign">
+          {clientSignatureSrc ? (
+            <>
+              <img
+                src={clientSignatureSrc}
+                alt="Firma recepcion cliente"
+                className="mx-auto h-10 max-w-[120px] object-contain"
+              />
+              <div className="mt-1">Firma recepcion cliente</div>
+              {clientSignatureDate && (
+                <div className="mt-1 text-[6px] normal-case">
+                  {formatDateTime(clientSignatureDate)}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="h-10" />
+              <div className="mt-1">Pendiente de firma</div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="deposit-footer-cell">
+        <div className="text-center">
+          AUTORIZO LA REPARACION DESCRITA.
+          <br />
+          DESEO RECOGER PIEZAS SUSTITUIDAS: &#9744; SI &nbsp;&nbsp; &#9744; NO
+        </div>
+
+        <div className="deposit-sign">
+          {clientSignatureSrc ? (
+            <>
+              <img
+                src={clientSignatureSrc}
+                alt="Firma autorizacion cliente"
+                className="mx-auto h-10 max-w-[120px] object-contain"
+              />
+              <div className="mt-1">Conformidad del cliente</div>
+            </>
+          ) : (
+            "Firma cliente"
+          )}
+        </div>
+
+        <div className="deposit-footer-head" style={{ marginTop: "9mm" }}>
+          RESGUARDO DE DEPOSITO
+        </div>
+
+        <div className="deposit-sign">
+          {workshopSignatureSrc ? (
+            <>
+              <img
+                src={workshopSignatureSrc}
+                alt="Firma taller"
+                className="mx-auto h-10 max-w-[120px] object-contain"
+              />
+              <div className="mt-1">Firma taller</div>
+            </>
+          ) : (
+            "Firma taller"
+          )}
+        </div>
+      </div>
+
+      <div className="deposit-footer-cell">
+        <div>DANOS OBSERVADOS EN LA CARROCERIA</div>
+        <div className="po-car-box">
+          <img
+            src={vehicleDamageDiagram}
+            alt="Diagrama de danos observados en la carroceria"
+            className="po-car-diagram"
+          />
+        </div>
+      </div>
+    </footer>
   );
 }
 
@@ -774,4 +999,18 @@ function SimpleBlock({ label, value, large = false, blank = false }) {
       )}
     </div>
   );
+}
+
+function getSignatureSrc(value) {
+  if (!value) return "";
+
+  const signature = String(value).trim();
+
+  if (!signature) return "";
+
+  if (signature.startsWith("data:image")) {
+    return signature;
+  }
+
+  return `data:image/png;base64,${signature}`;
 }

@@ -2744,14 +2744,6 @@ export default function RegisterWorkOrder() {
                             Ver Pre-orden
                           </a>
                         )}
-
-                        <a
-                          href={`/print-order/${o.Id}?type=resguardo&print=1`}
-                          rel="noopener noreferrer"
-                          className="inline-flex justify-center rounded-xl px-3 py-2 bg-slate-700 hover:bg-slate-800 text-sm font-medium text-white transition"
-                        >
-                          Resguardo
-                        </a>
                       </>
                     )}
 
