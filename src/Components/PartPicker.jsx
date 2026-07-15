@@ -280,6 +280,7 @@ export default function PartPicker({
 
     const res = await api.post("/Proveedor", {
       nombre: "Proveedor por definir",
+      nifCif: "PENDIENTE",
       categoria: "Repuestos",
       observaciones: "Proveedor genérico creado desde el selector rápido de repuestos.",
     });

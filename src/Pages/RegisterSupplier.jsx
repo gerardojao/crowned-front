@@ -126,7 +126,7 @@ export default function RegisterSupplier() {
     const next = {};
 
     if (!supplier.Nombre.trim()) next.Nombre = "El nombre es requerido.";
-    if (!supplier.Telefono.trim()) next.Telefono = "El teléfono es requerido.";
+    if (!supplier.NifCif.trim()) next.NifCif = "El NIF/CIF es requerido.";
 
     setErrors(next);
 
@@ -298,6 +298,7 @@ export default function RegisterSupplier() {
                 Nombre *
               </label>
               <input
+                required
                 type="text"
                 name="Nombre"
                 value={supplier.Nombre}
@@ -312,7 +313,7 @@ export default function RegisterSupplier() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Teléfono *
+                Teléfono 
               </label>
               <input
                 type="text"
@@ -343,16 +344,20 @@ export default function RegisterSupplier() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                NIF/CIF
+                NIF/CIF *
               </label>
               <input
                 type="text"
                 name="NifCif"
+                required
                 value={supplier.NifCif}
                 className={cls("NifCif")}
                 onChange={handleChange}
                 placeholder="B12345678"
               />
+              {errors.NifCif && (
+                <p className="mt-1 text-xs text-rose-600">{errors.NifCif}</p>
+              )}
             </div>
 
             <div>

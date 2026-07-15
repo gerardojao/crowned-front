@@ -7,9 +7,9 @@ import {
 } from "./supplierQuickCreate.js";
 
 test("quick provider validates required minimum fields", () => {
-  assert.deepEqual(validateQuickProviderForm({ nombre: " ", telefono: "" }), {
+  assert.deepEqual(validateQuickProviderForm({ nombre: " ", nifCif: "" }), {
     nombre: "El nombre es requerido.",
-    telefono: "El telefono es requerido.",
+    nifCif: "El NIF/CIF es requerido.",
   });
 });
 

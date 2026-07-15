@@ -18,8 +18,8 @@ export function validateQuickProviderForm(form) {
     errors.nombre = "El nombre es requerido.";
   }
 
-  if (!String(form?.telefono || "").trim()) {
-    errors.telefono = "El telefono es requerido.";
+  if (!String(form?.nifCif || "").trim()) {
+    errors.nifCif = "El NIF/CIF es requerido.";
   }
 
   return errors;
