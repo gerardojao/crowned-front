@@ -36,7 +36,7 @@ export default function PurchasesModuleScreen() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const { bankAccounts } = useBankAccounts();
-  const { notes, loadingNotes, loadNotes } = useDeliveryNotes();
+  const { notes, loadingNotes, loadNotes } = useDeliveryNotes({ pageSize: 100 });
   const {
     supplierInvoices,
     setSupplierInvoices,

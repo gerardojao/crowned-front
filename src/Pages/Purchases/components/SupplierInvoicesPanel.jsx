@@ -415,7 +415,7 @@ export default function SupplierInvoicesPanel({
 
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">
-                        Telefono *
+                        Telefono
                       </label>
                       <input
                         type="text"
@@ -424,22 +424,15 @@ export default function SupplierInvoicesPanel({
                           setQuickProviderField("telefono", e.target.value)
                         }
                         className={`w-full rounded-xl border px-3 py-2 text-sm ${
-                          quickProviderErrors.telefono
-                            ? "border-rose-400 ring-1 ring-rose-200"
-                            : "border-slate-300"
+                          "border-slate-300"
                         }`}
                         placeholder="Telefono"
                       />
-                      {quickProviderErrors.telefono && (
-                        <p className="mt-1 text-xs text-rose-600">
-                          {quickProviderErrors.telefono}
-                        </p>
-                      )}
                     </div>
 
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">
-                        NIF/CIF
+                        NIF/CIF *
                       </label>
                       <input
                         type="text"
@@ -447,9 +440,18 @@ export default function SupplierInvoicesPanel({
                         onChange={(e) =>
                           setQuickProviderField("nifCif", e.target.value)
                         }
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                          quickProviderErrors.nifCif
+                            ? "border-rose-400 ring-1 ring-rose-200"
+                            : "border-slate-300"
+                        }`}
                         placeholder="B12345678"
                       />
+                      {quickProviderErrors.nifCif && (
+                        <p className="mt-1 text-xs text-rose-600">
+                          {quickProviderErrors.nifCif}
+                        </p>
+                      )}
                     </div>
 
                     <div>
