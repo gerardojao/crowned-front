@@ -19,7 +19,7 @@ const createEmptyLine = () => ({
   marca: "",
   cantidad: "1",
   precioCompra: "",
-  ivaPct: "21",
+  ivaPct: "0",
 });
 
 const initialHeader = {
@@ -43,55 +43,36 @@ function isPendingInvoice(note) {
 //   return estado === "pendiente de facturar";
 // }
 
-function buildVatBuckets(notes) {
-  const buckets = {
-    base0: 0,
-    base4: 0,
-    iva4: 0,
-    base10: 0,
-    iva10: 0,
-    base21: 0,
-    iva21: 0,
-    baseMixta: 0,
-    ivaMixta: 0,
-  };
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 
-  notes.forEach((note) => {
-    const lines = Array.isArray(note.lineas) ? note.lineas : [];
+const createEmptyInvoiceVatBreakdown = () => ({
+  base21: "",
+  base10: "",
+  base4: "",
+  base0: "",
+});
 
-    if (lines.length === 0) {
-      buckets.baseMixta += Number(note.base) || 0;
-      buckets.ivaMixta += Number(note.iva) || 0;
-      return;
-    }
-
-    lines.forEach((line) => {
-      const rate = Number(line.ivaPct) || 0;
-      const base = Number(line.base) || 0;
-      const iva = Number(line.iva) || 0;
-
-      if (rate === 0) {
-        buckets.base0 += base;
-      } else if (rate === 4) {
-        buckets.base4 += base;
-        buckets.iva4 += iva;
-      } else if (rate === 10) {
-        buckets.base10 += base;
-        buckets.iva10 += iva;
-      } else if (rate === 21) {
-        buckets.base21 += base;
-        buckets.iva21 += iva;
-      } else {
-        buckets.baseMixta += base;
-        buckets.ivaMixta += iva;
-      }
+const getInvoiceVatLines = (breakdown) =>
+  [
+    { ivaPct: 21, base: Number(breakdown.base21) || 0 },
+    { ivaPct: 10, base: Number(breakdown.base10) || 0 },
+    { ivaPct: 4, base: Number(breakdown.base4) || 0 },
+    { ivaPct: 0, base: Number(breakdown.base0) || 0 },
+  ]
+    .filter((line) => line.base > 0)
+    .map((line) => {
+      const iva = roundMoney((line.base * line.ivaPct) / 100);
+      return {
+        ...line,
+        iva,
+        total: roundMoney(line.base + iva),
+      };
     });
-  });
 
-  return buckets;
-}
-
-export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
+export default function SupplierDeliveryNotesPanel({
+  onNotesChanged,
+  onInvoicesChanged,
+}) {
   const { notes, loadingNotes, loadNotes, loadNoteDetail } = useDeliveryNotes();
   const { bankAccounts } = useBankAccounts();
   const { providers } = useProviders();
@@ -113,6 +94,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     descripcion: "",
     estado: "Pendiente de pago",
     bankAccountId: "",
+    ivaBreakdown: createEmptyInvoiceVatBreakdown(),
   });
 
   const deliveryTotals = sumDeliveryLines(lines);
@@ -129,9 +111,21 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     },
     { base: 0, iva: 0, total: 0 },
   );
-  const selectedVatBuckets = useMemo(
-    () => buildVatBuckets(selectedNotes),
-    [selectedNotes],
+  const invoiceVatLines = useMemo(
+    () => getInvoiceVatLines(invoiceForm.ivaBreakdown),
+    [invoiceForm.ivaBreakdown],
+  );
+  const invoiceVatTotals = invoiceVatLines.reduce(
+    (acc, line) => {
+      acc.base = roundMoney(acc.base + line.base);
+      acc.iva = roundMoney(acc.iva + line.iva);
+      acc.total = roundMoney(acc.total + line.total);
+      return acc;
+    },
+    { base: 0, iva: 0, total: 0 },
+  );
+  const invoiceBaseDifference = roundMoney(
+    selectedTotals.base - invoiceVatTotals.base,
   );
 
   const resetForm = () => {
@@ -180,6 +174,10 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
       ...prev,
       open: true,
       fecha: new Date().toISOString().slice(0, 10),
+      ivaBreakdown: {
+        ...createEmptyInvoiceVatBreakdown(),
+        base21: selectedTotals.base ? selectedTotals.base.toFixed(2) : "",
+      },
       descripcion:
         prev.descripcion ||
         `Factura de albaranes ${selectedNotes
@@ -225,6 +223,16 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
     setInvoiceForm((prev) => ({ ...prev, [field]: value }));
   };
 
+  const setInvoiceVatBase = (field, value) => {
+    setInvoiceForm((prev) => ({
+      ...prev,
+      ivaBreakdown: {
+        ...prev.ivaBreakdown,
+        [field]: value,
+      },
+    }));
+  };
+
   const submitInvoiceFromNotes = async (e) => {
     e.preventDefault();
     if (invoiceSubmitting) return;
@@ -244,6 +252,23 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
       return;
     }
 
+    if (roundMoney(selectedTotals.base) <= 0) {
+      alert("La base imponible de los albaranes debe ser mayor que 0.");
+      return;
+    }
+
+    if (invoiceVatLines.length === 0) {
+      alert("Desglosa la base imponible por tipo de IVA.");
+      return;
+    }
+
+    if (Math.abs(invoiceBaseDifference) >= 0.01) {
+      alert(
+        `La suma del desglose de IVA debe coincidir con la base imponible de los albaranes. Diferencia: ${formatCurrency(invoiceBaseDifference)}.`,
+      );
+      return;
+    }
+
     const payload = {
       albaranIds: selectedNoteIds,
       fecha: invoiceForm.fecha,
@@ -255,6 +280,12 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
         invoiceForm.estado === "Pagada"
           ? Number(invoiceForm.bankAccountId)
           : null,
+      lineasIva: invoiceVatLines.map((line) => ({
+        base: line.base,
+        ivaPct: line.ivaPct,
+        iva: line.iva,
+        total: line.total,
+      })),
     };
 
     try {
@@ -271,6 +302,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
 
       await loadNotes();
       await onNotesChanged?.();
+      await onInvoicesChanged?.();
       setSelectedNoteIds([]);
       setInvoiceForm((prev) => ({
         ...prev,
@@ -279,6 +311,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
         referencia: "",
         descripcion: "",
         estado: "Pendiente de pago",
+        ivaBreakdown: createEmptyInvoiceVatBreakdown(),
       }));
     } catch (err) {
       alert(
@@ -341,7 +374,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
         marca: line.marca?.trim() || null,
         cantidad: Number(line.cantidad),
         precioCompra: Number(line.precioCompra),
-        ivaPct: Number(line.ivaPct),
+        ivaPct: 0,
       })),
     };
 
@@ -535,8 +568,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                     <th className="px-3 py-2 text-left">Marca</th>
                     <th className="px-3 py-2 text-right">Cantidad</th>
                     <th className="px-3 py-2 text-right">Precio</th>
-                    <th className="px-3 py-2 text-right">IVA</th>
-                    <th className="px-3 py-2 text-right">Total</th>
+                    <th className="px-3 py-2 text-right">Base imponible</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -609,22 +641,8 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                             className="w-28 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
                           />
                         </td>
-                        <td className="px-3 py-2 text-right">
-                          <select
-                            value={line.ivaPct}
-                            onChange={(e) =>
-                              setLineField(line.id, "ivaPct", e.target.value)
-                            }
-                            className="w-24 rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm"
-                          >
-                            <option value="0">0%</option>
-                            <option value="4">4%</option>
-                            <option value="10">10%</option>
-                            <option value="21">21%</option>
-                          </select>
-                        </td>
                         <td className="px-3 py-2 text-right font-bold text-slate-900">
-                          {formatCurrency(total.total)}
+                          {formatCurrency(total.base)}
                         </td>
                         <td className="px-3 py-2 text-right">
                           <button
@@ -643,13 +661,10 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 <tfoot className="bg-slate-50">
                   <tr>
                     <th colSpan={5} className="px-3 py-2 text-right">
-                      Totales
+                      Base imponible
                     </th>
                     <th className="px-3 py-2 text-right font-bold">
-                      {formatCurrency(deliveryTotals.iva)}
-                    </th>
-                    <th className="px-3 py-2 text-right font-bold">
-                      {formatCurrency(deliveryTotals.total)}
+                      {formatCurrency(deliveryTotals.base)}
                     </th>
                     <th></th>
                   </tr>
@@ -686,31 +701,9 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold">
-                {selectedNotes.length} albarán(es) seleccionados · Total{" "}
-                {formatCurrency(selectedTotals.total)}
+                {selectedNotes.length} albarán(es) seleccionados · Base imponible{" "}
+                {formatCurrency(selectedTotals.base)}
               </p>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold text-sky-800">
-                <span>IVA 0: {formatCurrency(selectedVatBuckets.base0)}</span>
-                <span>
-                  IVA 4: {formatCurrency(selectedVatBuckets.base4)} +{" "}
-                  {formatCurrency(selectedVatBuckets.iva4)}
-                </span>
-                <span>
-                  IVA 10: {formatCurrency(selectedVatBuckets.base10)} +{" "}
-                  {formatCurrency(selectedVatBuckets.iva10)}
-                </span>
-                <span>
-                  IVA 21: {formatCurrency(selectedVatBuckets.base21)} +{" "}
-                  {formatCurrency(selectedVatBuckets.iva21)}
-                </span>
-                {(selectedVatBuckets.baseMixta !== 0 ||
-                  selectedVatBuckets.ivaMixta !== 0) && (
-                  <span>
-                    Mixto: {formatCurrency(selectedVatBuckets.baseMixta)} +{" "}
-                    {formatCurrency(selectedVatBuckets.ivaMixta)}
-                  </span>
-                )}
-              </div>
             </div>
             <button
               type="button"
@@ -743,24 +736,9 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 Crear factura desde albaranes
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                {selectedNotes.length} albarán(es) · Total{" "}
-                {formatCurrency(selectedTotals.total)}
+                {selectedNotes.length} albarán(es) · Base imponible{" "}
+                {formatCurrency(selectedTotals.base)}
               </p>
-              <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-xs font-semibold text-slate-700 sm:grid-cols-4">
-                <span>IVA 0: {formatCurrency(selectedVatBuckets.base0)}</span>
-                <span>
-                  IVA 4: {formatCurrency(selectedVatBuckets.base4)} +{" "}
-                  {formatCurrency(selectedVatBuckets.iva4)}
-                </span>
-                <span>
-                  IVA 10: {formatCurrency(selectedVatBuckets.base10)} +{" "}
-                  {formatCurrency(selectedVatBuckets.iva10)}
-                </span>
-                <span>
-                  IVA 21: {formatCurrency(selectedVatBuckets.base21)} +{" "}
-                  {formatCurrency(selectedVatBuckets.iva21)}
-                </span>
-              </div>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -849,6 +827,64 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
               </label>
             </div>
 
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    Desglose de IVA de la factura
+                  </h4>
+                  <p className="text-xs text-slate-600">
+                    Reparte la base imponible de los albaranes entre los tipos
+                    de IVA que correspondan.
+                  </p>
+                </div>
+                <div className="text-right text-xs font-semibold text-slate-700">
+                  Base albaranes: {formatCurrency(selectedTotals.base)}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                {[
+                  ["base21", "Base 21%"],
+                  ["base10", "Base 10%"],
+                  ["base4", "Base 4%"],
+                  ["base0", "Base 0% / exenta"],
+                ].map(([field, label]) => (
+                  <label
+                    key={field}
+                    className="flex flex-col gap-1 text-xs font-bold text-slate-600"
+                  >
+                    {label}
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={invoiceForm.ivaBreakdown[field]}
+                      onChange={(e) =>
+                        setInvoiceVatBase(field, e.target.value)
+                      }
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm font-medium text-slate-800"
+                    />
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-white p-3 text-xs font-semibold text-slate-700 sm:grid-cols-4">
+                <span>Base: {formatCurrency(invoiceVatTotals.base)}</span>
+                <span>IVA: {formatCurrency(invoiceVatTotals.iva)}</span>
+                <span>Total factura: {formatCurrency(invoiceVatTotals.total)}</span>
+                <span
+                  className={
+                    Math.abs(invoiceBaseDifference) < 0.01
+                      ? "text-emerald-700"
+                      : "text-rose-700"
+                  }
+                >
+                  Diferencia: {formatCurrency(invoiceBaseDifference)}
+                </span>
+              </div>
+            </div>
+
             <div className="mt-5 flex justify-end gap-2">
               <button
                 type="button"
@@ -915,7 +951,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
                     <div>
                       <p className="text-xs font-bold uppercase text-slate-400">
                         Estado
@@ -930,22 +966,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                       </p>
                       <p className="mt-1 font-semibold text-slate-800">
                         {formatCurrency(detailNote.base)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase text-slate-400">
-                        IVA
-                      </p>
-                      <p className="mt-1 font-semibold text-slate-800">
-                        {formatCurrency(detailNote.iva)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold uppercase text-slate-400">
-                        Total
-                      </p>
-                      <p className="mt-1 text-base font-bold text-slate-900">
-                        {formatCurrency(detailNote.total)}
                       </p>
                     </div>
                   </div>
@@ -967,17 +987,14 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                             <th className="px-4 py-3 text-left">Marca</th>
                             <th className="px-4 py-3 text-right">Cant.</th>
                             <th className="px-4 py-3 text-right">Precio</th>
-                            <th className="px-4 py-3 text-right">IVA %</th>
                             <th className="px-4 py-3 text-right">Base</th>
-                            <th className="px-4 py-3 text-right">IVA</th>
-                            <th className="px-4 py-3 text-right">Total</th>
                           </tr>
                         </thead>
                         <tbody>
                           {detailNote.lineas.length === 0 ? (
                             <tr>
                               <td
-                                colSpan={9}
+                                colSpan={6}
                                 className="px-4 py-8 text-center text-sm font-semibold text-slate-600"
                               >
                                 Este albaran no tiene lineas registradas.
@@ -1005,16 +1022,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                                   {formatCurrency(line.precioCompra)}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  {line.ivaPct}%
-                                </td>
-                                <td className="px-4 py-3 text-right">
                                   {formatCurrency(line.base)}
-                                </td>
-                                <td className="px-4 py-3 text-right">
-                                  {formatCurrency(line.iva)}
-                                </td>
-                                <td className="px-4 py-3 text-right font-bold text-slate-900">
-                                  {formatCurrency(line.total)}
                                 </td>
                               </tr>
                             ))
@@ -1039,9 +1047,7 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                 <th className="px-4 py-3 text-center">Fecha</th>
                 <th className="px-4 py-3 text-center">Proveedor</th>
                 <th className="px-4 py-3 text-center">Número albarán</th>
-                <th className="px-4 py-3 text-center">Base</th>
-                <th className="px-4 py-3 text-center">IVA</th>
-                <th className="px-4 py-3 text-center">Total</th>
+                <th className="px-4 py-3 text-center">Base imponible</th>
                 <th className="px-4 py-3 text-center">Estado</th>
                 <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
@@ -1050,13 +1056,13 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
             <tbody>
               {loadingNotes ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center">
+                  <td colSpan={7} className="px-4 py-10 text-center">
                     <Loader />
                   </td>
                 </tr>
               ) : notes.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center">
+                  <td colSpan={7} className="px-4 py-10 text-center">
                     <p className="text-sm font-semibold text-slate-700">
                       Todavía no hay albaranes registrados.
                     </p>
@@ -1091,12 +1097,6 @@ export default function SupplierDeliveryNotesPanel({ onNotesChanged }) {
                       <td className="px-4 py-3">{note.numeroAlbaran}</td>
                       <td className="px-4 py-3 text-right">
                         {formatCurrency(note.base)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatCurrency(note.iva)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-900">
-                        {formatCurrency(note.total)}
                       </td>
                       <td className="px-4 py-3">
                         <span

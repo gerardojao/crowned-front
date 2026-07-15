@@ -213,7 +213,10 @@ export default function PurchasesModuleScreen() {
           )}
 
           {activeTab === "albaranes" && (
-            <SupplierDeliveryNotesPanel onNotesChanged={loadNotes} />
+            <SupplierDeliveryNotesPanel
+              onNotesChanged={loadNotes}
+              onInvoicesChanged={loadSupplierInvoices}
+            />
           )}
         </div>
       </div>

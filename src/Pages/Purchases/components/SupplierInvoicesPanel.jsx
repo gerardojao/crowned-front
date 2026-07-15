@@ -310,8 +310,7 @@ export default function SupplierInvoicesPanel({
               Facturas recibidas
             </h3>
             <p className="text-sm text-slate-500">
-              Registro inicial de compras. Luego conectaremos esto con CxP,
-              bancos e inventario.
+              Registro inicial de compras. 
             </p>
           </div>
 
