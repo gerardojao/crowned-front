@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Eye, Plus, X } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
@@ -61,17 +62,68 @@ function PartReferenceInput({ line, onChange, onSelect }) {
   const [matches, setMatches] = useState([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [panelStyle, setPanelStyle] = useState(null);
   const wrapperRef = useRef(null);
+  const inputRef = useRef(null);
+  const panelRef = useRef(null);
   const query = String(line.codigoReferencia || "");
+
+  const updatePanelPosition = () => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const rect = input.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const margin = 12;
+    const gap = 6;
+    const width = Math.min(380, viewportWidth - margin * 2);
+    const left = Math.min(
+      Math.max(rect.left, margin),
+      Math.max(margin, viewportWidth - width - margin),
+    );
+    const maxHeight = Math.min(320, Math.max(180, viewportHeight - rect.bottom - margin - gap));
+    const canOpenBelow = viewportHeight - rect.bottom > 190;
+    const top = canOpenBelow
+      ? rect.bottom + gap
+      : Math.max(margin, rect.top - maxHeight - gap);
+
+    setPanelStyle({
+      position: "fixed",
+      left,
+      top,
+      width,
+      maxHeight,
+      zIndex: 100000,
+    });
+  };
 
   useEffect(() => {
     const onClickOutside = (event) => {
-      if (!wrapperRef.current?.contains(event.target)) setOpen(false);
+      if (
+        !wrapperRef.current?.contains(event.target) &&
+        !panelRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+      }
     };
 
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    updatePanelPosition();
+    window.addEventListener("resize", updatePanelPosition);
+    window.addEventListener("scroll", updatePanelPosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePanelPosition);
+      window.removeEventListener("scroll", updatePanelPosition, true);
+    };
+  }, [open, query, matches.length]);
 
   useEffect(() => {
     let alive = true;
@@ -120,6 +172,7 @@ function PartReferenceInput({ line, onChange, onSelect }) {
   return (
     <div ref={wrapperRef} className="relative w-44">
       <input
+        ref={inputRef}
         type="text"
         value={line.codigoReferencia}
         onFocus={() => setOpen(true)}
@@ -147,21 +200,20 @@ function PartReferenceInput({ line, onChange, onSelect }) {
         </p>
       )}
 
-      {!line.repuestoStockId && query.trim() && !exactMatch && (
-        <p className="mt-1 text-[11px] font-semibold text-slate-500">
-          Si guardas la linea, se creara como repuesto nuevo.
-        </p>
-      )}
-
-      {open && query.trim() && (
-        <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-80 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+      {open && query.trim() && panelStyle &&
+        createPortal(
+        <div
+          ref={panelRef}
+          style={panelStyle}
+          className="overflow-auto overscroll-contain rounded-xl border border-slate-200 bg-white shadow-xl"
+        >
           <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
             {loading ? "Buscando stock..." : "Coincidencias de stock"}
           </div>
 
           {matches.length === 0 ? (
             <div className="px-3 py-3 text-sm font-semibold text-slate-500">
-              No hay repuestos coincidentes.
+              No hay repuestos coincidentes. Si completas la linea, se creara como repuesto nuevo.
             </div>
           ) : (
             matches.map((part) => {
@@ -198,7 +250,8 @@ function PartReferenceInput({ line, onChange, onSelect }) {
               );
             })
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -232,11 +285,22 @@ export default function SupplierDeliveryNotesPanel({
   onNotesChanged,
   onInvoicesChanged,
 }) {
-  const { notes, loadingNotes, loadNotes, loadNoteDetail } = useDeliveryNotes();
+  const {
+    notes,
+    loadingNotes,
+    loadNotes,
+    loadNoteDetail,
+    filters,
+    updateFilters,
+    pagination,
+    totalPages,
+  } = useDeliveryNotes();
   const { bankAccounts } = useBankAccounts();
   const { providers } = useProviders();
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [loadingEditId, setLoadingEditId] = useState(null);
   const [cancellingNoteId, setCancellingNoteId] = useState(null);
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
   const [header, setHeader] = useState(initialHeader);
@@ -290,6 +354,12 @@ export default function SupplierDeliveryNotesPanel({
   const resetForm = () => {
     setHeader(initialHeader);
     setLines([createEmptyLine()]);
+    setEditingNoteId(null);
+  };
+
+  const setNoteFilter = (field, value) => {
+    updateFilters({ [field]: value, page: 1 });
+    setSelectedNoteIds([]);
   };
 
   const setLineField = (id, field, value) => {
@@ -375,6 +445,50 @@ export default function SupplierDeliveryNotesPanel({
       );
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const startEditNote = async (note) => {
+    if (!isPendingInvoice(note) || loadingEditId) return;
+
+    try {
+      setLoadingEditId(note.id);
+      const detail = await loadNoteDetail(note.id);
+      setEditingNoteId(note.id);
+      setHeader({
+        idProveedor: String(detail.idProveedor || ""),
+        numeroAlbaran: detail.numeroAlbaran || "",
+        fecha: detail.fecha ? String(detail.fecha).slice(0, 10) : "",
+        observaciones: detail.observaciones || "",
+      });
+      setLines(
+        detail.lineas?.length
+          ? detail.lineas.map((line) => ({
+              id: crypto.randomUUID(),
+              repuestoStockId: line.repuestoStockId
+                ? String(line.repuestoStockId)
+                : "",
+              codigoReferencia: line.codigoReferencia || "",
+              nombre: line.nombre || "",
+              marca: line.marca || "",
+              cantidad: String(line.cantidad || ""),
+              precioCompra: String(line.precioCompra || ""),
+              descuentoPct: "",
+              ivaPct: "0",
+            }))
+          : [createEmptyLine()],
+      );
+      setShowForm(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      alert(
+        err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          "No se pudo cargar el albaran para editar.",
+      );
+    } finally {
+      setLoadingEditId(null);
     }
   };
 
@@ -583,7 +697,9 @@ export default function SupplierDeliveryNotesPanel({
 
     try {
       setSubmitting(true);
-      const res = await api.post("/Albaran", payload);
+      const res = editingNoteId
+        ? await api.put(`/Albaran/${editingNoteId}`, payload)
+        : await api.post("/Albaran", payload);
 
       if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
         throw new Error(
@@ -654,7 +770,14 @@ export default function SupplierDeliveryNotesPanel({
 
           <button
             type="button"
-            onClick={() => setShowForm((prev) => !prev)}
+            onClick={() => {
+              if (showForm) {
+                resetForm();
+                setShowForm(false);
+                return;
+              }
+              setShowForm(true);
+            }}
             className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
           >
             <Plus size={17} />
@@ -900,7 +1023,11 @@ export default function SupplierDeliveryNotesPanel({
               disabled={submitting}
               className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700 disabled:opacity-60"
             >
-              {submitting ? "Guardando..." : "Guardar albarán"}
+              {submitting
+                ? "Guardando..."
+                : editingNoteId
+                  ? "Actualizar albarán"
+                  : "Guardar albarán"}
             </button>
             <button
               type="button"
@@ -1259,6 +1386,107 @@ export default function SupplierDeliveryNotesPanel({
         </div>
       )}
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Buscar
+            </label>
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => setNoteFilter("search", event.target.value)}
+              placeholder="Numero, proveedor, referencia o nombre"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Estado
+            </label>
+            <select
+              value={filters.estado}
+              onChange={(event) => setNoteFilter("estado", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="PendienteFactura">Pendiente factura</option>
+              <option value="Facturado">Facturado</option>
+              <option value="Anulado">Anulado</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Desde
+            </label>
+            <input
+              type="date"
+              value={filters.fechaInicio}
+              onChange={(event) =>
+                setNoteFilter("fechaInicio", event.target.value)
+              }
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Hasta
+            </label>
+            <input
+              type="date"
+              value={filters.fechaFin}
+              onChange={(event) => setNoteFilter("fechaFin", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Por pagina
+            </label>
+            <select
+              value={filters.pageSize}
+              onChange={(event) =>
+                updateFilters({
+                  pageSize: Number(event.target.value),
+                  page: 1,
+                })
+              }
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-slate-500">
+            {pagination.total} albaran(es) encontrados
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              updateFilters({
+                search: "",
+                estado: "",
+                fechaInicio: "",
+                fechaFin: "",
+                page: 1,
+              });
+              setSelectedNoteIds([]);
+            }}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -1340,18 +1568,24 @@ export default function SupplierDeliveryNotesPanel({
                             <Eye size={14} className="mr-1.5" />
                             Ver
                           </button>
-                        {selectable && (
                           <button
                             type="button"
-                            disabled={cancellingNoteId === note.id}
+                            disabled={!selectable || loadingEditId === note.id}
+                            onClick={() => startEditNote(note)}
+                            className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {loadingEditId === note.id ? "Cargando..." : "Editar"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!selectable || cancellingNoteId === note.id}
                             onClick={() => cancelDeliveryNote(note)}
-                            className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 disabled:opacity-60"
+                            className="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {cancellingNoteId === note.id
                               ? "Anulando..."
                               : "Anular"}
                           </button>
-                        )}
                         </div>
                       </td>
                     </tr>
@@ -1360,6 +1594,36 @@ export default function SupplierDeliveryNotesPanel({
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm md:flex-row md:items-center md:justify-between">
+        <p className="font-semibold text-slate-600">
+          Pagina {pagination.page} de {totalPages}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={pagination.page <= 1 || loadingNotes}
+            onClick={() =>
+              updateFilters({ page: Math.max(1, pagination.page - 1) })
+            }
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            disabled={pagination.page >= totalPages || loadingNotes}
+            onClick={() =>
+              updateFilters({
+                page: Math.min(totalPages, pagination.page + 1),
+              })
+            }
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
     </div>

@@ -33,12 +33,17 @@ export function sumInvoiceLines(lines) {
 export function calcDeliveryLine(line) {
   const cantidad = Number(line?.cantidad) || 0;
   const precioCompra = Number(line?.precioCompra) || 0;
+  const descuentoPct = Math.min(
+    100,
+    Math.max(0, Number(line?.descuentoPct ?? line?.dcto) || 0),
+  );
   const ivaPct = Number(line?.ivaPct) || 0;
-  const base = roundMoney(cantidad * precioCompra);
+  const precioCompraNeto = roundMoney(precioCompra * (1 - descuentoPct / 100));
+  const base = roundMoney(cantidad * precioCompraNeto);
   const iva = calcIva(base, ivaPct);
   const total = roundMoney(base + iva);
 
-  return { base, iva, total, ivaPct };
+  return { base, iva, total, ivaPct, descuentoPct, precioCompraNeto };
 }
 
 export function sumDeliveryLines(lines) {
