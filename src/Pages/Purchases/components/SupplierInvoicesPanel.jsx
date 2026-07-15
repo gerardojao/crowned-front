@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
+import ProviderSearchInput from "./ProviderSearchInput";
 import { useExpenseTypes } from "../hooks/useExpenseTypes";
 import { useProviders } from "../hooks/useProviders";
 import {
@@ -73,29 +74,6 @@ export default function SupplierInvoicesPanel({
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleProviderChange = (e) => {
-    const selectedId = e.target.value;
-    const selectedProvider = providers.find((provider) => {
-      const id = provider.id ?? provider.Id;
-      return String(id) === String(selectedId);
-    });
-
-    const providerName =
-      selectedProvider?.nombre ??
-      selectedProvider?.Nombre ??
-      selectedProvider?.razonSocial ??
-      selectedProvider?.RazonSocial ??
-      selectedProvider?.contacto ??
-      selectedProvider?.Contacto ??
-      "";
-
-    setForm((prev) => ({
-      ...prev,
-      proveedorId: selectedId,
-      proveedor: providerName,
-    }));
   };
 
   const setQuickProviderField = (name, value) => {
@@ -350,24 +328,21 @@ export default function SupplierInvoicesPanel({
               </label>
 
               <div className="flex gap-2">
-                <select
-                  name="proveedorId"
-                  value={form.proveedorId}
-                  onChange={handleProviderChange}
-                  className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                >
-                  <option value="">Selecciona</option>
-                  {providers.map((provider) => {
-                    const id = provider.id ?? provider.Id;
-                    const nombre = provider.nombre ?? provider.Nombre;
-
-                    return (
-                      <option key={id} value={id}>
-                        {nombre}
-                      </option>
-                    );
-                  })}
-                </select>
+                <div className="min-w-0 flex-1">
+                  <ProviderSearchInput
+                    providers={providers}
+                    valueId={form.proveedorId}
+                    valueName={form.proveedor}
+                    onSelect={({ id, name }) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        proveedorId: id ? String(id) : "",
+                        proveedor: name || "",
+                        facturaOriginalId: "",
+                      }))
+                    }
+                  />
+                </div>
 
                 <button
                   type="button"

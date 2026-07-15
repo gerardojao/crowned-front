@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Plus, X } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
+import ProviderSearchInput from "./ProviderSearchInput";
 import { useBankAccounts } from "../hooks/useBankAccounts";
 import { useDeliveryNotes } from "../hooks/useDeliveryNotes";
 import { useProviders } from "../hooks/useProviders";
@@ -19,6 +20,7 @@ const createEmptyLine = () => ({
   marca: "",
   cantidad: "1",
   precioCompra: "",
+  descuentoPct: "",
   ivaPct: "0",
 });
 
@@ -44,6 +46,163 @@ function isPendingInvoice(note) {
 // }
 
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+
+const normalizeReference = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase();
+
+const partValue = (part, field, fallback = "") => {
+  const pascal = field.charAt(0).toUpperCase() + field.slice(1);
+  return part?.[field] ?? part?.[pascal] ?? fallback;
+};
+
+function PartReferenceInput({ line, onChange, onSelect }) {
+  const [matches, setMatches] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const wrapperRef = useRef(null);
+  const query = String(line.codigoReferencia || "");
+
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (!wrapperRef.current?.contains(event.target)) setOpen(false);
+    };
+
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    const search = query.trim();
+
+    if (!search) {
+      setMatches([]);
+      return undefined;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+        const res = await api.get("/RepuestoStock", {
+          params: {
+            search,
+            esFacturado: false,
+            page: 1,
+            pageSize: 8,
+          },
+        });
+        if (!alive) return;
+        setMatches(res?.data?.data?.[0]?.items || []);
+      } catch {
+        if (alive) setMatches([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  const exactMatch = matches.find(
+    (part) =>
+      normalizeReference(partValue(part, "codigoReferencia")) ===
+      normalizeReference(query),
+  );
+  const isExistingUnselected = Boolean(
+    query.trim() && exactMatch && !line.repuestoStockId,
+  );
+
+  return (
+    <div ref={wrapperRef} className="relative w-44">
+      <input
+        type="text"
+        value={line.codigoReferencia}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setOpen(true);
+        }}
+        className={`w-full rounded-lg border px-2 py-1 text-sm ${
+          isExistingUnselected
+            ? "border-amber-300 bg-amber-50"
+            : "border-slate-300"
+        }`}
+        placeholder="Buscar referencia"
+      />
+
+      {line.repuestoStockId && (
+        <p className="mt-1 text-[11px] font-semibold text-emerald-700">
+          Stock vinculado #{line.repuestoStockId}
+        </p>
+      )}
+
+      {isExistingUnselected && (
+        <p className="mt-1 text-[11px] font-semibold text-amber-700">
+          Esta referencia ya existe. Seleccionala de la lista.
+        </p>
+      )}
+
+      {!line.repuestoStockId && query.trim() && !exactMatch && (
+        <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          Si guardas la linea, se creara como repuesto nuevo.
+        </p>
+      )}
+
+      {open && query.trim() && (
+        <div className="absolute left-0 top-full z-40 mt-1 max-h-72 w-80 overflow-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+          <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+            {loading ? "Buscando stock..." : "Coincidencias de stock"}
+          </div>
+
+          {matches.length === 0 ? (
+            <div className="px-3 py-3 text-sm font-semibold text-slate-500">
+              No hay repuestos coincidentes.
+            </div>
+          ) : (
+            matches.map((part) => {
+              const id = partValue(part, "id");
+              const reference = partValue(part, "codigoReferencia");
+              const name = partValue(part, "nombre", "Repuesto sin nombre");
+              const brand = partValue(part, "marca");
+              const price = Number(partValue(part, "precioCompra", 0) || 0);
+
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    onSelect(part);
+                    setOpen(false);
+                  }}
+                  className="flex w-full items-start justify-between gap-3 border-b border-slate-100 px-3 py-2 text-left hover:bg-sky-50"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-slate-800">
+                      {[reference, name].filter(Boolean).join(" - ")}
+                    </span>
+                    {brand && (
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        Marca: {brand}
+                      </span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-xs font-bold text-emerald-700">
+                    {formatCurrency(price)}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const createEmptyInvoiceVatBreakdown = () => ({
   base21: "",
@@ -136,6 +295,12 @@ export default function SupplierDeliveryNotesPanel({
   const setLineField = (id, field, value) => {
     setLines((prev) =>
       prev.map((line) => (line.id === id ? { ...line, [field]: value } : line)),
+    );
+  };
+
+  const setLineValues = (id, values) => {
+    setLines((prev) =>
+      prev.map((line) => (line.id === id ? { ...line, ...values } : line)),
     );
   };
 
@@ -352,7 +517,9 @@ export default function SupplierDeliveryNotesPanel({
       (line) =>
         Number(line.cantidad) <= 0 ||
         Number(line.precioCompra) < 0 ||
-        Number.isNaN(Number(line.precioCompra)),
+        Number.isNaN(Number(line.precioCompra)) ||
+        Number(line.descuentoPct || 0) < 0 ||
+        Number(line.descuentoPct || 0) > 100,
     );
 
     if (invalidLine) {
@@ -360,22 +527,58 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
+    for (const line of validLines) {
+      const reference = line.codigoReferencia?.trim();
+      if (!reference || line.repuestoStockId) continue;
+
+      try {
+        const res = await api.get("/RepuestoStock", {
+          params: {
+            search: reference,
+            esFacturado: false,
+            page: 1,
+            pageSize: 8,
+          },
+        });
+        const items = res?.data?.data?.[0]?.items || [];
+        const existing = items.find(
+          (part) =>
+            normalizeReference(partValue(part, "codigoReferencia")) ===
+            normalizeReference(reference),
+        );
+
+        if (existing) {
+          alert(
+            `La referencia ${reference} ya existe en stock. Selecciona el repuesto de la lista antes de guardar el albaran.`,
+          );
+          return;
+        }
+      } catch {
+        alert("No se pudo validar la referencia del repuesto en stock.");
+        return;
+      }
+    }
+
     const payload = {
       idProveedor: Number(header.idProveedor),
       numeroAlbaran: header.numeroAlbaran.trim(),
       fecha: header.fecha,
       observaciones: header.observaciones?.trim() || null,
-      lineas: validLines.map((line) => ({
-        repuestoStockId: line.repuestoStockId
-          ? Number(line.repuestoStockId)
-          : null,
-        codigoReferencia: line.codigoReferencia?.trim() || null,
-        nombre: line.nombre.trim(),
-        marca: line.marca?.trim() || null,
-        cantidad: Number(line.cantidad),
-        precioCompra: Number(line.precioCompra),
-        ivaPct: 0,
-      })),
+      lineas: validLines.map((line) => {
+        const total = calcDeliveryLine(line);
+
+        return {
+          repuestoStockId: line.repuestoStockId
+            ? Number(line.repuestoStockId)
+            : null,
+          codigoReferencia: line.codigoReferencia?.trim() || null,
+          nombre: line.nombre.trim(),
+          marca: line.marca?.trim() || null,
+          cantidad: Number(line.cantidad),
+          precioCompra: total.precioCompraNeto,
+          ivaPct: 0,
+        };
+      }),
     };
 
     try {
@@ -470,28 +673,16 @@ export default function SupplierDeliveryNotesPanel({
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Proveedor
               </label>
-              <select
-                value={header.idProveedor}
-                onChange={(e) =>
+              <ProviderSearchInput
+                providers={providers}
+                valueId={header.idProveedor}
+                onSelect={({ id }) =>
                   setHeader((prev) => ({
                     ...prev,
-                    idProveedor: e.target.value,
+                    idProveedor: id ? String(id) : "",
                   }))
                 }
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-              >
-                <option value="">Selecciona</option>
-                {providers.map((provider) => {
-                  const id = provider.id ?? provider.Id;
-                  const nombre = provider.nombre ?? provider.Nombre;
-
-                  return (
-                    <option key={id} value={id}>
-                      {nombre}
-                    </option>
-                  );
-                })}
-              </select>
+              />
             </div>
 
             <div>
@@ -568,6 +759,7 @@ export default function SupplierDeliveryNotesPanel({
                     <th className="px-3 py-2 text-left">Marca</th>
                     <th className="px-3 py-2 text-right">Cantidad</th>
                     <th className="px-3 py-2 text-right">Precio</th>
+                    <th className="px-3 py-2 text-right">Dcto %</th>
                     <th className="px-3 py-2 text-right">Base imponible</th>
                     <th className="px-3 py-2"></th>
                   </tr>
@@ -580,17 +772,28 @@ export default function SupplierDeliveryNotesPanel({
                     return (
                       <tr key={line.id}>
                         <td className="px-3 py-2">
-                          <input
-                            type="text"
-                            value={line.codigoReferencia}
-                            onChange={(e) =>
-                              setLineField(
-                                line.id,
-                                "codigoReferencia",
-                                e.target.value,
-                              )
+                          <PartReferenceInput
+                            line={line}
+                            onChange={(value) =>
+                              setLineValues(line.id, {
+                                codigoReferencia: value,
+                                repuestoStockId: "",
+                              })
                             }
-                            className="w-32 rounded-lg border border-slate-300 px-2 py-1 text-sm"
+                            onSelect={(part) =>
+                              setLineValues(line.id, {
+                                repuestoStockId: String(partValue(part, "id")),
+                                codigoReferencia: partValue(
+                                  part,
+                                  "codigoReferencia",
+                                ),
+                                nombre: partValue(part, "nombre"),
+                                marca: partValue(part, "marca"),
+                                precioCompra: String(
+                                  partValue(part, "precioCompra", "") ?? "",
+                                ),
+                              })
+                            }
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -641,6 +844,24 @@ export default function SupplierDeliveryNotesPanel({
                             className="w-28 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
                           />
                         </td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={line.descuentoPct}
+                            onChange={(e) =>
+                              setLineField(
+                                line.id,
+                                "descuentoPct",
+                                e.target.value,
+                              )
+                            }
+                            className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-right text-sm"
+                            placeholder="0"
+                          />
+                        </td>
                         <td className="px-3 py-2 text-right font-bold text-slate-900">
                           {formatCurrency(total.base)}
                         </td>
@@ -660,7 +881,7 @@ export default function SupplierDeliveryNotesPanel({
 
                 <tfoot className="bg-slate-50">
                   <tr>
-                    <th colSpan={5} className="px-3 py-2 text-right">
+                    <th colSpan={6} className="px-3 py-2 text-right">
                       Base imponible
                     </th>
                     <th className="px-3 py-2 text-right font-bold">
