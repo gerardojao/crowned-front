@@ -5,6 +5,7 @@ import api from "../Components/api";
 import { soloFecha } from "../utils/date";
 
 const months = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+const CASH_PAYMENT_VALUE = "cash";
 
 const EMPTY_INCOME = {
   Id: "", Foto: "", Fecha: "", Mes: "", Importe: "",
@@ -129,7 +130,12 @@ export default function RegisterIncome({ income, setIncome }) {
       IngresoId: r.tipoId ?? "",
       NombreIngreso: r.tipo ?? "",
       Descripcion: r.descripcion ?? "",
-      BankAccountId: r.bankAccountId ?? r.BankAccountId ?? "",
+      BankAccountId:
+        (r.bankAccountId ?? r.BankAccountId)
+          ? String(r.bankAccountId ?? r.BankAccountId)
+          : ["efectivo", "caja"].includes(String(r.bankAccountName ?? r.BankAccountName ?? "").toLowerCase())
+            ? CASH_PAYMENT_VALUE
+            : "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
@@ -151,7 +157,7 @@ export default function RegisterIncome({ income, setIncome }) {
         else if (Number(value) <= 0) msg = "Debe ser mayor que 0.";
         break;
       case "BankAccountId":
-        if (bankAccounts.length > 1 && !value) msg = REQUIRED;
+        if (!value) msg = REQUIRED;
         break;
       default:
         break;
@@ -162,7 +168,7 @@ export default function RegisterIncome({ income, setIncome }) {
 
   const validateAll = () => {
     const fields = ["IngresoId", "Mes", "Fecha", "Importe"];
-    if (bankAccounts.length > 1) fields.push("BankAccountId");
+    fields.push("BankAccountId");
     const next = {};
     for (const f of fields) {
       const ok = validateField(f, income[f]);
@@ -221,7 +227,11 @@ export default function RegisterIncome({ income, setIncome }) {
           descripcion: income.Descripcion ?? null,
           importe: Number(income.Importe ?? 0),
           foto: income.Foto ?? null,
-          ...(income.BankAccountId ? { bankAccountId: Number(income.BankAccountId) } : {}),
+          ...(income.BankAccountId === CASH_PAYMENT_VALUE
+            ? { metodoPago: "Efectivo" }
+            : income.BankAccountId
+              ? { bankAccountId: Number(income.BankAccountId) }
+              : {}),
         });
         setNotice({
           type: "success",
@@ -242,7 +252,11 @@ export default function RegisterIncome({ income, setIncome }) {
         Importe: Number(income.Importe),
         NombreIngreso: Number(income.IngresoId),     // FK esperado
         Descripcion: income.Descripcion || null,
-        BankAccountId: income.BankAccountId ? Number(income.BankAccountId) : null,
+        BankAccountId: income.BankAccountId === CASH_PAYMENT_VALUE
+          ? null
+          : income.BankAccountId
+            ? Number(income.BankAccountId)
+            : null,
       });
 
       setIncome(EMPTY_INCOME);
@@ -336,9 +350,9 @@ export default function RegisterIncome({ income, setIncome }) {
         </div> */}
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {bankAccounts.length > 1 && (
+          {(
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="BankAccountId">Banco</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="BankAccountId">Metodo de pago</label>
               <select
                 id="BankAccountId"
                 name="BankAccountId"
@@ -350,6 +364,7 @@ export default function RegisterIncome({ income, setIncome }) {
                 aria-describedby={errors.BankAccountId ? "BankAccountId-error" : undefined}
               >
                 <option value="">Selecciona...</option>
+                <option value={CASH_PAYMENT_VALUE}>Efectivo</option>
                 {bankAccounts.map((bank) => {
                   const id = bank.id ?? bank.Id;
                   const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";

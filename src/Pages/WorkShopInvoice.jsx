@@ -477,6 +477,8 @@ export default function WorkshopInvoice() {
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
   const isCredit = invoice.tipoPago === "Credito";
   const accountsReceivableEnabled = Boolean(taller.enableAccountsReceivable);
+  const effectiveTipoPago = accountsReceivableEnabled ? invoice.tipoPago : "Efectivo";
+  const isCashPayment = effectiveTipoPago === "Efectivo";
   const paymentDetailText = useMemo(() => {
     if (isCredit) return "Pago a credito";
     const selectedLabels = selectedPaymentMethods
@@ -744,12 +746,12 @@ const saveIssuedInvoice = async () => {
     serie: taller.serieFactura || "A",
     observaciones: invoice.observaciones || null,
     tipoOperacion: invoice.tipoOperacion || "Mecanica",
-    tipoPago: accountsReceivableEnabled ? invoice.tipoPago : "Efectivo",
+    tipoPago: effectiveTipoPago,
     metodoPagoDetalle: paymentDetailText || null,
     totalAbonado: isCredit ? paymentTotal : companyPayable,
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
     fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
-    bankAccountId: selectedBankId ? Number(selectedBankId) : null,
+    bankAccountId: !isCredit && !isCashPayment && selectedBankId ? Number(selectedBankId) : null,
     items: billableItems,
   };
 
@@ -791,7 +793,7 @@ const printInvoice = async () => {
       throw new Error("El abono inicial no puede superar el importe a pagar por el cliente.");
     }
 
-    if (bankAccounts.length > 1 && !selectedBankId) {
+    if (!isCashPayment && bankAccounts.length > 1 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
 
@@ -1004,7 +1006,7 @@ const printInvoice = async () => {
               readOnly
             />
 
-            {bankAccounts.length > 1 && (
+            {!isCashPayment && bankAccounts.length > 1 && (
               <label className="block text-sm font-semibold text-slate-700">
                 Banco para esta factura
                 <select
@@ -1186,7 +1188,7 @@ const printInvoice = async () => {
                 value={invoice.tipoPago}
                 onChange={(e) => setTipoPago(e.target.value)}
               >
-                <option value="Efectivo">Contado</option>
+                <option value="Efectivo">Efectivo</option>
             
                   <option value="Credito">Credito</option>
                

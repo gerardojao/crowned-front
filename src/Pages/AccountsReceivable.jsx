@@ -5,6 +5,7 @@ import api from "../Components/api";
 import { currency, amountInput } from "../utils/currency";
 
 const ESTADOS = ["Todas", "Pendiente", "Parcial", "Rectificada", "Parcial rectificada", "Pagada"];
+const CASH_PAYMENT_VALUE = "cash";
 
 const pickItems = (res) => {
   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? [];
@@ -198,19 +199,20 @@ export default function AccountsReceivable() {
       return;
     }
 
-    const bankAccountId = abonoBanks[id];
-    if (!bankAccountId) {
-      setError("Selecciona el banco donde entra el abono.");
+    const paymentMethod = abonoBanks[id];
+    if (!paymentMethod) {
+      setError("Selecciona el metodo de pago del abono.");
       return;
     }
+    const isCash = paymentMethod === CASH_PAYMENT_VALUE;
 
     try {
       setError("");
       setNotice("");
       const res = await api.put(`/FacturaEmitida/${id}/abono`, {
         importe,
-        metodoPago: "Transferencia",
-        bankAccountId: Number(bankAccountId),
+        metodoPago: isCash ? "Efectivo" : "Transferencia",
+        bankAccountId: isCash ? null : Number(paymentMethod),
       });
       if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
         throw new Error(res?.data?.message || res?.data?.Message);
@@ -506,7 +508,6 @@ export default function AccountsReceivable() {
                     <button
                       type="button"
                       onClick={() => registrarAbono(factura)}
-                      disabled={bankAccounts.length === 0}
                       className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
                     >
                       Aplicar
@@ -623,7 +624,6 @@ function FacturaRow({
       <button
         type="button"
         onClick={() => registrarAbono(factura)}
-        disabled={bankAccounts.length === 0}
         className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-60"
       >
         Aplicar
@@ -636,21 +636,14 @@ function FacturaRow({
 }
 
 function BankSelect({ value, bankAccounts, onChange }) {
-  if (bankAccounts.length === 0) {
-    return (
-      <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 ring-1 ring-amber-200">
-        Sin bancos activos
-      </div>
-    );
-  }
-
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
       className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
     >
-      <option value="">Banco del abono</option>
+      <option value="">Metodo de pago</option>
+      <option value={CASH_PAYMENT_VALUE}>Efectivo</option>
       {bankAccounts.map((bank) => {
         const id = bank.id ?? bank.Id;
         const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";

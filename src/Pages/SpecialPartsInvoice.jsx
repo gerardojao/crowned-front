@@ -176,6 +176,8 @@ export default function SpecialPartsInvoice() {
   const accountsReceivableEnabled = Boolean(
     taller.enableAccountsReceivable ?? taller.EnableAccountsReceivable ?? false,
   );
+  const effectiveTipoPago = accountsReceivableEnabled ? invoice.tipoPago : "Efectivo";
+  const isCashPayment = effectiveTipoPago === "Efectivo";
   const moduleEnabled = invoiceMode.isRapel
     ? (taller.enableRapelInvoices ?? taller.EnableRapelInvoices ?? false)
     : invoiceMode.isNoVat
@@ -472,7 +474,7 @@ export default function SpecialPartsInvoice() {
     if (!billableItems.length) {
       throw new Error(`Agrega al menos una línea de ${invoiceMode.titleLower} con importe mayor que 0.`);
     }
-    if (!isCredit && bankAccounts.length > 1 && !selectedBankId) {
+    if (!isCredit && !isCashPayment && bankAccounts.length > 1 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
     if (isCredit && !accountsReceivableEnabled) {
@@ -483,7 +485,7 @@ export default function SpecialPartsInvoice() {
     }
 
     const effectiveBankAccountId =
-      !isCredit && selectedBankId ? Number(selectedBankId) : null;
+      !isCredit && !isCashPayment && selectedBankId ? Number(selectedBankId) : null;
 
     const res = await api.post("/FacturaEmitida/emitir", {
       tipoFactura: invoiceMode.tipoFactura,
@@ -506,12 +508,12 @@ export default function SpecialPartsInvoice() {
       observaciones: invoice.observaciones || null,
       tipoOperacion: invoiceMode.operationType,
       ivaPct: Number(invoice.ivaPct || 0),
-      tipoPago: accountsReceivableEnabled ? invoice.tipoPago : "Efectivo",
+      tipoPago: effectiveTipoPago,
       metodoPagoDetalle: isCredit ? "Pago a credito" : invoice.tipoPago,
       totalAbonado: isCredit || invoiceMode.isRapel ? 0 : companyPayable,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
-      bankAccountId: null,
+      bankAccountId: effectiveBankAccountId,
       items: billableItems,
     });
 
@@ -863,7 +865,7 @@ export default function SpecialPartsInvoice() {
               />
             </div>
           )}
-          {bankAccounts.length > 0 && (
+          {!isCredit && !isCashPayment && bankAccounts.length > 0 && (
             <label className="block text-sm font-medium text-slate-700">
               Banco
               <select

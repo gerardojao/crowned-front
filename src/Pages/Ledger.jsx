@@ -4,7 +4,7 @@ import { ArrowLeft, Landmark, RefreshCw, Trash2 } from "lucide-react";
 import api from "../Components/api";
 import { amountInput, currency } from "../utils/currency";
 
-const ACCOUNTS = ["Cliente", "Proveedor", "IvaSoportado", "IvaRepercutido", "Banco"];
+const ACCOUNTS = ["Cliente", "Proveedor", "IvaSoportado", "IvaRepercutido", "Banco", "Efectivo"];
 const MOVEMENT_TYPES = ["Ingreso", "Egreso"];
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -61,6 +61,7 @@ export default function Ledger() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
   const [bankAccounts, setBankAccounts] = useState([]);
   const [bankFilter, setBankFilter] = useState("");
   const [from, setFrom] = useState("");
@@ -92,6 +93,12 @@ export default function Ledger() {
       )
         ? filters.bankFilter
         : bankFilter;
+      const nextTypeFilter = Object.prototype.hasOwnProperty.call(
+        filters,
+        "typeFilter",
+      )
+        ? filters.typeFilter
+        : typeFilter;
       const nextFrom = Object.prototype.hasOwnProperty.call(filters, "from")
         ? filters.from
         : from;
@@ -125,6 +132,7 @@ export default function Ledger() {
         api.get("/Mayor", {
           params: {
             cuenta: nextAccountFilter || null,
+            tipoMovimiento: nextTypeFilter || null,
             bankAccountId: bankParam,
             fechaInicio: nextFrom || null,
             fechaFin: nextTo || null,
@@ -136,6 +144,7 @@ export default function Ledger() {
         api.get("/Mayor", {
           params: {
             bankAccountId: bankParam,
+            tipoMovimiento: nextTypeFilter || null,
             fechaInicio: nextFrom || null,
             fechaFin: nextTo || null,
             busqueda: nextSearchFilter || null,
@@ -238,6 +247,7 @@ export default function Ledger() {
 
   const clearFilters = () => {
     setAccountFilter("");
+    setTypeFilter("");
     setBankFilter("");
     setFrom("");
     setTo("");
@@ -245,6 +255,7 @@ export default function Ledger() {
     setSearchFilter("");
     load({ 
     accountFilter: "",
+    typeFilter: "",
     bankFilter: "",
     from: "",
     to: "",
@@ -263,7 +274,7 @@ export default function Ledger() {
             <div>
               <h2 className="text-2xl font-bold text-slate-900">Mayor</h2>
               <p className="text-sm text-slate-500">
-                Registro por cuenta contable: Cliente, Compras/Gastos, IVA y Banco.
+                Registro por cuenta contable: Cliente, Compras/Gastos, IVA, Banco y Efectivo.
               </p>
             </div>
           </div>
@@ -445,6 +456,21 @@ export default function Ledger() {
                       </select>
                     </label>
                   )}
+                  <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                    Tipo
+                    <select
+                      value={typeFilter}
+                      onChange={(event) => setTypeFilter(event.target.value)}
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                    >
+                      <option value="">Todos</option>
+                      {MOVEMENT_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <label className="grid gap-1 text-sm font-semibold text-slate-700">
                     Desde
                     <input
