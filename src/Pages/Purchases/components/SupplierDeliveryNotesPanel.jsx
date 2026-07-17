@@ -47,6 +47,7 @@ function isPendingInvoice(note) {
 // }
 
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
+const CASH_PAYMENT_VALUE = "cash";
 
 const normalizeReference = (value) =>
   String(value || "")
@@ -527,7 +528,7 @@ export default function SupplierDeliveryNotesPanel({
     }
 
     if (invoiceForm.estado === "Pagada" && !invoiceForm.bankAccountId) {
-      alert("Selecciona el banco para registrar la factura pagada.");
+      alert("Selecciona el metodo de pago para registrar la factura pagada.");
       return;
     }
 
@@ -557,7 +558,9 @@ export default function SupplierDeliveryNotesPanel({
       estado: invoiceForm.estado,
       bankAccountId:
         invoiceForm.estado === "Pagada"
-          ? Number(invoiceForm.bankAccountId)
+          ? invoiceForm.bankAccountId === CASH_PAYMENT_VALUE
+            ? null
+            : Number(invoiceForm.bankAccountId)
           : null,
       lineasIva: invoiceVatLines.map((line) => ({
         base: line.base,
@@ -1126,7 +1129,7 @@ export default function SupplierDeliveryNotesPanel({
 
               {invoiceForm.estado === "Pagada" && (
                 <label className="flex flex-col gap-1 text-sm font-medium text-slate-700 md:col-span-2">
-                  Banco *
+                  Metodo de pago *
                   <select
                     value={invoiceForm.bankAccountId}
                     onChange={(e) =>
@@ -1134,7 +1137,8 @@ export default function SupplierDeliveryNotesPanel({
                     }
                     className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                   >
-                    <option value="">Selecciona banco</option>
+                    <option value="">Selecciona metodo</option>
+                    <option value={CASH_PAYMENT_VALUE}>Efectivo</option>
                     {bankAccounts.map((bank) => {
                       const id = bank.id ?? bank.Id;
                       const name =
