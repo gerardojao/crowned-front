@@ -1,5 +1,7 @@
 import { CheckCircle2 } from "lucide-react";
 
+const CASH_PAYMENT_VALUE = "cash";
+
 export default function PaymentModal({
   open,
   invoice,
@@ -72,13 +74,14 @@ export default function PaymentModal({
           </label>
 
           <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-            Banco *
+            Metodo de pago *
             <select
               value={bankAccountId}
               onChange={(e) => onChangeBank(e.target.value)}
               className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
             >
-              <option value="">Selecciona banco</option>
+              <option value="">Selecciona metodo</option>
+              <option value={CASH_PAYMENT_VALUE}>Efectivo</option>
               {bankAccounts.map((bank) => {
                 const id = bank.id ?? bank.Id;
                 const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
@@ -95,7 +98,7 @@ export default function PaymentModal({
 
           {bankAccounts.length === 0 && (
             <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-amber-200">
-              No hay bancos activos configurados para este taller.
+              No hay bancos activos configurados para este taller. Puedes registrar el pago en efectivo.
             </p>
           )}
         </div>
@@ -112,7 +115,7 @@ export default function PaymentModal({
 
           <button
             type="button"
-            disabled={loading || bankAccounts.length === 0}
+            disabled={loading || !bankAccountId}
             onClick={onConfirm}
             className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:opacity-60"
           >

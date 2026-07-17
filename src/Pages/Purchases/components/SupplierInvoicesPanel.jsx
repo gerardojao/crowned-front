@@ -37,6 +37,8 @@ const initialForm = {
   facturaOriginalId: "",
 };
 
+const CASH_PAYMENT_VALUE = "cash";
+
 function normalizeState(value) {
   return String(value || "")
     .trim()
@@ -204,7 +206,7 @@ export default function SupplierInvoicesPanel({
     const estadoFactura = normalizeState(form.estado);
 
     if (estadoFactura.includes("pagad") && !form.bankAccountId) {
-      alert("Selecciona el banco por el que se pagó la factura.");
+      alert("Selecciona el metodo de pago de la factura.");
       return;
     }
 
@@ -238,7 +240,10 @@ export default function SupplierInvoicesPanel({
         iva,
         total,
         estado: estadoFactura.includes("pagad") ? "Pagada" : "Pendiente de pago",
-        bankAccountId: form.bankAccountId ? Number(form.bankAccountId) : null,
+        bankAccountId:
+          form.bankAccountId && form.bankAccountId !== CASH_PAYMENT_VALUE
+            ? Number(form.bankAccountId)
+            : null,
         facturaOriginalId: form.facturaOriginalId
           ? Number(form.facturaOriginalId)
           : null,
@@ -644,7 +649,7 @@ export default function SupplierInvoicesPanel({
             {form.estado === "Pagada" && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Banco de pago
+                  Metodo de pago
                 </label>
                 <select
                   name="bankAccountId"
@@ -652,7 +657,8 @@ export default function SupplierInvoicesPanel({
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                 >
-                  <option value="">Selecciona banco</option>
+                  <option value="">Selecciona metodo</option>
+                  <option value={CASH_PAYMENT_VALUE}>Efectivo</option>
                   {bankAccounts.map((bank) => {
                     const id = bank.id ?? bank.Id;
                     const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";

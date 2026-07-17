@@ -11,6 +11,8 @@ import {
 } from "../utils/miscExpenses";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 
+const CASH_PAYMENT_VALUE = "cash";
+
 const initialForm = {
   numeroComprobante: "",
   fecha: new Date().toISOString().slice(0, 10),
@@ -138,7 +140,10 @@ export default function MiscExpensesPanel() {
       descripcion: item.descripcion ?? item.Descripcion ?? "",
       tipoGastoId: String(item.tipoGastoId ?? item.TipoGastoId ?? ""),
       importe: String(item.importe ?? item.Importe ?? ""),
-      bankAccountId: String(item.bankAccountId ?? item.BankAccountId ?? ""),
+      bankAccountId:
+        item.bankAccountId ?? item.BankAccountId
+          ? String(item.bankAccountId ?? item.BankAccountId)
+          : CASH_PAYMENT_VALUE,
     });
     setShowForm(true);
   };
@@ -187,7 +192,7 @@ export default function MiscExpensesPanel() {
               Gastos varios
             </h3>
             <p className="text-sm text-slate-500">
-              Gastos sin factura ni IVA, pagados de contado desde banco.
+              Gastos sin factura ni IVA, pagados de contado.
             </p>
           </div>
 
@@ -279,13 +284,14 @@ export default function MiscExpensesPanel() {
             </label>
 
             <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
-              Banco *
+              Metodo de pago *
               <select
                 value={form.bankAccountId}
                 onChange={(e) => setField("bankAccountId", e.target.value)}
                 className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               >
-                <option value="">Selecciona banco</option>
+                <option value="">Selecciona metodo</option>
+                <option value={CASH_PAYMENT_VALUE}>Efectivo</option>
                 {bankAccounts.map((bank) => {
                   const id = bank.id ?? bank.Id;
                   const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
@@ -313,8 +319,8 @@ export default function MiscExpensesPanel() {
 
           <div className="rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
             <span className="font-semibold">Movimiento:</span> aumenta gastos
-            por {formatCurrency(Number(form.importe) || 0)} y disminuye banco
-            por el mismo importe. IVA 0.
+            por {formatCurrency(Number(form.importe) || 0)} y registra el pago
+            con el metodo seleccionado. IVA 0.
           </div>
 
           <div className="flex flex-wrap gap-3">
@@ -351,7 +357,7 @@ export default function MiscExpensesPanel() {
                 <th className="px-4 py-3 text-left">Proveedor</th>
                 <th className="px-4 py-3 text-left">Descripcion</th>
                 <th className="px-4 py-3 text-left">Tipo</th>
-                <th className="px-4 py-3 text-left">Banco</th>
+                <th className="px-4 py-3 text-left">Metodo de pago</th>
                 <th className="px-4 py-3 text-right">Importe</th>
                 <th className="px-4 py-3 text-right">Acciones</th>
               </tr>
@@ -390,7 +396,7 @@ export default function MiscExpensesPanel() {
                     </td>
                     <td className="px-4 py-3">{item.tipoGastoNombre || "-"}</td>
                     <td className="px-4 py-3">
-                      {item.bankAccountName || "Sin banco"}
+                      {item.bankAccountName || "Efectivo"}
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-slate-900">
                       {formatCurrency(item.importe)}

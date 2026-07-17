@@ -20,7 +20,30 @@ test("misc expense validates required cash expense fields", () => {
       proveedorNombre: "El nombre del proveedor es requerido.",
       tipoGastoId: "Selecciona el tipo de gasto.",
       importe: "El importe debe ser mayor que 0.",
-      bankAccountId: "Selecciona el banco del gasto.",
+      bankAccountId: "Selecciona el metodo de pago.",
+    },
+  );
+});
+
+test("misc expense builds cash payload without bank account", () => {
+  assert.deepEqual(
+    buildMiscExpensePayload({
+      numeroComprobante: " CASH-1 ",
+      fecha: "2026-07-10",
+      proveedorNombre: " Ferreteria ",
+      descripcion: "",
+      tipoGastoId: "7",
+      importe: "12.30",
+      bankAccountId: "cash",
+    }),
+    {
+      numeroComprobante: "CASH-1",
+      fecha: "2026-07-10",
+      proveedorNombre: "Ferreteria",
+      descripcion: null,
+      tipoGastoId: 7,
+      importe: 12.3,
+      bankAccountId: null,
     },
   );
 });

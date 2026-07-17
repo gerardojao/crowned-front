@@ -4,6 +4,8 @@ import Loader from "../../../Components/Loader";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 import PaymentModal from "./PaymentModal";
 
+const CASH_PAYMENT_VALUE = "cash";
+
 function normalizePendingInvoice(item) {
   return {
     id: item?.id ?? item?.Id,
@@ -100,7 +102,7 @@ export default function AccountsPayablePanel({
     if (!invoice || paymentModal.loading) return;
 
     if (!paymentModal.bankAccountId) {
-      alert("Selecciona el banco por el que se realiza el pago.");
+      alert("Selecciona el metodo de pago.");
       return;
     }
 
@@ -120,7 +122,10 @@ export default function AccountsPayablePanel({
 
       const payload = {
         fechaPago: paymentModal.fecha || null,
-        bankAccountId: Number(paymentModal.bankAccountId),
+        bankAccountId:
+          paymentModal.bankAccountId === CASH_PAYMENT_VALUE
+            ? null
+            : Number(paymentModal.bankAccountId),
       };
 
       const res =

@@ -20,7 +20,7 @@ export function validateMiscExpenseForm(form) {
     errors.importe = "El importe debe ser mayor que 0.";
   }
   if (!form.bankAccountId) {
-    errors.bankAccountId = "Selecciona el banco del gasto.";
+    errors.bankAccountId = "Selecciona el metodo de pago.";
   }
   return errors;
 }
@@ -33,6 +33,7 @@ export function buildMiscExpensePayload(form) {
     descripcion: String(form.descripcion || "").trim() || null,
     tipoGastoId: Number(form.tipoGastoId),
     importe: Number(form.importe),
-    bankAccountId: Number(form.bankAccountId),
+    bankAccountId:
+      form.bankAccountId === "cash" ? null : Number(form.bankAccountId),
   };
 }
