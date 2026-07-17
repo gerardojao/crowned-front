@@ -7,7 +7,6 @@ import {
   Search, RotateCcw, ArrowLeft, CalendarDays, XCircle,
 } from "lucide-react";
 import {
-  fetchAccountsReceivableIncome,
   incomeIvaAmount,
   incomeTotalAmount,
 } from "../utils/accountsReceivableIncome";
@@ -15,6 +14,12 @@ import {
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const IVA_RATE = 0.21;
 const amountOf = (value) => Number(value ?? 0);
+const textOf = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 const incomeIvaOf = (item, value) =>
   incomeIvaAmount(item, amountOf(value), IVA_RATE);
 const incomeTotalWithIva = (item, value) =>
@@ -97,9 +102,12 @@ export default function IncomeDetails() {
   const location = useLocation();
 
   const [rows, setRows] = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [tipoId, setTipoId] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
   const [tipos, setTipos] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -123,6 +131,33 @@ export default function IncomeDetails() {
     () => rows.reduce((acc, x) => acc + incomeTotalWithIva(x, x.importe), 0),
     [rows],
   );
+  const paymentMethod = useCallback((row) => {
+    const method = row?.bankAccountName ?? row?.BankAccountName ?? "";
+    return String(method || "Efectivo").toLowerCase() === "caja" ? "Efectivo" : method || "Efectivo";
+  }, []);
+  const paymentMethods = useMemo(() => {
+    const names = new Set(allRows.map((row) => paymentMethod(row)).filter(Boolean));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "es"));
+  }, [allRows, paymentMethod]);
+  const applyFilters = useCallback(
+    (list, method, search) => {
+      const cleanSearch = textOf(search);
+      return list.filter((row) => {
+        if (method && paymentMethod(row) !== method) return false;
+        if (!cleanSearch) return true;
+        return [
+          row?.tipo,
+          row?.Tipo,
+          row?.descripcion,
+          row?.Descripcion,
+          row?.mes,
+          row?.Mes,
+          paymentMethod(row),
+        ].some((value) => textOf(value).includes(cleanSearch));
+      });
+    },
+    [paymentMethod],
+  );
 
   const loadTipos = useCallback(async () => {
     try {
@@ -144,6 +179,8 @@ export default function IncomeDetails() {
         const f = opts.from ?? from;
         const t = opts.to ?? to;
         const tid = opts.tipoId ?? tipoId;
+        const nextPayment = opts.paymentFilter ?? "";
+        const nextSearch = opts.searchFilter ?? "";
 
         const params = new URLSearchParams();
         if (f) params.set("fechaInicio", f);
@@ -152,11 +189,11 @@ export default function IncomeDetails() {
 
         const res = await api.get(`/Ingreso/detalle?${params.toString()}`);
         const list = res.data?.data?.[0] ?? [];
-        const cxc = tid
-          ? { rows: [] }
-          : await fetchAccountsReceivableIncome({ from: f, to: t });
-        setRows([...(Array.isArray(list) ? list : []), ...(cxc.rows || [])]);
+        const nextRows = Array.isArray(list) ? list : [];
+        setAllRows(nextRows);
+        setRows(applyFilters(nextRows, nextPayment, nextSearch));
       } catch (e) {
+        setAllRows([]);
         setRows([]);
         setNotice({
           type: "error",
@@ -166,7 +203,7 @@ export default function IncomeDetails() {
         setLoading(false);
       }
     },
-    [from, to, tipoId]
+    [applyFilters, from, tipoId, to]
   );
 
   useEffect(() => {
@@ -210,14 +247,26 @@ export default function IncomeDetails() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    fetchData();
+    fetchData({ paymentFilter, searchFilter });
   };
 
   const onClear = () => {
     setFrom("");
     setTo("");
     setTipoId("");
-    fetchData({ from: "", to: "", tipoId: "" });
+    setPaymentFilter("");
+    setSearchFilter("");
+    fetchData({ from: "", to: "", tipoId: "", paymentFilter: "", searchFilter: "" });
+  };
+
+  const handlePaymentFilterChange = (value) => {
+    setPaymentFilter(value);
+    setRows(applyFilters(allRows, value, searchFilter));
+  };
+
+  const handleSearchFilterChange = (value) => {
+    setSearchFilter(value);
+    setRows(applyFilters(allRows, paymentFilter, value));
   };
 
   // Rangos rápidos
@@ -227,7 +276,7 @@ export default function IncomeDetails() {
     const t = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     setFrom(f);
     setTo(t);
-    fetchData({ from: f, to: t });
+    fetchData({ from: f, to: t, paymentFilter, searchFilter });
   };
   const setLast30 = () => {
     const now = new Date();
@@ -236,7 +285,7 @@ export default function IncomeDetails() {
     const f = ymd(past), t = ymd(now);
     setFrom(f);
     setTo(t);
-    fetchData({ from: f, to: t });
+    fetchData({ from: f, to: t, paymentFilter, searchFilter });
   };
   const setThisYear = () => {
     const now = new Date();
@@ -244,7 +293,7 @@ export default function IncomeDetails() {
     const t = ymd(new Date(now.getFullYear(), 11, 31));
     setFrom(f);
     setTo(t);
-    fetchData({ from: f, to: t });
+    fetchData({ from: f, to: t, paymentFilter, searchFilter });
   };
 
   // Acciones
@@ -317,7 +366,7 @@ export default function IncomeDetails() {
         className="rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-5 mb-6"
         onSubmit={onSubmit}
       >
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.1fr_1.1fr_1.4fr_auto] gap-4 items-end">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="from">
               Desde
@@ -359,6 +408,37 @@ export default function IncomeDetails() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="payment">
+              Metodo de pago
+            </label>
+            <select
+              id="payment"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              value={paymentFilter}
+              onChange={(e) => handlePaymentFilterChange(e.target.value)}
+            >
+              <option value="">Todos</option>
+              {paymentMethods.map((method) => (
+                <option key={method} value={method}>
+                  {method}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1" htmlFor="search">
+              Buscar
+            </label>
+            <input
+              id="search"
+              type="search"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              value={searchFilter}
+              onChange={(e) => handleSearchFilterChange(e.target.value)}
+              placeholder="Coincidencia"
+            />
           </div>
 
         <div className="flex gap-2">
@@ -436,7 +516,7 @@ export default function IncomeDetails() {
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    {r.tipo ?? "—"} · {r.mes ?? "—"}
+                    {r.tipo ?? "—"} · {r.mes ?? "—"} · {paymentMethod(r)}
                   </div>
                   <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
                 </div>
@@ -475,6 +555,7 @@ export default function IncomeDetails() {
                       <th className="py-2.5 px-3 font-semibold">Fecha</th>
                       <th className="py-2.5 px-3 font-semibold"> </th>
                       <th className="py-2.5 px-3 font-semibold">Tipo</th>
+                      <th className="py-2.5 px-3 font-semibold">Metodo de pago</th>
                       <th className="py-2.5 px-3 font-semibold">Descripción</th>
                       <th className="py-2.5 px-3 font-semibold text-right">Importe</th>
                       <th className="py-2.5 px-3 font-semibold text-right">IVA</th>
@@ -484,7 +565,7 @@ export default function IncomeDetails() {
                   <tbody className="divide-y divide-slate-100">
                     {rows.length === 0 ? (
                       <tr>
-                        <td className="py-6 px-3 text-slate-500" colSpan={7}>
+                        <td className="py-6 px-3 text-slate-500" colSpan={8}>
                           Sin resultados
                         </td>
                       </tr>
@@ -496,6 +577,7 @@ export default function IncomeDetails() {
                           </td>
                           <td className="py-2.5 px-3">{"  "}</td>
                           <td className="py-2.5 px-3">{r.tipo ?? "—"}</td>
+                          <td className="py-2.5 px-3 text-slate-700">{paymentMethod(r)}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
                             {eur.format(amountOf(r.importe))}
@@ -512,7 +594,7 @@ export default function IncomeDetails() {
                   </tbody>
                   <tfoot className="bg-slate-50">
                     <tr>
-                      <th className="py-2.5 px-3 text-right font-semibold" colSpan={4}>
+                      <th className="py-2.5 px-3 text-right font-semibold" colSpan={5}>
                         Total
                       </th>
                       <th className="py-2.5 px-3 text-right font-bold text-slate-900">{eur.format(total)}</th>

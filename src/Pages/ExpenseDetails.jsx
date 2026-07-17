@@ -22,6 +22,13 @@ const eur = new Intl.NumberFormat("es-ES", {
 const ymd = (date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
+const textOf = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
 function read(row, camel, pascal, fallback = "") {
   return row?.[camel] ?? row?.[pascal] ?? fallback;
 }
@@ -45,6 +52,11 @@ function description(row) {
 
 function invoiceNumber(row) {
   return read(row, "numeroFactura", "NumeroFactura", "");
+}
+
+function paymentMethod(row) {
+  const method = read(row, "bankAccountName", "BankAccountName", "") || "Efectivo";
+  return String(method).toLowerCase() === "caja" ? "Efectivo" : method;
 }
 
 function Banner({ notice, onClose }) {
@@ -155,10 +167,13 @@ export default function ExpenseDetails() {
   const location = useLocation();
 
   const [rows, setRows] = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [types, setTypes] = useState([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [tipoId, setTipoId] = useState("");
+  const [paymentFilter, setPaymentFilter] = useState("");
+  const [searchFilter, setSearchFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -168,6 +183,28 @@ export default function ExpenseDetails() {
     () => rows.reduce((sum, row) => sum + amount(row), 0),
     [rows],
   );
+
+  const paymentMethods = useMemo(() => {
+    const names = new Set(allRows.map((row) => paymentMethod(row)).filter(Boolean));
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "es"));
+  }, [allRows]);
+
+  const applyFilters = useCallback((list, method, search) => {
+    const cleanSearch = textOf(search);
+    return list.filter((row) => {
+      if (method && paymentMethod(row) !== method) return false;
+      if (!cleanSearch) return true;
+      return [
+        typeName(row),
+        providerName(row),
+        description(row),
+        invoiceNumber(row),
+        paymentMethod(row),
+        row?.mes,
+        row?.Mes,
+      ].some((value) => textOf(value).includes(cleanSearch));
+    });
+  }, []);
 
   const loadTypes = useCallback(async () => {
     try {
@@ -196,21 +233,26 @@ export default function ExpenseDetails() {
         const nextFrom = opts.from ?? from;
         const nextTo = opts.to ?? to;
         const nextType = opts.tipoId ?? tipoId;
+        const nextPayment = opts.paymentFilter ?? "";
+        const nextSearch = opts.searchFilter ?? "";
         if (nextFrom) params.set("fechaInicio", nextFrom);
         if (nextTo) params.set("fechaFin", nextTo);
         if (nextType) params.set("tipoId", nextType);
 
         const res = await api.get(`/Egreso/detalle?${params.toString()}`);
         const list = res.data?.data?.[0] ?? [];
-        setRows(Array.isArray(list) ? list : []);
+        const nextRows = Array.isArray(list) ? list : [];
+        setAllRows(nextRows);
+        setRows(applyFilters(nextRows, nextPayment, nextSearch));
       } catch {
+        setAllRows([]);
         setRows([]);
         setNotice({ type: "error", text: "No se pudo obtener el detalle de gastos." });
       } finally {
         setLoading(false);
       }
     },
-    [from, to, tipoId],
+    [applyFilters, from, tipoId, to],
   );
 
   useEffect(() => {
@@ -228,14 +270,26 @@ export default function ExpenseDetails() {
 
   const onSubmit = (event) => {
     event.preventDefault();
-    fetchData();
+    fetchData({ paymentFilter, searchFilter });
   };
 
   const clearFilters = () => {
     setFrom("");
     setTo("");
     setTipoId("");
-    fetchData({ from: "", to: "", tipoId: "" });
+    setPaymentFilter("");
+    setSearchFilter("");
+    fetchData({ from: "", to: "", tipoId: "", paymentFilter: "", searchFilter: "" });
+  };
+
+  const handlePaymentFilterChange = (value) => {
+    setPaymentFilter(value);
+    setRows(applyFilters(allRows, value, searchFilter));
+  };
+
+  const handleSearchFilterChange = (value) => {
+    setSearchFilter(value);
+    setRows(applyFilters(allRows, paymentFilter, value));
   };
 
   const setThisMonth = () => {
@@ -244,7 +298,7 @@ export default function ExpenseDetails() {
     const end = ymd(new Date(now.getFullYear(), now.getMonth() + 1, 0));
     setFrom(start);
     setTo(end);
-    fetchData({ from: start, to: end });
+    fetchData({ from: start, to: end, paymentFilter, searchFilter });
   };
 
   const setLast30 = () => {
@@ -253,7 +307,7 @@ export default function ExpenseDetails() {
     start.setDate(end.getDate() - 30);
     setFrom(ymd(start));
     setTo(ymd(end));
-    fetchData({ from: ymd(start), to: ymd(end) });
+    fetchData({ from: ymd(start), to: ymd(end), paymentFilter, searchFilter });
   };
 
   const confirmDelete = async () => {
@@ -301,7 +355,7 @@ export default function ExpenseDetails() {
           <Filter size={17} className="text-slate-500" />
           Filtros
         </div>
-        <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1.2fr_auto]">
+        <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1.1fr_1.1fr_1.4fr_auto]">
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Desde
             <input
@@ -334,6 +388,31 @@ export default function ExpenseDetails() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Metodo de pago
+            <select
+              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+              value={paymentFilter}
+              onChange={(event) => handlePaymentFilterChange(event.target.value)}
+            >
+              <option value="">Todos</option>
+              {paymentMethods.map((method) => (
+                <option key={method} value={method}>
+                  {method}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Buscar
+            <input
+              type="search"
+              className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+              value={searchFilter}
+              onChange={(event) => handleSearchFilterChange(event.target.value)}
+              placeholder="Coincidencia"
+            />
           </label>
           <div className="flex gap-2">
             <button
@@ -422,6 +501,9 @@ export default function ExpenseDetails() {
                       Comprobante: {invoiceNumber(row)}
                     </div>
                   )}
+                  <div className="mt-1 text-xs font-medium text-slate-600">
+                    Metodo de pago: {paymentMethod(row)}
+                  </div>
                 </div>
                 <div className="shrink-0 text-right font-semibold text-rose-700">
                   {eur.format(amount(row))}
@@ -462,6 +544,7 @@ export default function ExpenseDetails() {
                     <th className="px-4 py-3 text-left font-semibold">Tipo</th>
                     <th className="px-4 py-3 text-left font-semibold">Comprobante</th>
                     <th className="px-4 py-3 text-left font-semibold">Proveedor</th>
+                    <th className="px-4 py-3 text-left font-semibold">Metodo de pago</th>
                     <th className="px-4 py-3 text-left font-semibold">Descripcion</th>
                     <th className="px-4 py-3 text-right font-semibold">Importe</th>
                     <th className="px-4 py-3 text-right font-semibold">Acciones</th>
@@ -490,6 +573,9 @@ export default function ExpenseDetails() {
                         </td>
                         <td className="px-4 py-3 text-slate-700">
                           {providerName(row) || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {paymentMethod(row)}
                         </td>
                         <td className="max-w-[320px] px-4 py-3 text-slate-700">
                           {description(row) || "-"}
@@ -522,7 +608,7 @@ export default function ExpenseDetails() {
                 </tbody>
                 <tfoot className="bg-slate-50 text-sm">
                   <tr>
-                    <th className="px-4 py-3 text-right font-semibold text-slate-700" colSpan={5}>
+                    <th className="px-4 py-3 text-right font-semibold text-slate-700" colSpan={6}>
                       Total
                     </th>
                     <th className="px-4 py-3 text-right font-bold text-slate-900">
