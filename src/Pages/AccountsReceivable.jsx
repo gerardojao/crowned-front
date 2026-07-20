@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, HandCoins, RefreshCw } from "lucide-react";
 import api from "../Components/api";
 import { currency, amountInput } from "../utils/currency";
+import { soloFecha } from "../utils/date";
 
 const ESTADOS = ["Todas", "Pendiente", "Parcial", "Rectificada", "Parcial rectificada", "Pagada"];
 const CASH_PAYMENT_VALUE = "cash";
@@ -15,13 +16,6 @@ const pickItems = (res) => {
 const dateOnly = (value) => {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("es-ES");
-};
-
-const isoDate = (value) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
 };
 
 const normalizeText = (value) =>
@@ -133,7 +127,7 @@ export default function AccountsReceivable() {
   const filteredItems = useMemo(() => {
     return items
       .filter((item) => {
-        const fecha = isoDate(item.fecha ?? item.Fecha);
+        const fecha = soloFecha(item.fecha ?? item.Fecha);
         if (from && (!fecha || fecha < from)) return false;
         if (to && (!fecha || fecha > to)) return false;
         if (!includesText(item.cliente ?? item.Cliente, clienteFilter)) return false;
