@@ -39,6 +39,7 @@ import {
   requiresCompletionConfirmation,
   WORK_ORDER_STATES,
 } from "../utils/workOrderWorkflow";
+import { parseOrderIdSearch } from "../utils/workOrderSearch";
 
 const EMPTY_ORDER = {
   ClienteId: "",
@@ -390,6 +391,7 @@ export default function RegisterWorkOrder() {
           kind: "labor",
           section: "ManoObra",
           codigo: "MO",
+          sectionLocked: true,
         }),
       ],
       Trabajo: prev.Trabajo?.trim()
@@ -438,6 +440,7 @@ export default function RegisterWorkOrder() {
         ...(existing || createDetailItem("Mano de obra", 1, amount)),
         kind: "labor",
         section: "ManoObra",
+        sectionLocked: true,
         descripcion: "Mano de obra",
         cantidad: 1,
         tiempo: 1,
@@ -500,6 +503,7 @@ export default function RegisterWorkOrder() {
           createDetailItem(name, 1, price, {
             kind: "repuesto",
             section: "Piezas",
+            sectionLocked: true,
             repuestoStockId: getPartId(part),
             idProveedor: getPartProviderId(part),
             nombreProveedor: getPartProviderName(part),
@@ -1131,12 +1135,32 @@ export default function RegisterWorkOrder() {
       setError("");
 
       const search = plateSearch.trim();
+      const orderIdSearch = parseOrderIdSearch(search);
       const baseParams = {
-        matricula: search || null,
+        matricula: orderIdSearch ? null : search || null,
         estado: statusFilter || null,
         fechaDesde: dateFrom || null,
         fechaHasta: dateTo || null,
       };
+
+      if (orderIdSearch) {
+        const res = await api.get(`/OrdenTrabajo/${orderIdSearch}`);
+        const item = normalizeOrder(res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? res?.data);
+        const fecha = item.Fecha ? String(item.Fecha).slice(0, 10) : "";
+        const matchesStatus = !statusFilter || item.Estado === statusFilter;
+        const isBilled = Boolean(item.Facturada || item.facturada);
+        const matchesBilled =
+          !billedFilter ||
+          (billedFilter === "facturadas" ? isBilled : !isBilled);
+        const matchesFrom = !dateFrom || fecha >= dateFrom;
+        const matchesTo = !dateTo || fecha <= dateTo;
+        const matches = matchesStatus && matchesBilled && matchesFrom && matchesTo;
+
+        setOrders(matches ? [item] : []);
+        setOrderTotal(matches ? 1 : 0);
+        setOrderPage(1);
+        return;
+      }
 
       if (billedFilter) {
         const pageSize = 100;
@@ -1274,6 +1298,7 @@ export default function RegisterWorkOrder() {
                     {
                       kind: "labor",
                       section: "ManoObra",
+                      sectionLocked: true,
                     },
                   ),
                 ]
@@ -2326,6 +2351,7 @@ export default function RegisterWorkOrder() {
                   {detailItems.map((item) => {
                     const section = getRepairLineSection(item);
                     const lineTotal = getRepairLineTotal(item);
+                    const sectionLocked = Boolean(item.sectionLocked);
 
                     return (
                       <div
@@ -2352,6 +2378,7 @@ export default function RegisterWorkOrder() {
                             />
                             <select
                               value={section}
+                              disabled={sectionLocked}
                               onChange={(e) =>
                                 setDetailItemField(
                                   item.id,
@@ -2359,7 +2386,11 @@ export default function RegisterWorkOrder() {
                                   e.target.value,
                                 )
                               }
-                              className={cls}
+                              className={`${cls} ${
+                                sectionLocked
+                                  ? "cursor-not-allowed bg-slate-100 text-slate-500"
+                                  : ""
+                              }`}
                             >
                               <option value="ManoObra">Mano obra</option>
                               <option value="Piezas">
@@ -2572,7 +2603,7 @@ export default function RegisterWorkOrder() {
               type="text"
               value={plateSearch}
               onChange={(e) => setPlateSearch(e.target.value)}
-              placeholder={labels.referenceSearchPlaceholder}
+              placeholder={`${labels.referenceSearchPlaceholder} u orden #`}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
             <select
@@ -2643,9 +2674,14 @@ export default function RegisterWorkOrder() {
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <h4 className="text-lg font-bold text-slate-900">
-                      {o.Matricula}
-                    </h4>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-lg font-bold text-slate-900">
+                        {o.Matricula}
+                      </h4>
+                      <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
+                        Orden #{o.Id}
+                      </span>
+                    </div>
 
                     <p className="text-sm text-slate-500">
                       {o.Marca} {o.Modelo}

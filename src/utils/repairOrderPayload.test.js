@@ -34,6 +34,7 @@ const baseOrder = {
     {
       descripcion: "Servicio cambio aceite",
       section: "ManoObra",
+      sectionLocked: true,
       kind: "labor",
       cantidad: 2,
       tiempo: 2,
@@ -71,6 +72,7 @@ test("buildWorkOrderPayload serializes technical lines when detailed lines are e
   assert.equal(items[0].cantidad, 2);
   assert.equal(items[0].tiempo, 2);
   assert.equal(items[0].kind, "labor");
+  assert.equal("sectionLocked" in items[0], false);
 });
 
 test("buildPreOrderPayload maps pre-order form to backend DTO contract", () => {
