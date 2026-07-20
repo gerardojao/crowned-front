@@ -1312,13 +1312,13 @@ export default function StockParts() {
                             >
                               Stock
                             </button>
-                            <button
+                            {/* <button
                               type="button"
                               onClick={() => updateQuantity(row, "add")}
                               className="rounded-lg bg-white px-2.5 py-2 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
                             >
                               +/-
-                            </button>
+                            </button> */}
                             <button
                               type="button"
                               onClick={() => deletePart(row)}

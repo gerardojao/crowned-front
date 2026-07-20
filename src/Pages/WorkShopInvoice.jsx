@@ -20,6 +20,7 @@ import {
   currentFiscalYearStart,
   localDateInputValue,
 } from "../utils/date";
+import { buildInvoicePaymentContract } from "../utils/invoicePayment";
 
 const EMPTY_ITEM = {
   codigo: "",
@@ -128,7 +129,7 @@ export default function WorkshopInvoice() {
     tipoOperacion: "Mecanica",
     ivaPct: 21,
     otros: "",
-    tipoPago: "Efectivo",
+    tipoPago: "Contado",
     plazoCreditoDias: 30,
     fechaVencimiento: "",
   });
@@ -477,8 +478,12 @@ export default function WorkshopInvoice() {
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
   const isCredit = invoice.tipoPago === "Credito";
   const accountsReceivableEnabled = Boolean(taller.enableAccountsReceivable);
-  const effectiveTipoPago = accountsReceivableEnabled ? invoice.tipoPago : "Efectivo";
-  const isCashPayment = effectiveTipoPago === "Efectivo";
+  const paymentContract = buildInvoicePaymentContract({
+    isCredit,
+    selectedPaymentMethods,
+    selectedBankId,
+  });
+  const { hasBankPayment, backendTipoPago, bankAccountId } = paymentContract;
   const paymentDetailText = useMemo(() => {
     if (isCredit) return "Pago a credito";
     const selectedLabels = selectedPaymentMethods
@@ -487,7 +492,7 @@ export default function WorkshopInvoice() {
       )
       .join(" / ");
     if (selectedLabels) return selectedLabels;
-    return invoice.tipoPago === "Contado" ? "Efectivo" : invoice.tipoPago;
+    return invoice.tipoPago;
   }, [invoice.tipoPago, isCredit, selectedPaymentMethods]);
   const hasTransferPayment = useMemo(
     () =>
@@ -515,7 +520,7 @@ export default function WorkshopInvoice() {
 
   useEffect(() => {
     if (accountsReceivableEnabled || !isCredit) return;
-    setTipoPago("Efectivo");
+    setTipoPago("Contado");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountsReceivableEnabled, isCredit]);
 
@@ -746,12 +751,12 @@ const saveIssuedInvoice = async () => {
     serie: taller.serieFactura || "A",
     observaciones: invoice.observaciones || null,
     tipoOperacion: invoice.tipoOperacion || "Mecanica",
-    tipoPago: effectiveTipoPago,
+    tipoPago: backendTipoPago,
     metodoPagoDetalle: paymentDetailText || null,
     totalAbonado: isCredit ? paymentTotal : companyPayable,
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
     fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
-    bankAccountId: !isCredit && !isCashPayment && selectedBankId ? Number(selectedBankId) : null,
+    bankAccountId,
     items: billableItems,
   };
 
@@ -793,7 +798,7 @@ const printInvoice = async () => {
       throw new Error("El abono inicial no puede superar el importe a pagar por el cliente.");
     }
 
-    if (!isCashPayment && bankAccounts.length > 1 && !selectedBankId) {
+    if (!isCredit && hasBankPayment && bankAccounts.length > 0 && !selectedBankId) {
       throw new Error("Selecciona el banco para esta factura.");
     }
 
@@ -949,7 +954,7 @@ const printInvoice = async () => {
       <section className="no-print grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
         <div className="rounded-2xl bg-white/80 p-5 ring-1 ring-slate-200 shadow-sm">
           <h3 className="text-lg font-semibold text-slate-800 mb-4">
-            Datos de la {labels.businessSingular}
+            Datos del {labels.businessSingular}
           </h3>
 
           <p className="mb-3 rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 ring-1 ring-slate-200">
@@ -1006,7 +1011,7 @@ const printInvoice = async () => {
               readOnly
             />
 
-            {!isCashPayment && bankAccounts.length > 1 && (
+            {!isCredit && hasBankPayment && bankAccounts.length > 0 && (
               <label className="block text-sm font-semibold text-slate-700">
                 Banco para esta factura
                 <select
@@ -1188,9 +1193,9 @@ const printInvoice = async () => {
                 value={invoice.tipoPago}
                 onChange={(e) => setTipoPago(e.target.value)}
               >
-                <option value="Efectivo">Efectivo</option>
+                <option value="Contado">Contado</option>
             
-                  <option value="Credito">Credito</option>
+                  <option value="Credito">A plazos</option>
                
               </select>
             </label>
@@ -1211,7 +1216,7 @@ const printInvoice = async () => {
                   </select>
                 </label>
 
-                <label className="block text-sm font-semibold text-slate-700">
+                {/* <label className="block text-sm font-semibold text-slate-700">
                   Fecha de vencimiento
                   <input
                     type="date"
@@ -1221,7 +1226,7 @@ const printInvoice = async () => {
                       setInvoiceField("fechaVencimiento", e.target.value)
                     }
                   />
-                </label>
+                </label> */}
               </>
             )}
           </div>
