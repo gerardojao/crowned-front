@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
+import {
+  buildAccountsPayableQueryParams,
+  emptyAccountsPayableFilters,
+} from "../utils/accountsPayableFilters";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 import PaymentModal from "./PaymentModal";
 
@@ -11,6 +15,7 @@ function normalizePendingInvoice(item) {
     id: item?.id ?? item?.Id,
     fecha: item?.fecha ?? item?.Fecha,
     proveedor: item?.proveedorNombre ?? item?.ProveedorNombre ?? "Proveedor no indicado",
+    proveedorId: item?.proveedorId ?? item?.ProveedorId ?? null,
     numeroFactura: item?.numeroFactura ?? item?.NumeroFactura ?? "",
     referencia: item?.referencia ?? item?.Referencia ?? "",
     descripcion: item?.descripcion ?? item?.Descripcion ?? "",
@@ -36,6 +41,8 @@ export default function AccountsPayablePanel({
 }) {
   const [pendingInvoices, setPendingInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState(emptyAccountsPayableFilters);
+  const [appliedFilters, setAppliedFilters] = useState(emptyAccountsPayableFilters);
   const [paymentModal, setPaymentModal] = useState({
     open: false,
     invoice: null,
@@ -47,10 +54,16 @@ export default function AccountsPayablePanel({
     loading: false,
   });
 
+  const setFilterField = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
   const loadPendingInvoices = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get("/FacturaRecibida/pendientes");
+      const res = await api.get("/FacturaRecibida/pendientes", {
+        params: buildAccountsPayableQueryParams(appliedFilters),
+      });
       const list = Array.isArray(res?.data?.data?.[0]) ? res.data.data[0] : [];
       setPendingInvoices(list.map(normalizePendingInvoice));
     } catch {
@@ -58,11 +71,24 @@ export default function AccountsPayablePanel({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [appliedFilters]);
 
   useEffect(() => {
     loadPendingInvoices();
   }, [loadPendingInvoices]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setAppliedFilters(filters);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [filters]);
+
+  const clearFilters = () => {
+    setFilters(emptyAccountsPayableFilters);
+    setAppliedFilters(emptyAccountsPayableFilters);
+  };
 
   const openPaymentModal = (invoice, mode = "full") => {
     const mainBank =
@@ -180,6 +206,59 @@ export default function AccountsPayablePanel({
         <p className="text-sm text-slate-500">
           Facturas recibidas pendientes de pago.
         </p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(220px,1fr)_170px_170px_auto] md:items-end">
+          <div className="min-w-0">
+            <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+              Buscar
+            </label>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(event) => setFilterField("search", event.target.value)}
+              placeholder="Documento, referencia, proveedor o descripción"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+              Desde
+            </label>
+            <input
+              type="date"
+              value={filters.fechaInicio}
+              onChange={(event) =>
+                setFilterField("fechaInicio", event.target.value)
+              }
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+              Hasta
+            </label>
+            <input
+              type="date"
+              value={filters.fechaFin}
+              onChange={(event) =>
+                setFilterField("fechaFin", event.target.value)
+              }
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            Limpiar
+          </button>
+        </div>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
