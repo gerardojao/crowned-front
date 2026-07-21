@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Landmark, RefreshCw, Trash2 } from "lucide-react";
 import api from "../Components/api";
 import { amountInput, currency } from "../utils/currency";
+import { signedLedgerAmount } from "../utils/ledgerAmounts";
 
 const ACCOUNTS = ["Cliente", "Proveedor", "IvaSoportado", "IvaRepercutido", "Banco", "Efectivo"];
 const MOVEMENT_TYPES = ["Ingreso", "Egreso"];
@@ -551,7 +552,7 @@ export default function Ledger() {
                             In: {currency(row?.ingresos ?? row?.Ingresos)}
                           </span>
                           <span className="text-rose-700">
-                            Out: {currency(row?.egresos ?? row?.Egresos)}
+                            Out: {currency(signedLedgerAmount(row?.egresos ?? row?.Egresos, "Egreso"))}
                           </span>
                         </div>
                       </div>
@@ -701,7 +702,7 @@ function LedgerRow({ item, onRemove }) {
       <td
         className={`px-3 py-3 text-right font-bold ${type === "Ingreso" ? "text-emerald-700" : "text-rose-700"}`}
       >
-        {currency(item.importe ?? item.Importe)}
+        {currency(signedLedgerAmount(item.importe ?? item.Importe, type))}
       </td>
       <td className="px-3 py-3 text-right">
         {canDelete ? (
@@ -758,7 +759,7 @@ function MobileMovement({ item, onRemove }) {
         <p
           className={`text-lg font-extrabold ${type === "Ingreso" ? "text-emerald-700" : "text-rose-700"}`}
         >
-          {currency(item.importe ?? item.Importe)}
+          {currency(signedLedgerAmount(item.importe ?? item.Importe, type))}
         </p>
       </div>
       {canDelete && (
