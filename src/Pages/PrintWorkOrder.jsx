@@ -301,7 +301,7 @@ export default function PrintWorkOrder() {
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
   const actionTitle = "Orden de trabajo";
   const actionSubtitle =
-    "Registra trabajos, vehÃ­culo, estado y costes del servicio.";
+    "Registra trabajos, vehículo, estado y costes del servicio.";
 
   const clientSignatureSrc = getSignatureSrc(order.clientSignatureBase64);
   const workshopSignatureSrc = getSignatureSrc(order.workshopSignatureBase64);
@@ -682,7 +682,7 @@ export default function PrintWorkOrder() {
             <table className="wo-meta">
               <tbody>
                 <tr>
-                  <th>NÂº Documento</th>
+                  <th>Nº Documento</th>
                   <td>{documentNumber}</td>
                 </tr>
                 <tr>
@@ -702,7 +702,7 @@ export default function PrintWorkOrder() {
                   <td>-</td>
                 </tr>
                 <tr>
-                  <th>Tipo de OperaciÃ³n</th>
+                  <th>Tipo de Operación</th>
                   <td>{operationType}</td>
                 </tr>
               </tbody>
@@ -773,10 +773,10 @@ export default function PrintWorkOrder() {
           <thead>
             <tr>
               <th>Matricula</th>
-              <th>NÂº peritaciÃ³n</th>
-              <th>F. matriculaciÃ³n</th>
-              <th>NÂº de chasis</th>
-              <th>NÂº motor</th>
+              <th>Nº peritación</th>
+              <th>F. matriculación</th>
+              <th>Nº de chasis</th>
+              <th>Nº motor</th>
               <th>Recepcion</th>
             </tr>
           </thead>
@@ -794,14 +794,14 @@ export default function PrintWorkOrder() {
 
         <section className="wo-body">
           <div className="wo-section-head">
-            <span>CÃ³digo operaciÃ³n</span>
+            <span>Código operación</span>
             <span>Descripcion</span>
             <span />
           </div>
 
          <div className="wo-block">
           <p className="wo-op-line">
-            * MOTIVO RECEPCION: {motivoRecepcion || "Sin averÃ­a descrita por el cliente."}
+            * MOTIVO RECEPCION: {motivoRecepcion || "Sin avería descrita por el cliente."}
           </p>
         </div>
 
@@ -879,10 +879,10 @@ export default function PrintWorkOrder() {
         </section>
 
         <footer className="wo-footer">
-          {/* RecepciÃ³n del vehÃ­culo */}
+          {/* Recepción del vehículo */}
           <div className="wo-footer-cell">
             <div className="font-bold uppercase text-center">
-              RECEPCIÃ“N DEL VEHÃCULO
+              RECEPCIÓN DEL VEHÍCULO
             </div>
 
             <div className="wo-sign">
@@ -890,11 +890,11 @@ export default function PrintWorkOrder() {
                 <>
                   <img
                     src={clientSignatureSrc}
-                    alt="Firma recepciÃ³n cliente"
+                    alt="Firma recepción cliente"
                     className="mx-auto h-10 max-w-[120px] object-contain"
                   />
 
-                  <div className="mt-1">Firma recepciÃ³n cliente</div>
+                  <div className="mt-1">Firma recepción cliente</div>
 
                   {order.clientSignatureDate && (
                     <div className="mt-1 text-[6px] normal-case">
@@ -911,12 +911,12 @@ export default function PrintWorkOrder() {
             </div>
           </div>
 
-          {/* AutorizaciÃ³n */}
+          {/* Autorización */}
           <div className="wo-footer-cell">
             <div className="text-center">
-              AUTORIZO LA REPARACIÃ“N DESCRITA.
+              AUTORIZO LA REPARACIÓN DESCRITA.
               <br />
-              DESEO RECOGER PIEZAS SUSTITUIDAS: â˜ SÃ &nbsp;&nbsp; â˜ NO
+              DESEO RECOGER PIEZAS SUSTITUIDAS: ☐ SÍ &nbsp;&nbsp; ☐ NO
             </div>
 
             <div className="wo-sign">
@@ -924,7 +924,7 @@ export default function PrintWorkOrder() {
                 <>
                   <img
                     src={clientSignatureSrc}
-                    alt="Firma autorizaciÃ³n cliente"
+                    alt="Firma autorización cliente"
                     className="mx-auto h-10 max-w-[120px] object-contain"
                   />
                   <div className="mt-1">Conformidad del cliente</div>
@@ -954,14 +954,14 @@ export default function PrintWorkOrder() {
             </div>
           </div>
 
-          {/* DaÃ±os */}
+          {/* Daños */}
           <div className="wo-footer-cell">
-            <div>DAÃ‘OS OBSERVADOS EN LA CARROCERÃA</div>
+            <div>DAÑOS OBSERVADOS EN LA CARROCERÍA</div>
 
             <div className="wo-car-box">
               <img
                 src={vehicleDamageDiagram}
-                alt="Diagrama de daÃ±os observados en la carrocerÃ­a"
+                alt="Diagrama de daños observados en la carrocería"
                 className="wo-car-diagram"
               />
             </div>
