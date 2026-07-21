@@ -12,6 +12,16 @@ import {
   incomeIvaAmount,
   incomeTotalAmount,
 } from "../utils/accountsReceivableIncome";
+import {
+  appendAccountsPayableSummary,
+  fetchAccountsPayableExpense,
+} from "../utils/accountsPayableExpense";
+import {
+  aggregateExpenseRows,
+  aggregateIncomeRows,
+  expenseCategoryName,
+  incomeCategoryName,
+} from "../utils/profitAndLossRows";
 
 const IVA_RATE = 0.21;
 const amountOf = (value) => Number(value ?? 0);
@@ -68,7 +78,9 @@ export default function Statement() {
       to: appliedTo,
     });
     setIncomes(
-      appendAccountsReceivableSummary(res?.data?.data?.[0] || [], cxc),
+      aggregateIncomeRows(
+        appendAccountsReceivableSummary(res?.data?.data?.[0] || [], cxc),
+      ),
     );
   };
 
@@ -95,7 +107,14 @@ export default function Statement() {
       };
     });
 
-    setExpenses(translatedData);
+    const cxp = await fetchAccountsPayableExpense({
+      from: appliedFrom,
+      to: appliedTo,
+    });
+
+    setExpenses(
+      aggregateExpenseRows(appendAccountsPayableSummary(translatedData, cxp)),
+    );
   };
 
   const loadData = async () => {
@@ -218,11 +237,13 @@ export default function Statement() {
       ]);
 
       const cxc = await fetchAccountsReceivableIncome({ from, to });
-      const reportIncomes = appendAccountsReceivableSummary(
-        incomeRes?.data?.data?.[0] || [],
-        cxc,
+      const cxp = await fetchAccountsPayableExpense({ from, to });
+      const reportIncomes = aggregateIncomeRows(
+        appendAccountsReceivableSummary(incomeRes?.data?.data?.[0] || [], cxc),
       );
-      const reportExpenses = expenseRes?.data?.data?.[0] || [];
+      const reportExpenses = aggregateExpenseRows(
+        appendAccountsPayableSummary(expenseRes?.data?.data?.[0] || [], cxp),
+      );
 
       const reportTotalIncomes = sumRows(reportIncomes);
       const reportTotalIncomesIva = sumIncomeIva(reportIncomes);
@@ -468,10 +489,7 @@ export default function Statement() {
                   return (
                     <tr key={idx} className="tr">
                       <td className="td">
-                        {i.cuenta_Ingreso ??
-                          i.Cuenta_Ingreso ??
-                          i.nombre ??
-                          "Sin tipo"}
+                        {incomeCategoryName(i)}
                       </td>
                       <td className="td text-right text-slate-600">
                         {formatPct(amount, totalIncomes)}
@@ -535,10 +553,7 @@ export default function Statement() {
                 {expenses.map((e, idx) => (
                   <tr key={idx} className="tr">
                     <td className="td">
-                      {e.cuenta_Egreso ??
-                        e.Cuenta_Egreso ??
-                        e.nombre ??
-                        "Sin tipo"}
+                      {expenseCategoryName(e)}
                     </td>
                     <td className="td">
                       <span
@@ -612,8 +627,7 @@ function downloadProfitAndLossExcel(report, filename) {
   const incomeRows = report.incomes
     .map((item) => {
       const amount = Number(item.total ?? item.Total ?? 0);
-      const name =
-        item.cuenta_Ingreso ?? item.Cuenta_Ingreso ?? item.nombre ?? "Sin tipo";
+      const name = incomeCategoryName(item);
 
       return `
         <tr>
@@ -630,8 +644,7 @@ function downloadProfitAndLossExcel(report, filename) {
   const expenseRows = report.expenses
     .map((item) => {
       const amount = Number(item.total ?? item.Total ?? 0);
-      const name =
-        item.cuenta_Egreso ?? item.Cuenta_Egreso ?? item.nombre ?? "Sin tipo";
+      const name = expenseCategoryName(item);
       const kind = expenseKindLabel(item);
 
       return `

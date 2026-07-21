@@ -1,7 +1,16 @@
 import api from "../Components/api";
+import { soloFecha } from "./date";
+import {
+  appendAccountsReceivableSummary,
+  CXC_INCOME_LABEL,
+  CXC_INCOME_SOURCE,
+} from "./financialStatementSummaries";
 
-export const CXC_INCOME_LABEL = "Cuentas por cobrar";
-export const CXC_INCOME_SOURCE = "cxc";
+export {
+  appendAccountsReceivableSummary,
+  CXC_INCOME_LABEL,
+  CXC_INCOME_SOURCE,
+};
 
 const pickItems = (res) => {
   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? [];
@@ -13,9 +22,7 @@ const read = (item, camel, pascal, fallback = null) =>
 
 const dateValue = (value) => {
   if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toISOString().slice(0, 10);
+  return soloFecha(value);
 };
 
 const inRange = (item, from, to) => {
@@ -83,11 +90,6 @@ export async function fetchAccountsReceivableIncome({ from = "", to = "" } = {})
         : null,
   };
 }
-
-export const appendAccountsReceivableSummary = (rows, cxc) => {
-  const list = Array.isArray(rows) ? [...rows] : [];
-  return cxc?.summaryRow ? [...list, cxc.summaryRow] : list;
-};
 
 export const isAccountsReceivableIncome = (item) =>
   (item?.source ?? item?.Source) === CXC_INCOME_SOURCE ||
