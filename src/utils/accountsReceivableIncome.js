@@ -2,12 +2,14 @@ import api from "../Components/api";
 import { soloFecha } from "./date";
 import {
   appendAccountsReceivableSummary,
+  CXC_INCOME_DISPLAY_LABEL,
   CXC_INCOME_LABEL,
   CXC_INCOME_SOURCE,
 } from "./financialStatementSummaries";
 
 export {
   appendAccountsReceivableSummary,
+  CXC_INCOME_DISPLAY_LABEL,
   CXC_INCOME_LABEL,
   CXC_INCOME_SOURCE,
 };
@@ -58,7 +60,7 @@ export async function fetchAccountsReceivableIncome({ from = "", to = "" } = {})
         id: `cxc-${read(item, "id", "Id", numeroFactura)}`,
         fecha: read(item, "fecha", "Fecha"),
         mes: "",
-        tipo: CXC_INCOME_LABEL,
+        tipo: CXC_INCOME_DISPLAY_LABEL,
         descripcion: `Abono factura ${numeroFactura}${cliente ? ` - ${cliente}` : ""}`,
         importe: totalAbonado,
         totalConIva: totalAbonado,
@@ -79,8 +81,8 @@ export async function fetchAccountsReceivableIncome({ from = "", to = "" } = {})
     summaryRow:
       total > 0
         ? {
-            cuenta_Ingreso: CXC_INCOME_LABEL,
-            Cuenta_Ingreso: CXC_INCOME_LABEL,
+            cuenta_Ingreso: CXC_INCOME_DISPLAY_LABEL,
+            Cuenta_Ingreso: CXC_INCOME_DISPLAY_LABEL,
             total,
             Total: total,
             totalIncludesIva: true,

@@ -10,6 +10,7 @@ import {
   incomeIvaAmount,
   incomeTotalAmount,
 } from "../utils/accountsReceivableIncome";
+import { incomeDisplayLabel } from "../utils/financialStatementSummaries";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const IVA_RATE = 0.21;
@@ -146,6 +147,7 @@ export default function IncomeDetails() {
         if (method && paymentMethod(row) !== method) return false;
         if (!cleanSearch) return true;
         return [
+          incomeDisplayLabel(row),
           row?.tipo,
           row?.Tipo,
           row?.descripcion,
@@ -516,7 +518,7 @@ export default function IncomeDetails() {
                     </span>
                   </div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    {r.tipo ?? "—"} · {r.mes ?? "—"} · {paymentMethod(r)}
+                    {incomeDisplayLabel(r) ?? "—"} · {r.mes ?? "—"} · {paymentMethod(r)}
                   </div>
                   <div className="text-sm text-slate-700 mt-1 truncate">{r.descripcion ?? "—"}</div>
                 </div>
@@ -576,7 +578,7 @@ export default function IncomeDetails() {
                             {r.fecha ? soloFecha(r.fecha) : "—"}
                           </td>
                           <td className="py-2.5 px-3">{"  "}</td>
-                          <td className="py-2.5 px-3">{r.tipo ?? "—"}</td>
+                          <td className="py-2.5 px-3">{incomeDisplayLabel(r) ?? "—"}</td>
                           <td className="py-2.5 px-3 text-slate-700">{paymentMethod(r)}</td>
                           <td className="py-2.5 px-3 text-slate-700">{r.descripcion ?? "—"}</td>
                           <td className="py-2.5 px-3 text-right font-semibold text-emerald-700 whitespace-nowrap">
