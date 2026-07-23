@@ -73,6 +73,8 @@ export default function AccountsReceivable() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
   const [clienteFilter, setClienteFilter] = useState("");
   const [matriculaFilter, setMatriculaFilter] = useState("");
   const [facturaFilter, setFacturaFilter] = useState("");
@@ -128,8 +130,13 @@ export default function AccountsReceivable() {
     return items
       .filter((item) => {
         const fecha = soloFecha(item.fecha ?? item.Fecha);
+        const fechaVencimiento = soloFecha(
+          item.fechaVencimiento ?? item.FechaVencimiento,
+        );
         if (from && (!fecha || fecha < from)) return false;
         if (to && (!fecha || fecha > to)) return false;
+        if (dueFrom && (!fechaVencimiento || fechaVencimiento < dueFrom)) return false;
+        if (dueTo && (!fechaVencimiento || fechaVencimiento > dueTo)) return false;
         if (!includesText(item.cliente ?? item.Cliente, clienteFilter)) return false;
         if (!includesText(item.matricula ?? item.Matricula, matriculaFilter)) return false;
         if (!includesText(item.numeroFactura ?? item.NumeroFactura, facturaFilter)) return false;
@@ -141,7 +148,7 @@ export default function AccountsReceivable() {
         if (fechaA !== fechaB) return fechaB - fechaA;
         return Number(b.id ?? b.Id ?? 0) - Number(a.id ?? a.Id ?? 0);
       });
-  }, [items, from, to, clienteFilter, matriculaFilter, facturaFilter]);
+  }, [items, from, to, dueFrom, dueTo, clienteFilter, matriculaFilter, facturaFilter]);
 
   const summary = useMemo(() => {
     return filteredItems.reduce(
@@ -169,6 +176,8 @@ export default function AccountsReceivable() {
   const clearDateFilter = () => {
     setFrom("");
     setTo("");
+    setDueFrom("");
+    setDueTo("");
   };
 
   const clearSearchFilters = () => {
@@ -360,9 +369,9 @@ export default function AccountsReceivable() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 md:ml-auto md:w-fit md:grid-cols-[170px_170px_auto] md:items-end">
+          <div className="grid grid-cols-1 gap-3 md:ml-auto md:w-fit md:grid-cols-[170px_170px_170px_170px_auto] md:items-end">
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
-              Desde
+              Fecha desde
               <input
                 type="date"
                 value={from}
@@ -371,11 +380,29 @@ export default function AccountsReceivable() {
               />
             </label>
             <label className="grid gap-1 text-sm font-semibold text-slate-700">
-              Hasta
+              Fecha hasta
               <input
                 type="date"
                 value={to}
                 onChange={(event) => setTo(event.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Vence desde
+              <input
+                type="date"
+                value={dueFrom}
+                onChange={(event) => setDueFrom(event.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              Vence hasta
+              <input
+                type="date"
+                value={dueTo}
+                onChange={(event) => setDueTo(event.target.value)}
                 className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               />
             </label>
