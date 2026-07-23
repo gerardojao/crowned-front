@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Trash2, Printer, Wrench } from "lucide-react";
 import api, { resolveApiAssetUrl } from "../Components/api";
@@ -87,6 +87,7 @@ const EMPTY_PAYMENT_METHODS = PAYMENT_METHODS.reduce(
     [method.key]: {
       checked: false,
       amount: "",
+      bankAccountId: "",
     },
   }),
   {},
@@ -455,6 +456,7 @@ export default function WorkshopInvoice() {
         amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
         rawAmount: paymentMethods[method.key]?.amount || "",
         checked: Boolean(paymentMethods[method.key]?.checked),
+        bankAccountId: paymentMethods[method.key]?.bankAccountId || "",
       })).filter((method) => method.checked),
     [paymentMethods],
   );
@@ -483,7 +485,7 @@ export default function WorkshopInvoice() {
     selectedPaymentMethods,
     selectedBankId,
   });
-  const { hasBankPayment, backendTipoPago, bankAccountId } = paymentContract;
+  const { backendTipoPago, bankAccountId, pagos } = paymentContract;
   const paymentDetailText = useMemo(() => {
     if (isCredit) return "Pago a credito";
     const selectedLabels = selectedPaymentMethods
@@ -500,11 +502,20 @@ export default function WorkshopInvoice() {
       String(paymentDetailText || "").toLowerCase().includes("transferencia"),
     [paymentDetailText, selectedPaymentMethods],
   );
-  const selectedBank = useMemo(
-    () => bankAccounts.find((item) => String(item.id ?? item.Id) === String(selectedBankId)),
-    [bankAccounts, selectedBankId],
-  );
+  const selectedBank = useMemo(() => {
+    const firstBankPayment = selectedPaymentMethods.find(
+      (method) => method.key !== "efectivo" && method.bankAccountId,
+    );
+    const effectiveBankId = firstBankPayment?.bankAccountId || selectedBankId;
+    return bankAccounts.find((item) => String(item.id ?? item.Id) === String(effectiveBankId));
+  }, [bankAccounts, selectedBankId, selectedPaymentMethods]);
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
+
+  useEffect(() => {
+    const iban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
+    if (!iban) return;
+    setTaller((prev) => (prev.iban === iban ? prev : { ...prev, iban }));
+  }, [selectedBank]);
 
   useEffect(() => {
     if (!isCredit) return;
@@ -532,12 +543,18 @@ export default function WorkshopInvoice() {
   };
 
   const setPaymentMethodChecked = (key, checked) => {
+    const mainBank = bankAccounts.find((item) => item.esPrincipal ?? item.EsPrincipal) || bankAccounts[0];
+    const defaultBankId = mainBank?.id ?? mainBank?.Id ?? selectedBankId ?? "";
     setPaymentMethods((prev) => ({
       ...prev,
       [key]: {
         ...prev[key],
         checked,
         amount: checked ? prev[key]?.amount || "" : "",
+        bankAccountId:
+          checked && key !== "efectivo"
+            ? prev[key]?.bankAccountId || String(defaultBankId || "")
+            : prev[key]?.bankAccountId || "",
       },
     }));
   };
@@ -552,6 +569,16 @@ export default function WorkshopInvoice() {
     }));
   };
 
+  const setPaymentMethodBank = (key, bankAccountId) => {
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        bankAccountId,
+      },
+    }));
+  };
+
   const loadBankAccounts = async () => {
     try {
       const res = await api.get("/WorkshopBankAccounts");
@@ -561,7 +588,23 @@ export default function WorkshopInvoice() {
       const main = banks.find((x) => x.esPrincipal ?? x.EsPrincipal) || banks[0];
       const mainId = main?.id ?? main?.Id ?? "";
       const mainIban = main?.iban ?? main?.Iban ?? "";
-      if (mainId) setSelectedBankId(String(mainId));
+      if (mainId) {
+        const normalizedMainId = String(mainId);
+        setSelectedBankId(normalizedMainId);
+        setPaymentMethods((prev) =>
+          PAYMENT_METHODS.reduce((acc, method) => {
+            const current = prev[method.key] || {};
+            acc[method.key] = {
+              ...current,
+              bankAccountId:
+                method.key === "efectivo"
+                  ? current.bankAccountId || ""
+                  : current.bankAccountId || normalizedMainId,
+            };
+            return acc;
+          }, {}),
+        );
+      }
       if (mainIban) {
         setTaller((prev) => ({
           ...prev,
@@ -591,18 +634,6 @@ export default function WorkshopInvoice() {
 
     if (tipoPago === "Credito") {
       setPaymentMethods(EMPTY_PAYMENT_METHODS);
-    }
-  };
-
-  const setInvoiceBank = (bankId) => {
-    setSelectedBankId(bankId);
-    const bank = bankAccounts.find((item) => String(item.id ?? item.Id) === String(bankId));
-    const iban = bank?.iban ?? bank?.Iban ?? "";
-    if (iban) {
-      setTaller((prev) => ({
-        ...prev,
-        iban,
-      }));
     }
   };
 
@@ -757,6 +788,7 @@ const saveIssuedInvoice = async () => {
     plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
     fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
     bankAccountId,
+    pagos,
     items: billableItems,
   };
 
@@ -798,8 +830,11 @@ const printInvoice = async () => {
       throw new Error("El abono inicial no puede superar el importe a pagar por el cliente.");
     }
 
-    if (!isCredit && hasBankPayment && bankAccounts.length > 0 && !selectedBankId) {
-      throw new Error("Selecciona el banco para esta factura.");
+    const bankPaymentWithoutBank = selectedPaymentMethods.find(
+      (method) => method.key !== "efectivo" && !method.bankAccountId,
+    );
+    if (bankPaymentWithoutBank) {
+      throw new Error(`Selecciona el banco para ${bankPaymentWithoutBank.label}.`);
     }
 
     const res = await saveIssuedInvoice();
@@ -1010,29 +1045,6 @@ const printInvoice = async () => {
               value={taller.iban}
               readOnly
             />
-
-            {!isCredit && hasBankPayment && bankAccounts.length > 0 && (
-              <label className="block text-sm font-semibold text-slate-700">
-                Banco para esta factura
-                <select
-                  className={`mt-1 w-full ${inputCls}`}
-                  value={selectedBankId}
-                  onChange={(e) => setInvoiceBank(e.target.value)}
-                >
-                  <option value="">Selecciona banco</option>
-                  {bankAccounts.map((bank) => {
-                    const id = bank.id ?? bank.Id;
-                    const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
-                    const iban = bank.iban ?? bank.Iban ?? "";
-                    return (
-                      <option key={id} value={id}>
-                        {name} - {iban}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-            )}
           </div>
         </div>
 
@@ -1278,23 +1290,47 @@ const printInvoice = async () => {
                     </label>
 
                     {checked && (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                        placeholder="Importe"
-                        value={paymentMethods[method.key]?.amount || ""}
-                        onChange={(e) =>
-                          setPaymentMethodAmount(method.key, e.target.value)
-                        }
-                        onBlur={(e) =>
-                          setPaymentMethodAmount(
-                            method.key,
-                            amountInput(e.target.value),
-                          )
-                        }
-                      />
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                          placeholder="Importe"
+                          value={paymentMethods[method.key]?.amount || ""}
+                          onChange={(e) =>
+                            setPaymentMethodAmount(method.key, e.target.value)
+                          }
+                          onBlur={(e) =>
+                            setPaymentMethodAmount(
+                              method.key,
+                              amountInput(e.target.value),
+                            )
+                          }
+                        />
+
+                        {method.key !== "efectivo" && (
+                          <select
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                            value={paymentMethods[method.key]?.bankAccountId || ""}
+                            onChange={(e) =>
+                              setPaymentMethodBank(method.key, e.target.value)
+                            }
+                          >
+                            <option value="">Banco</option>
+                            {bankAccounts.map((bank) => {
+                              const id = bank.id ?? bank.Id;
+                              const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                              const iban = bank.iban ?? bank.Iban ?? "";
+                              return (
+                                <option key={id} value={id}>
+                                  {name} - {iban}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
@@ -1924,4 +1960,3 @@ function formatDate(value) {
     year: "numeric",
   });
 }
-

@@ -4,33 +4,60 @@ import { buildInvoicePaymentContract } from "./invoicePayment.js";
 
 test("cash-only counted invoice keeps backend cash compatibility", () => {
   const contract = buildInvoicePaymentContract({
-    selectedPaymentMethods: [{ key: "efectivo" }],
+    selectedPaymentMethods: [{ key: "efectivo", amount: 50 }],
     selectedBankId: "7",
   });
 
   assert.equal(contract.hasBankPayment, false);
   assert.equal(contract.backendTipoPago, "Efectivo");
   assert.equal(contract.bankAccountId, null);
+  assert.deepEqual(contract.pagos, [
+    { metodoPago: "Efectivo", importe: 50, bankAccountId: null },
+  ]);
 });
 
-test("counted invoice with bank payment sends bank-backed contado", () => {
+test("counted invoice with bank payment sends bank-backed contado and detailed payments", () => {
   const contract = buildInvoicePaymentContract({
-    selectedPaymentMethods: [{ key: "transferencia" }],
-    selectedBankId: "7",
+    selectedPaymentMethods: [
+      { key: "transferencia", amount: 75, bankAccountId: "7" },
+    ],
   });
 
   assert.equal(contract.hasBankPayment, true);
   assert.equal(contract.backendTipoPago, "Contado");
   assert.equal(contract.bankAccountId, 7);
+  assert.deepEqual(contract.pagos, [
+    { metodoPago: "Transferencia", importe: 75, bankAccountId: 7 },
+  ]);
 });
 
-test("credit invoice keeps CxC type and does not assign bank as invoice bank", () => {
+test("mixed counted invoice keeps cash out of bank and keeps each bank id", () => {
+  const contract = buildInvoicePaymentContract({
+    selectedPaymentMethods: [
+      { key: "efectivo", amount: 40 },
+      { key: "tdc", amount: 35, bankAccountId: "8" },
+      { key: "transferencia", amount: 25, bankAccountId: "9" },
+    ],
+  });
+
+  assert.equal(contract.backendTipoPago, "Contado");
+  assert.equal(contract.bankAccountId, 8);
+  assert.deepEqual(contract.pagos, [
+    { metodoPago: "Efectivo", importe: 40, bankAccountId: null },
+    { metodoPago: "TPV", importe: 35, bankAccountId: 8 },
+    { metodoPago: "Transferencia", importe: 25, bankAccountId: 9 },
+  ]);
+});
+
+test("credit invoice keeps CxC type but sends initial payment detail", () => {
   const contract = buildInvoicePaymentContract({
     isCredit: true,
-    selectedPaymentMethods: [{ key: "transferencia" }],
-    selectedBankId: "7",
+    selectedPaymentMethods: [{ key: "transferencia", amount: 20, bankAccountId: "7" }],
   });
 
   assert.equal(contract.backendTipoPago, "Credito");
   assert.equal(contract.bankAccountId, null);
+  assert.deepEqual(contract.pagos, [
+    { metodoPago: "Transferencia", importe: 20, bankAccountId: 7 },
+  ]);
 });
