@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -542,7 +542,7 @@ export default function StockParts() {
       return;
     }
 
-    const next = quantityModal.mode === "set" ? value : current + value;
+    const next = Math.round((quantityModal.mode === "set" ? value : current + value) * 100) / 100;
     if (next < 0) {
       setNotice({
         type: "error",
@@ -554,7 +554,10 @@ export default function StockParts() {
     try {
       setQuantityModal((currentState) => ({ ...currentState, loading: true }));
       setNotice(null);
-      await api.patch(`/RepuestoStock/${id}/cantidad`, next);
+      const res = await api.patch(`/RepuestoStock/${id}/cantidad`, { cantidad: next });
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(res?.data?.message || res?.data?.Message || "No se pudo actualizar la cantidad.");
+      }
       await loadInventory();
       setQuantityModal({
         open: false,
