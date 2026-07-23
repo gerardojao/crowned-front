@@ -9,6 +9,12 @@ export const WORK_ORDER_STATES = [
   "Entregado",
 ];
 
+const HIDDEN_WORK_ORDER_STATES = ["Repuesto devuelto"];
+
+export const VISIBLE_WORK_ORDER_STATES = WORK_ORDER_STATES.filter(
+  (state) => !HIDDEN_WORK_ORDER_STATES.includes(state),
+);
+
 const transitions = {
   Recibido: ["Diagnóstico", "Reparando"],
   Diagnóstico: ["Reparando", "Esperando repuesto"],
@@ -42,7 +48,9 @@ export function getAllowedWorkOrderStates(currentState, isInvoiced) {
   const normalizedState = normalizeWorkOrderState(currentState);
   const nextStates = transitions[normalizedState] || [];
   const filteredNextStates = nextStates.filter(
-    (state) => state !== "Entregado" || Boolean(isInvoiced),
+    (state) =>
+      !HIDDEN_WORK_ORDER_STATES.includes(state) &&
+      (state !== "Entregado" || Boolean(isInvoiced)),
   );
   return [normalizedState, ...filteredNextStates].filter(
     (state, index, values) => state && values.indexOf(state) === index,
@@ -62,7 +70,6 @@ export function requiresCompletionConfirmation(currentState, nextState) {
 
 export function isWorkOrderEditLocked(state) {
   return [
-    "Reparando",
     "Esperando repuesto",
     "Terminado",
     "Entregado",

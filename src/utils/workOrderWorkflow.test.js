@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   canInvoiceWorkOrder,
   getAllowedWorkOrderStates,
+  isWorkOrderEditLocked,
   normalizeWorkOrderState,
   requiresCompletionConfirmation,
+  VISIBLE_WORK_ORDER_STATES,
 } from "./workOrderWorkflow.js";
 
 test("work order state options only include the current and valid next states", () => {
@@ -16,6 +18,7 @@ test("work order state options only include the current and valid next states", 
   assert.deepEqual(getAllowedWorkOrderStates("Reparando", false), [
     "Reparando",
     "Esperando repuesto",
+    "Repuesto Recibido",
     "Terminado",
   ]);
 });
@@ -55,4 +58,24 @@ test("finishing an order requires confirmation only when entering the final stat
     requiresCompletionConfirmation("Reparando", "Esperando repuesto"),
     false,
   );
+});
+
+test("hidden legacy states are not offered as selectable options", () => {
+  assert.equal(VISIBLE_WORK_ORDER_STATES.includes("Repuesto devuelto"), false);
+  assert.deepEqual(getAllowedWorkOrderStates("Repuesto Recibido", false), [
+    "Repuesto Recibido",
+    "Reparando",
+    "Terminado",
+  ]);
+  assert.deepEqual(getAllowedWorkOrderStates("Repuesto devuelto", false), [
+    "Repuesto devuelto",
+    "Repuesto Recibido",
+  ]);
+});
+
+test("repairing work orders remain editable", () => {
+  assert.equal(isWorkOrderEditLocked("Reparando"), false);
+  assert.equal(isWorkOrderEditLocked("Esperando repuesto"), true);
+  assert.equal(isWorkOrderEditLocked("Terminado"), true);
+  assert.equal(isWorkOrderEditLocked("Entregado"), true);
 });

@@ -26,6 +26,8 @@ import SmallSuccessModal from "../Components/SmallSuccessModal";
 import ConfirmActionModal from "../Components/ConfirmActionModal";
 import {
   buildWorkOrderPayload,
+  getWorkOrderOperationTypeBadgeClass,
+  getWorkOrderOperationTypeLabel,
   getRepairLineQuantity,
   getRepairLineSection,
   getRepairLineTotal,
@@ -37,7 +39,7 @@ import {
   isWorkOrderEditLocked,
   normalizeWorkOrderState,
   requiresCompletionConfirmation,
-  WORK_ORDER_STATES,
+  VISIBLE_WORK_ORDER_STATES,
 } from "../utils/workOrderWorkflow";
 import { parseOrderIdSearch } from "../utils/workOrderSearch";
 
@@ -97,6 +99,26 @@ const DEFAULT_FREQUENT_SERVICES = [
 ];
 
 const SERVICE_PREFIX = "Servicio ";
+const normalizeOrderSearchText = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const compactOrderSearchText = (value) =>
+  normalizeOrderSearchText(value).replace(/[^a-z0-9]/g, "");
+
+const includesOrderSearchText = (value, term) => {
+  const cleanValue = normalizeOrderSearchText(value);
+  const cleanTerm = normalizeOrderSearchText(term);
+  if (!cleanTerm) return true;
+  if (cleanValue.includes(cleanTerm)) return true;
+  return compactOrderSearchText(value).includes(compactOrderSearchText(term));
+};
+
+const matchesWorkOrderOperationSearch = (order, term) =>
+  includesOrderSearchText(getWorkOrderOperationTypeLabel(order), term);
 const normalizeFrequentServiceName = (value) => {
   const name = value.trim();
   if (!name) return "";
@@ -248,6 +270,10 @@ export default function RegisterWorkOrder() {
     nextState: "",
     loading: false,
   });
+  const [deleteConfirmation, setDeleteConfirmation] = useState({
+    order: null,
+    loading: false,
+  });
   const [plateSearch, setPlateSearch] = useState("");
   const [error, setError] = useState("");
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -291,11 +317,14 @@ export default function RegisterWorkOrder() {
   const hasSelectedVehicle = Boolean(
     order.Matricula || order.Modelo || order.VehiculoId,
   );
+  const isStandaloneOrderCreationBlocked =
+    preOrdersEnabled && !editingId && !preOrderSourceId;
   const shouldShowOrderForm =
-    showNewCustomer ||
-    editingId ||
-    preOrderSourceId ||
-    (hasSelectedClient && hasSelectedVehicle);
+    !isStandaloneOrderCreationBlocked &&
+    (showNewCustomer ||
+      editingId ||
+      preOrderSourceId ||
+      (hasSelectedClient && hasSelectedVehicle));
 
   const [quickCreateNotice, setQuickCreateNotice] = useState("");
 
@@ -1136,8 +1165,14 @@ export default function RegisterWorkOrder() {
 
       const search = plateSearch.trim();
       const orderIdSearch = parseOrderIdSearch(search);
+      const isOperationTypeSearch =
+        !orderIdSearch &&
+        search &&
+        ["Mecanica", "Mecánica", "Chapa y pintura"].some((type) =>
+          includesOrderSearchText(type, search),
+        );
       const baseParams = {
-        matricula: orderIdSearch ? null : search || null,
+        matricula: orderIdSearch || isOperationTypeSearch ? null : search || null,
         estado: statusFilter || null,
         fechaDesde: dateFrom || null,
         fechaHasta: dateTo || null,
@@ -1162,7 +1197,7 @@ export default function RegisterWorkOrder() {
         return;
       }
 
-      if (billedFilter) {
+      if (billedFilter || isOperationTypeSearch) {
         const pageSize = 100;
         let apiPage = 1;
         let apiTotal = 0;
@@ -1184,13 +1219,18 @@ export default function RegisterWorkOrder() {
           apiPage += 1;
         } while (allItems.length < apiTotal);
 
-        const billedItems = allItems.filter((item) => {
+        const filteredItems = allItems.filter((item) => {
           const isBilled = Boolean(item.Facturada || item.facturada);
-          return billedFilter === "facturadas" ? isBilled : !isBilled;
+          const matchesBilled =
+            !billedFilter ||
+            (billedFilter === "facturadas" ? isBilled : !isBilled);
+          const matchesOperation =
+            !isOperationTypeSearch || matchesWorkOrderOperationSearch(item, search);
+          return matchesBilled && matchesOperation;
         });
         const start = (page - 1) * orderPageSize;
-        setOrders(billedItems.slice(start, start + orderPageSize));
-        setOrderTotal(billedItems.length);
+        setOrders(filteredItems.slice(start, start + orderPageSize));
+        setOrderTotal(filteredItems.length);
         setOrderPage(page);
         return;
       }
@@ -1456,6 +1496,47 @@ export default function RegisterWorkOrder() {
     }
   };
 
+  const closeDeleteConfirmation = () => {
+    if (deleteConfirmation.loading) return;
+    setDeleteConfirmation({ order: null, loading: false });
+  };
+
+  const requestOrderDelete = (targetOrder) => {
+    setDeleteConfirmation({ order: targetOrder, loading: false });
+  };
+
+  const confirmOrderDelete = async () => {
+    const targetOrder = deleteConfirmation.order;
+    if (!targetOrder || deleteConfirmation.loading) return;
+
+    try {
+      setDeleteConfirmation((current) => ({ ...current, loading: true }));
+      setError("");
+      setNotice("");
+      const res = await api.delete(`/OrdenTrabajo/${targetOrder.Id}`);
+      ensureOk(res);
+      setOrders((currentOrders) =>
+        currentOrders.filter((item) => item.Id !== targetOrder.Id),
+      );
+      setOrderTotal((currentTotal) => Math.max(0, currentTotal - 1));
+      if (editingId === targetOrder.Id) {
+        setOrder(EMPTY_ORDER);
+        setEditingId(null);
+      }
+      setDeleteConfirmation({ order: null, loading: false });
+      setNotice("Orden eliminada correctamente.");
+      await loadOrders(orderPage);
+    } catch (err) {
+      console.error(err);
+      setDeleteConfirmation((current) => ({ ...current, loading: false }));
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo eliminar la orden.",
+      );
+    }
+  };
   const requestOrderStateChange = (targetOrder, nextState) => {
     if (
       requiresCompletionConfirmation(targetOrder.Estado, nextState)
@@ -1568,6 +1649,11 @@ export default function RegisterWorkOrder() {
 
     if (submitting) return;
 
+    if (isStandaloneOrderCreationBlocked) {
+      setError("Con el módulo de pre-órdenes activo, las órdenes nuevas deben crearse desde una pre-orden.");
+      return;
+    }
+
     try {
       setSubmitting(true);
       setNotice("");
@@ -1653,8 +1739,6 @@ export default function RegisterWorkOrder() {
     }
   }, []);
 
-  console.log(order);
-
   return (
     <>
       <SmallSuccessModal
@@ -1668,6 +1752,15 @@ export default function RegisterWorkOrder() {
         message={warningModal}
         variant="warning"
         onClose={() => setWarningModal("")}
+      />
+      <ConfirmActionModal
+        open={Boolean(deleteConfirmation.order)}
+        title="Eliminar orden"
+        message={`Se eliminará la orden #${deleteConfirmation.order?.Id ?? ""}. Esta acción no se puede deshacer desde el front.`}
+        confirmLabel="Eliminar"
+        loading={deleteConfirmation.loading}
+        onConfirm={confirmOrderDelete}
+        onCancel={closeDeleteConfirmation}
       />
       <ConfirmActionModal
         open={Boolean(completionConfirmation.order)}
@@ -1756,6 +1849,23 @@ export default function RegisterWorkOrder() {
         <Metric label="Página" value={`${orderPage}/${orderTotalPages}`} />
       </section>
 
+      {isStandaloneOrderCreationBlocked ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm">
+          <h3 className="text-base font-bold">Alta directa bloqueada</h3>
+          <p className="mt-1 text-sm leading-6">
+            El módulo de pre-órdenes está activo. Para crear una orden nueva,
+            primero registra la pre-orden y conviértela desde esa pantalla.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link
+              to="/pre-ordenes"
+              className="inline-flex items-center rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-700"
+            >
+              Ir a pre-órdenes
+            </Link>
+          </div>
+        </section>
+      ) : (
       <form
         onSubmit={onSubmit}
         autoComplete="off"
@@ -2565,6 +2675,7 @@ export default function RegisterWorkOrder() {
           </button>
         </div>
       </form>
+      )}
 
       <div className="mt-8 flex justify-center">
         <button
@@ -2613,7 +2724,7 @@ export default function RegisterWorkOrder() {
               aria-label="Filtrar por estado"
             >
               <option value="">Todos los estados</option>
-              {WORK_ORDER_STATES.map((state) => (
+              {VISIBLE_WORK_ORDER_STATES.map((state) => (
                 <option key={state} value={state}>
                   {state}
                 </option>
@@ -2680,6 +2791,11 @@ export default function RegisterWorkOrder() {
                       </h4>
                       <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
                         Orden #{o.Id}
+                      </span>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getWorkOrderOperationTypeBadgeClass(o)}`}
+                      >
+                        {getWorkOrderOperationTypeLabel(o)}
                       </span>
                     </div>
 
@@ -2813,6 +2929,17 @@ export default function RegisterWorkOrder() {
                       >
                         Facturar
                       </Link>
+                    )}
+
+                    {!(o.Facturada || o.facturada) && (
+                      <button
+                        type="button"
+                        onClick={() => requestOrderDelete(o)}
+                        className="inline-flex justify-center gap-2 rounded-xl px-3 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-sm font-medium text-rose-700 transition"
+                      >
+                        <Trash2 size={16} />
+                        Eliminar
+                      </button>
                     )}
 
                     {(o.Facturada || o.facturada) && (

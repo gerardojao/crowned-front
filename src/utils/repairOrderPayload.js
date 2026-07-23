@@ -1,3 +1,25 @@
+export function getWorkOrderOperationType(order) {
+  return (
+    order?.tipoOperacion ??
+    order?.TipoOperacion ??
+    order?.operationType ??
+    order?.OperationType ??
+    "Mecanica"
+  );
+}
+
+export function getWorkOrderOperationTypeLabel(order) {
+  const value = String(getWorkOrderOperationType(order) || "Mecanica").trim();
+  return value.toLowerCase() === "mecanica" ? "Mecánica" : value;
+}
+
+export function getWorkOrderOperationTypeBadgeClass(order) {
+  const value = String(getWorkOrderOperationType(order) || "").toLowerCase();
+  if (value.includes("chapa") || value.includes("pintura")) {
+    return "bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-200";
+  }
+  return "bg-slate-50 text-slate-700 ring-slate-200";
+}
 export function getRepairLineSection(item) {
   const raw = String(
     item?.section ??

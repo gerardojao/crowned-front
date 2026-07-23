@@ -1,4 +1,4 @@
-﻿import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import {
   ClipboardList,
@@ -26,6 +26,10 @@ import KPIs from "../Components/Kpi";
 import { useAuth } from "../Components/AuthContext";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+import {
+  getWorkOrderOperationTypeBadgeClass,
+  getWorkOrderOperationTypeLabel,
+} from "../utils/repairOrderPayload";
 
 function soloFecha(value) {
   if (!value) return "";
@@ -178,7 +182,7 @@ export default function Home() {
   useEffect(() => {
     if (!isAuthed) {
       setOrdenes([]);
-      setVehiculosEstado({ reparando: 0, entregado: 0 });
+      setVehiculosEstado({ reparando: 0, terminado: 0, entregado: 0 });
       setSaldoCuentasPorCobrar(0);
       setFacturacionDashboard({ todayTotal: 0, monthTotal: 0 });
       setVehiculosReparacionLoading(false);
@@ -205,6 +209,7 @@ export default function Home() {
         const [
           movRes,
           reparacionRes,
+          terminadoRes,
           entregadosRes,
           settingsRes,
           ingresosRes,
@@ -213,6 +218,9 @@ export default function Home() {
           api.get("/OrdenTrabajo/ultimas", { params: { take: 10 } }),
           api.get("/OrdenTrabajo", {
             params: { estado: "Reparando", page: 1, pageSize: 1 },
+          }),
+          api.get("/OrdenTrabajo", {
+            params: { estado: "Terminado", page: 1, pageSize: 1 },
           }),
           api.get("/OrdenTrabajo", {
             params: { estado: "Entregado", page: 1, pageSize: 1 },
@@ -236,6 +244,7 @@ export default function Home() {
         setOrdenes(pickDataList(movRes));
         setVehiculosEstado({
           reparando: pickPagingTotal(reparacionRes),
+          terminado: pickPagingTotal(terminadoRes),
           entregado: pickPagingTotal(entregadosRes),
         });
 
@@ -305,7 +314,7 @@ export default function Home() {
         console.error(err);
 
         setOrdenes([]);
-        setVehiculosEstado({ reparando: 0, entregado: 0 });
+        setVehiculosEstado({ reparando: 0, terminado: 0, entregado: 0 });
         setSaldoCuentasPorCobrar(0);
         setFacturacionDashboard({ todayTotal: 0, monthTotal: 0 });
         setDashboardTotals({ ingresos: 0, gastos: 0 });
@@ -420,7 +429,7 @@ export default function Home() {
                     Vehículos por estado
                   </p>
 
-                  <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="rounded-2xl bg-amber-50 px-3 py-2 ring-1 ring-amber-100">
                       <p className="text-xs font-semibold text-amber-700">
                         Reparando
@@ -429,6 +438,16 @@ export default function Home() {
                         {vehiculosReparacionLoading
                           ? "..."
                           : vehiculosEstado.reparando}
+                      </p>
+                    </div>
+                    <div className="rounded-2xl bg-emerald-50 px-3 py-2 ring-1 ring-emerald-100">
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Terminado
+                      </p>
+                      <p className="mt-1 text-3xl font-extrabold text-emerald-700">
+                        {vehiculosReparacionLoading
+                          ? "..."
+                          : vehiculosEstado.terminado}
                       </p>
                     </div>
 
@@ -445,7 +464,7 @@ export default function Home() {
                   </div>
 
                   <p className="mt-1 text-sm text-slate-500">
-                    Órdenes en reparación y entregadas
+                    Órdenes en reparación, terminadas y entregadas
                   </p>
                 </div>
               </div>
@@ -467,7 +486,7 @@ export default function Home() {
                     Facturación
                   </p>
 
-                  <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div className="rounded-2xl bg-violet-50 px-3 py-2 ring-1 ring-violet-100">
                       <p className="text-xs font-semibold text-violet-700">
                         Hoy
@@ -542,10 +561,10 @@ export default function Home() {
             </div>
 
             <Link
-              to="/register-work-order"
+              to={preOrdersEnabled ? "/pre-ordenes" : "/register-work-order"}
               className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-700 transition shadow-sm font-semibold"
             >
-              Nueva orden
+              {preOrdersEnabled ? "Nueva pre-orden" : "Nueva orden"}
               <ArrowRight size={17} />
             </Link>
             
@@ -724,6 +743,7 @@ export default function Home() {
             const estado = o.estado ?? o.Estado;
             const cliente = o.cliente ?? o.Cliente;
             const matricula = o.matricula ?? o.Matricula;
+            const operationType = getWorkOrderOperationTypeLabel(o);
 
             return (
               <article
@@ -743,11 +763,18 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <span
-                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
-                  >
-                    {estado}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
+                    >
+                      {estado}
+                    </span>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ${getWorkOrderOperationTypeBadgeClass(o)}`}
+                    >
+                      {operationType}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-3">
@@ -773,6 +800,9 @@ export default function Home() {
                   <th className="py-2.5 px-3 font-bold w-[160px] text-center">
                     Estado
                   </th>
+                  <th className="py-2.5 px-3 font-bold w-[150px] text-center">
+                    Tipo
+                  </th>
                   <th className="py-2.5 px-3 text-center font-bold">Cliente</th>
                   <th className="py-2.5 px-3 font-bold w-[140px] text-center">
                     {labels.referenceLabel}
@@ -784,7 +814,7 @@ export default function Home() {
               <tbody className="divide-y divide-slate-100">
                 {ordenes.length === 0 && (
                   <tr>
-                    <td className="py-4 px-3 text-slate-500" colSpan={4}>
+                    <td className="py-4 px-3 text-slate-500" colSpan={6}>
                       No hay órdenes aún.
                     </td>
                   </tr>
@@ -796,6 +826,7 @@ export default function Home() {
                   const estado = o.estado ?? o.Estado;
                   const cliente = o.cliente ?? o.Cliente;
                   const matricula = o.matricula ?? o.Matricula;
+                  const operationType = getWorkOrderOperationTypeLabel(o);
 
                   return (
                     <tr key={id} className="hover:bg-slate-50">
@@ -808,6 +839,14 @@ export default function Home() {
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs ring-1 ${getEstadoBadge(estado)}`}
                         >
                           {estado}
+                        </span>
+                      </td>
+
+                      <td className="py-2.5 px-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${getWorkOrderOperationTypeBadgeClass(o)}`}
+                        >
+                          {operationType}
                         </span>
                       </td>
 

@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   buildPreOrderPayload,
   buildWorkOrderPayload,
+  getWorkOrderOperationTypeBadgeClass,
+  getWorkOrderOperationTypeLabel,
 } from "./repairOrderPayload.js";
 
 const baseOrder = {
@@ -112,4 +114,20 @@ test("buildPreOrderPayload maps pre-order form to backend DTO contract", () => {
   assert.equal(payload.tipoOperacion, "Mecanica");
   assert.equal(payload.motivoRecepcion, "Ruido al frenar");
   assert.equal(payload.diagnosticoMecanico, null);
+});
+
+test("getWorkOrderOperationTypeLabel formats work order operation type", () => {
+  assert.equal(getWorkOrderOperationTypeLabel({ TipoOperacion: "Mecanica" }), "Mecánica");
+  assert.equal(getWorkOrderOperationTypeLabel({ tipoOperacion: "Chapa y pintura" }), "Chapa y pintura");
+});
+
+test("getWorkOrderOperationTypeBadgeClass highlights body and paint orders", () => {
+  assert.match(
+    getWorkOrderOperationTypeBadgeClass({ TipoOperacion: "Chapa y pintura" }),
+    /fuchsia/,
+  );
+  assert.match(
+    getWorkOrderOperationTypeBadgeClass({ TipoOperacion: "Mecanica" }),
+    /slate/,
+  );
 });
