@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import api from "../Components/api";
 
 const EMPTY_EGRESO = {
@@ -305,13 +305,15 @@ export default function RegisterExpenseType() {
                   </td>
 
                   <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-5">
+                    <div className="flex items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={() => startEdit(item)}
-                        className="text-sky-600 hover:underline font-medium"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        title="Editar tipo de gasto"
+                        aria-label={`Editar tipo de gasto ${item.Nombre}`}
                       >
-                        Editar
+                        <Edit3 size={15} />
                       </button>
 
                       <button
@@ -322,9 +324,11 @@ export default function RegisterExpenseType() {
                             item,
                           })
                         }
-                        className="text-rose-600 hover:underline font-medium"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                        title="Eliminar tipo de gasto"
+                        aria-label={`Eliminar tipo de gasto ${item.Nombre}`}
                       >
-                        Eliminar
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </td>

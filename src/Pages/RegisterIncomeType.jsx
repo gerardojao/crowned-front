@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import api from "../Components/api";
 
 const EMPTY_INGRESO = {
@@ -245,13 +245,15 @@ export default function RegisterIncomeType() {
                   </td>
 
                   <td className="py-3 px-4 text-center">
-                    <div className="flex items-center justify-center gap-5">
+                    <div className="flex items-center justify-center gap-2">
                       <button
                         type="button"
                         onClick={() => startEdit(item)}
-                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-sky-600 text-white hover:bg-sky-700"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100"
+                        title="Editar tipo de ingreso"
+                        aria-label={`Editar tipo de ingreso ${item.NombreIngreso}`}
                       >
-                        Editar
+                        <Edit3 size={15} />
                       </button>
 
                       <button
@@ -262,9 +264,11 @@ export default function RegisterIncomeType() {
                             item,
                           })
                         }
-                        className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-rose-600 text-white hover:bg-rose-700"
+                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                        title="Eliminar tipo de ingreso"
+                        aria-label={`Eliminar tipo de ingreso ${item.NombreIngreso}`}
                       >
-                        Eliminar
+                        <Trash2 size={15} />
                       </button>
                     </div>
                   </td>
