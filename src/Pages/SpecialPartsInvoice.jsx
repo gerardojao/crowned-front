@@ -140,6 +140,7 @@ export default function SpecialPartsInvoice() {
   const [clientSearch, setClientSearch] = useState("");
   const [clientResults, setClientResults] = useState([]);
   const [showClientForm, setShowClientForm] = useState(false);
+  const [includeVehicle, setIncludeVehicle] = useState(false);
   const [invoice, setInvoice] = useState({
     numero: "",
     idCliente: "",
@@ -361,6 +362,7 @@ export default function SpecialPartsInvoice() {
     setClientSearch("");
     setClientResults([]);
     setShowClientForm(false);
+    setIncludeVehicle(false);
   };
 
   const saveClientFromInvoice = async () => {
@@ -376,24 +378,26 @@ export default function SpecialPartsInvoice() {
       poblacion: invoice.poblacionCliente || null,
       provincia: invoice.provinciaCliente || null,
       clasificacion: invoice.clasificacion || "Particular",
-      matricula: invoice.matricula,
-      bastidor: invoice.bastidor || null,
-      marca: invoice.marca || null,
-      modelo: invoice.modelo,
-      fechaMatriculacion: invoice.fechaMatriculacion || null,
-      motor: invoice.motor || null,
-      kw: invoice.kw ? Number(invoice.kw) : null,
-      cv: invoice.cv ? Number(invoice.cv) : null,
-      combustible: invoice.combustible || null,
-      kilometraje: invoice.km ? Number(invoice.km) : null,
       observaciones: invoice.observaciones || null,
     };
 
     if (!payload.nombre?.trim()) return setError("Indica el nombre del cliente para registrarlo.");
     if (!payload.telefono?.trim()) return setError("Indica el telefono del cliente para registrarlo.");
-    if (!payload.matricula?.trim()) return setError("Indica la matrícula para registrar el cliente.");
-    if (!payload.modelo?.trim()) return setError("Indica el modelo para registrar el cliente.");
+    if (includeVehicle) {
+      payload.matricula = invoice.matricula;
+      payload.bastidor = invoice.bastidor || null;
+      payload.marca = invoice.marca || null;
+      payload.modelo = invoice.modelo;
+      payload.fechaMatriculacion = invoice.fechaMatriculacion || null;
+      payload.motor = invoice.motor || null;
+      payload.kw = invoice.kw ? Number(invoice.kw) : null;
+      payload.cv = invoice.cv ? Number(invoice.cv) : null;
+      payload.combustible = invoice.combustible || null;
+      payload.kilometraje = invoice.km ? Number(invoice.km) : null;
 
+      if (!payload.matricula?.trim()) return setError("Indica la matricula para registrar el vehiculo.");
+      if (!payload.modelo?.trim()) return setError("Indica el modelo para registrar el vehiculo.");
+    }
     try {
       setSavingCustomer(true);
       setError("");
@@ -408,6 +412,7 @@ export default function SpecialPartsInvoice() {
         idCliente: createdId || prev.idCliente,
       }));
       setShowClientForm(false);
+      setIncludeVehicle(false);
       setNotice("Cliente guardado correctamente.");
     } catch (err) {
       console.error(err);
@@ -743,17 +748,41 @@ export default function SpecialPartsInvoice() {
                 onChange={(v) => setInvoiceField("franquiciaImporte", v)}
               />
             )}
-            <Input label="Matrícula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
-            <Input label="Bastidor" value={invoice.bastidor} onChange={(v) => setInvoiceField("bastidor", v)} />
-            <Input label="Km" value={invoice.km} onChange={(v) => setInvoiceField("km", v)} />
-            <Input label="Marca" value={invoice.marca} onChange={(v) => setInvoiceField("marca", v)} />
-            <Input label="Modelo" value={invoice.modelo} onChange={(v) => setInvoiceField("modelo", v)} />  
-            <Input label="Fecha matriculación" type="date" value={invoice.fechaMatriculacion} onChange={(v) => setInvoiceField("fechaMatriculacion", v)} />
-            <Input label="Motor" value={invoice.motor} onChange={(v) => setInvoiceField("motor", v)} />
-            <Input label="KW" type="number" value={invoice.kw} onChange={(v) => setInvoiceField("kw", v)} />
-            <Input label="CV" type="number" value={invoice.cv} onChange={(v) => setInvoiceField("cv", v)} />
-            <Input label="Combustible" value={invoice.combustible} onChange={(v) => setInvoiceField("combustible", v)} />
           </div>
+          {!hasSelectedClient && (
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  {includeVehicle ? "Vehiculo incluido en el registro" : "Registrar vehiculo ahora"}
+                </p>
+                <p className="text-xs text-slate-500">
+                  Puedes guardar solo el cliente y asociarle un vehiculo despues.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIncludeVehicle((value) => !value)}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                <Plus size={16} />
+                {includeVehicle ? "Quitar vehiculo" : "Agregar vehiculo"}
+              </button>
+            </div>
+          )}
+          {!hasSelectedClient && includeVehicle && (
+            <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 p-3 md:grid-cols-2">
+              <Input label="Matricula" value={invoice.matricula} onChange={(v) => setInvoiceField("matricula", v)} />
+              <Input label="Bastidor" value={invoice.bastidor} onChange={(v) => setInvoiceField("bastidor", v)} />
+              <Input label="Km" value={invoice.km} onChange={(v) => setInvoiceField("km", v)} />
+              <Input label="Marca" value={invoice.marca} onChange={(v) => setInvoiceField("marca", v)} />
+              <Input label="Modelo" value={invoice.modelo} onChange={(v) => setInvoiceField("modelo", v)} />
+              <Input label="Fecha matriculacion" type="date" value={invoice.fechaMatriculacion} onChange={(v) => setInvoiceField("fechaMatriculacion", v)} />
+              <Input label="Motor" value={invoice.motor} onChange={(v) => setInvoiceField("motor", v)} />
+              <Input label="KW" type="number" value={invoice.kw} onChange={(v) => setInvoiceField("kw", v)} />
+              <Input label="CV" type="number" value={invoice.cv} onChange={(v) => setInvoiceField("cv", v)} />
+              <Input label="Combustible" value={invoice.combustible} onChange={(v) => setInvoiceField("combustible", v)} />
+            </div>
+          )}
           {!hasSelectedClient && (
             <button
               type="button"
