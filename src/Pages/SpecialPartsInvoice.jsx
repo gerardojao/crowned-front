@@ -12,10 +12,12 @@ import PartPicker, {
   getPartSalePrice,
 } from "../Components/PartPicker";
 import ZagaInvoiceDocument, { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
+import { amountInput } from "../utils/currency";
 import {
   currentFiscalYearStart,
   localDateInputValue,
 } from "../utils/date";
+import { buildInvoicePaymentContract } from "../utils/invoicePayment";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -43,13 +45,24 @@ const EMPTY_ITEM = {
   kind: "Recambio",
 };
 
-const PAYMENT_OPTIONS = [
-  { value: "Efectivo", label: "Efectivo" },
-  { value: "Transferencia", label: "Transferencia" },
-  { value: "TDC", label: "TPV" },
-  { value: "Bizum", label: "Bizum" },
-  { value: "Credito", label: "Credito" },
+const PAYMENT_METHODS = [
+  { key: "efectivo", label: "Efectivo" },
+  { key: "transferencia", label: "Transferencia" },
+  { key: "tdc", label: "TPV" },
+  { key: "bizum", label: "Bizum" },
 ];
+
+const EMPTY_PAYMENT_METHODS = PAYMENT_METHODS.reduce(
+  (acc, method) => ({
+    ...acc,
+    [method.key]: {
+      checked: false,
+      amount: "",
+      bankAccountId: "",
+    },
+  }),
+  {},
+);
 
 const eur = new Intl.NumberFormat("es-ES", {
   style: "currency",
@@ -137,6 +150,7 @@ export default function SpecialPartsInvoice() {
   const [taller, setTaller] = useState(DEFAULT_TALLER);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBankId, setSelectedBankId] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState(EMPTY_PAYMENT_METHODS);
   const [clientSearch, setClientSearch] = useState("");
   const [clientResults, setClientResults] = useState([]);
   const [showClientForm, setShowClientForm] = useState(false);
@@ -167,7 +181,7 @@ export default function SpecialPartsInvoice() {
     observaciones: "",
     tipoOperacion: invoiceMode.operationType,
     ivaPct: invoiceMode.ivaPct,
-    tipoPago: "Efectivo",
+    tipoPago: "Contado",
     plazoCreditoDias: 30,
     fechaVencimiento: "",
   });
@@ -177,8 +191,6 @@ export default function SpecialPartsInvoice() {
   const accountsReceivableEnabled = Boolean(
     taller.enableAccountsReceivable ?? taller.EnableAccountsReceivable ?? false,
   );
-  const effectiveTipoPago = accountsReceivableEnabled ? invoice.tipoPago : "Efectivo";
-  const isCashPayment = effectiveTipoPago === "Efectivo";
   const moduleEnabled = invoiceMode.isRapel
     ? (taller.enableRapelInvoices ?? taller.EnableRapelInvoices ?? false)
     : invoiceMode.isNoVat
@@ -198,21 +210,67 @@ export default function SpecialPartsInvoice() {
   );
   const iva = round2(subtotal * (Number(invoice.ivaPct || 0) / 100));
   const total = round2(subtotal + iva);
-  const selectedBank = useMemo(
-    () =>
-      bankAccounts.find(
-        (bank) => String(bank.id ?? bank.Id) === String(selectedBankId),
-      ) || null,
-    [bankAccounts, selectedBankId],
-  );
-  const selectedBankIban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
-  const selectedBankName = selectedBank?.nombre ?? selectedBank?.Nombre ?? "";
   const isInsuranceCustomer =
     !invoiceMode.isRapel &&
     String(invoice.clasificacion || "").toLowerCase().includes("seguro");
   const franchiseAmount = isInsuranceCustomer ? round2(Math.max(0, Number(invoice.franquiciaImporte || 0))) : 0;
   const companyPayable = round2(Math.max(0, total - franchiseAmount));
   const totals = { subtotal, iva, otros: 0, total };
+  const selectedPaymentMethods = useMemo(
+    () =>
+      PAYMENT_METHODS.map((method) => ({
+        ...method,
+        amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
+        rawAmount: paymentMethods[method.key]?.amount || "",
+        checked: Boolean(paymentMethods[method.key]?.checked),
+        bankAccountId: paymentMethods[method.key]?.bankAccountId || "",
+      })).filter((method) => method.checked),
+    [paymentMethods],
+  );
+  const paymentTotal = useMemo(
+    () =>
+      round2(
+        selectedPaymentMethods.reduce(
+          (sum, method) => sum + Number(method.amount || 0),
+          0,
+        ),
+      ),
+    [selectedPaymentMethods],
+  );
+  const paymentDifference = useMemo(
+    () => round2(companyPayable - paymentTotal),
+    [companyPayable, paymentTotal],
+  );
+  const hasPaymentMethods = selectedPaymentMethods.length > 0;
+  const requiresPaymentMethods = !invoiceMode.isRapel && companyPayable > 0;
+  const paymentContract = buildInvoicePaymentContract({
+    isCredit,
+    selectedPaymentMethods,
+    selectedBankId,
+  });
+  const { backendTipoPago, bankAccountId, pagos } = paymentContract;
+  const paymentDetailText = useMemo(() => {
+    if (isCredit) return "Pago a credito";
+    const selectedLabels = selectedPaymentMethods
+      .map((method) =>
+        method.amount > 0 ? `${method.label} ${eur.format(method.amount)}` : method.label,
+      )
+      .join(" / ");
+    return selectedLabels || "Contado";
+  }, [isCredit, selectedPaymentMethods]);
+  const selectedBank = useMemo(() => {
+    const firstBankPayment = selectedPaymentMethods.find(
+      (method) => method.key !== "efectivo" && method.bankAccountId,
+    );
+    const effectiveBankId = firstBankPayment?.bankAccountId || selectedBankId;
+    return (
+      bankAccounts.find(
+        (bank) => String(bank.id ?? bank.Id) === String(effectiveBankId),
+      ) || null
+    );
+  }, [bankAccounts, selectedBankId, selectedPaymentMethods]);
+  const selectedBankIban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
+  const selectedBankName = selectedBank?.nombre ?? selectedBank?.Nombre ?? "";
 
   useEffect(() => {
     let alive = true;
@@ -277,7 +335,21 @@ export default function SpecialPartsInvoice() {
           iban: main?.iban ?? main?.Iban ?? nextTaller.iban,
         });
         setBankAccounts(banks);
-        setSelectedBankId(String(main?.id ?? main?.Id ?? ""));
+        const mainBankId = String(main?.id ?? main?.Id ?? "");
+        setSelectedBankId(mainBankId);
+        setPaymentMethods((prev) =>
+          PAYMENT_METHODS.reduce((acc, method) => {
+            const current = prev[method.key] || {};
+            acc[method.key] = {
+              ...current,
+              bankAccountId:
+                method.key === "efectivo"
+                  ? current.bankAccountId || ""
+                  : current.bankAccountId || mainBankId,
+            };
+            return acc;
+          }, {}),
+        );
         setInvoice((prev) => ({
           ...prev,
           numero: numeroFactura,
@@ -300,8 +372,21 @@ export default function SpecialPartsInvoice() {
 
   useEffect(() => {
     if (accountsReceivableEnabled || !isCredit) return;
-    setInvoice((prev) => ({ ...prev, tipoPago: "Efectivo" }));
+    setInvoice((prev) => ({ ...prev, tipoPago: "Contado" }));
+    setPaymentMethods(EMPTY_PAYMENT_METHODS);
   }, [accountsReceivableEnabled, isCredit]);
+
+  useEffect(() => {
+    if (!isCredit) return;
+
+    const baseDate = invoice.fecha || localDateInputValue();
+    const due = new Date(`${baseDate}T00:00:00`);
+    due.setDate(due.getDate() + Number(invoice.plazoCreditoDias || 30));
+    setInvoice((prev) => ({
+      ...prev,
+      fechaVencimiento: due.toISOString().slice(0, 10),
+    }));
+  }, [isCredit, invoice.fecha, invoice.plazoCreditoDias]);
 
   useEffect(() => {
     const search = clientSearch.trim();
@@ -332,6 +417,61 @@ export default function SpecialPartsInvoice() {
 
   const setInvoiceField = (field, value) => {
     setInvoice((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const setTipoPago = (tipoPago) => {
+    if (tipoPago === "Credito" && !accountsReceivableEnabled) {
+      setError("El modulo de cuentas por cobrar no esta habilitado para este taller.");
+      return;
+    }
+
+    setInvoice((prev) => ({
+      ...prev,
+      tipoPago,
+      plazoCreditoDias: tipoPago === "Credito" ? prev.plazoCreditoDias || 30 : 30,
+      fechaVencimiento: tipoPago === "Credito" ? prev.fechaVencimiento : "",
+    }));
+
+    if (tipoPago === "Credito") {
+      setPaymentMethods(EMPTY_PAYMENT_METHODS);
+    }
+  };
+
+  const setPaymentMethodChecked = (key, checked) => {
+    const mainBank = bankAccounts.find((item) => item.esPrincipal ?? item.EsPrincipal) || bankAccounts[0];
+    const defaultBankId = mainBank?.id ?? mainBank?.Id ?? selectedBankId ?? "";
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        checked,
+        amount: checked ? prev[key]?.amount || "" : "",
+        bankAccountId:
+          checked && key !== "efectivo"
+            ? prev[key]?.bankAccountId || String(defaultBankId || "")
+            : prev[key]?.bankAccountId || "",
+      },
+    }));
+  };
+
+  const setPaymentMethodAmount = (key, amount) => {
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        amount,
+      },
+    }));
+  };
+
+  const setPaymentMethodBank = (key, bankAccountId) => {
+    setPaymentMethods((prev) => ({
+      ...prev,
+      [key]: {
+        ...prev[key],
+        bankAccountId,
+      },
+    }));
   };
 
   const hasSelectedClient = Boolean(invoice.idCliente);
@@ -479,18 +619,39 @@ export default function SpecialPartsInvoice() {
     if (!billableItems.length) {
       throw new Error(`Agrega al menos una línea de ${invoiceMode.titleLower} con importe mayor que 0.`);
     }
-    if (!isCredit && !isCashPayment && bankAccounts.length > 1 && !selectedBankId) {
-      throw new Error("Selecciona el banco para esta factura.");
-    }
     if (isCredit && !accountsReceivableEnabled) {
       throw new Error("El módulo de cuentas por cobrar no está habilitado para este taller.");
     }
     if (!invoiceMode.isRapel && franchiseAmount > total) {
       throw new Error("La franquicia no puede superar el total de la factura.");
     }
+    if (requiresPaymentMethods && !isCredit && !hasPaymentMethods) {
+      throw new Error("Selecciona al menos un metodo de pago.");
+    }
 
-    const effectiveBankAccountId =
-      !isCredit && !isCashPayment && selectedBankId ? Number(selectedBankId) : null;
+    const paymentWithoutAmount = selectedPaymentMethods.find(
+      (method) => Number(method.amount || 0) <= 0,
+    );
+    if (paymentWithoutAmount) {
+      throw new Error(`Indica un importe mayor que 0 para ${paymentWithoutAmount.label}.`);
+    }
+
+    if (requiresPaymentMethods && !isCredit && Math.abs(paymentDifference) >= 0.01) {
+      throw new Error(
+        `La suma de los metodos de pago (${eur.format(paymentTotal)}) debe coincidir con el importe a pagar por el cliente (${eur.format(companyPayable)}).`,
+      );
+    }
+
+    if (isCredit && paymentTotal > companyPayable) {
+      throw new Error("El abono inicial no puede superar el importe a pagar por el cliente.");
+    }
+
+    const bankPaymentWithoutBank = selectedPaymentMethods.find(
+      (method) => method.key !== "efectivo" && !method.bankAccountId,
+    );
+    if (bankPaymentWithoutBank) {
+      throw new Error(`Selecciona el banco para ${bankPaymentWithoutBank.label}.`);
+    }
 
     const res = await api.post("/FacturaEmitida/emitir", {
       tipoFactura: invoiceMode.tipoFactura,
@@ -513,12 +674,13 @@ export default function SpecialPartsInvoice() {
       observaciones: invoice.observaciones || null,
       tipoOperacion: invoiceMode.operationType,
       ivaPct: Number(invoice.ivaPct || 0),
-      tipoPago: effectiveTipoPago,
-      metodoPagoDetalle: isCredit ? "Pago a credito" : invoice.tipoPago,
-      totalAbonado: isCredit || invoiceMode.isRapel ? 0 : companyPayable,
+      tipoPago: backendTipoPago,
+      metodoPagoDetalle: paymentDetailText || null,
+      totalAbonado: invoiceMode.isRapel ? 0 : isCredit ? paymentTotal : companyPayable,
       plazoCreditoDias: isCredit ? Number(invoice.plazoCreditoDias || 30) : null,
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
-      bankAccountId: effectiveBankAccountId,
+      bankAccountId,
+      pagos,
       items: billableItems,
     });
 
@@ -864,20 +1026,19 @@ export default function SpecialPartsInvoice() {
             max={localDateInputValue()}
             onChange={(v) => setInvoiceField("fecha", v)}
           />
-          <label className="block text-sm font-medium text-slate-700">
-            Metodo de pago
-            <select
-              value={invoice.tipoPago}
-              onChange={(event) => setInvoiceField("tipoPago", event.target.value)}
-              className={`${inputCls} mt-1 w-full`}
-            >
-              {PAYMENT_OPTIONS.filter((option) => accountsReceivableEnabled || option.value !== "Credito").map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {accountsReceivableEnabled && (
+            <label className="block text-sm font-medium text-slate-700">
+              Tipo de pago
+              <select
+                value={invoice.tipoPago}
+                onChange={(event) => setTipoPago(event.target.value)}
+                className={`${inputCls} mt-1 w-full`}
+              >
+                <option value="Contado">Contado</option>
+                <option value="Credito">A plazos</option>
+              </select>
+            </label>
+          )}
           {isCredit && (
             <div className="grid grid-cols-1 gap-3">
               <Input
@@ -894,25 +1055,99 @@ export default function SpecialPartsInvoice() {
               />
             </div>
           )}
-          {!isCredit && !isCashPayment && bankAccounts.length > 0 && (
-            <label className="block text-sm font-medium text-slate-700">
-              Banco
-              <select
-                value={selectedBankId}
-                onChange={(event) => setSelectedBankId(event.target.value)}
-                className={`${inputCls} mt-1 w-full`}
-              >
-                {bankAccounts.map((bank) => {
-                  const id = bank.id ?? bank.Id;
-                  return (
-                    <option key={id} value={id}>
-                      {bank.nombre ?? bank.Nombre}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-          )}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-3">
+              <h4 className="text-sm font-bold text-slate-800">Metodos de pago</h4>
+              <p className="text-xs text-slate-500">
+                {isCredit
+                  ? "Registra el abono inicial si el cliente paga una parte."
+                  : "La suma debe coincidir con el total antes de imprimir."}
+              </p>
+            </div>
+
+            {!isCredit && requiresPaymentMethods && !hasPaymentMethods && (
+              <div className="mb-3 text-sm text-slate-500">
+                Por favor, selecciona un metodo de pago.
+              </div>
+            )}
+
+            <div className="space-y-3">
+              {PAYMENT_METHODS.map((method) => {
+                const checked = Boolean(paymentMethods[method.key]?.checked);
+                return (
+                  <div key={method.key} className="rounded-xl bg-white p-3 ring-1 ring-slate-200">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) =>
+                          setPaymentMethodChecked(method.key, event.target.checked)
+                        }
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      {method.label}
+                    </label>
+
+                    {checked && (
+                      <div className="mt-2 space-y-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                          placeholder="Importe"
+                          value={paymentMethods[method.key]?.amount || ""}
+                          onChange={(event) =>
+                            setPaymentMethodAmount(method.key, event.target.value)
+                          }
+                          onBlur={(event) =>
+                            setPaymentMethodAmount(
+                              method.key,
+                              amountInput(event.target.value),
+                            )
+                          }
+                        />
+
+                        {method.key !== "efectivo" && (
+                          <select
+                            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                            value={paymentMethods[method.key]?.bankAccountId || ""}
+                            onChange={(event) =>
+                              setPaymentMethodBank(method.key, event.target.value)
+                            }
+                          >
+                            <option value="">Banco</option>
+                            {bankAccounts.map((bank) => {
+                              const id = bank.id ?? bank.Id;
+                              const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                              const iban = bank.iban ?? bank.Iban ?? "";
+                              return (
+                                <option key={id} value={id}>
+                                  {name} - {iban}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ring-1 ${
+                isCredit || !requiresPaymentMethods || (hasPaymentMethods && Math.abs(paymentDifference) < 0.01)
+                  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                  : "bg-amber-50 text-amber-800 ring-amber-200"
+              }`}
+            >
+              {isCredit ? "Abono inicial" : "Asignado"}: {eur.format(paymentTotal)} -{" "}
+              {isCredit ? "Saldo pendiente" : "Diferencia"}:{" "}
+              {eur.format(Math.max(0, paymentDifference))}
+            </div>
+          </div>
           <label className="block text-sm font-medium text-slate-700">
             Observaciones
             <textarea
@@ -962,12 +1197,13 @@ export default function SpecialPartsInvoice() {
             clasificacionCliente: invoice.clasificacion,
             bankAccountName: isCredit ? "" : selectedBankName,
             bankAccountIban: isCredit ? "" : selectedBankIban,
-            totalAbonado: 0,
-            saldoPendiente: isCredit ? companyPayable : 0,
+            totalAbonado: invoiceMode.isRapel ? 0 : isCredit ? paymentTotal : companyPayable,
+            saldoPendiente: Math.max(0, paymentDifference),
+            metodoPagoDetalle: paymentDetailText,
           }}
           items={printableItems}
           totals={totals}
-          selectedPaymentMethods={[{ label: invoice.tipoPago }]}
+          selectedPaymentMethods={selectedPaymentMethods}
         />
       ) : (
         <StandardInvoiceDocument
@@ -980,8 +1216,9 @@ export default function SpecialPartsInvoice() {
             clasificacionCliente: invoice.clasificacion,
             bankAccountName: isCredit ? "" : selectedBankName,
             bankAccountIban: isCredit ? "" : selectedBankIban,
-            totalAbonado: 0,
-            saldoPendiente: isCredit ? companyPayable : 0,
+            totalAbonado: invoiceMode.isRapel ? 0 : isCredit ? paymentTotal : companyPayable,
+            saldoPendiente: Math.max(0, paymentDifference),
+            metodoPagoDetalle: paymentDetailText,
           }}
           items={printableItems}
           totals={totals}
@@ -1044,7 +1281,7 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
         </div>
         <div className="md:text-right">
           <p>Fecha: {invoice.fecha}</p>
-          <p>Pago: {isCredit ? "Pago a credito" : invoice.tipoPago}</p>
+          <p>Pago: {invoice.metodoPagoDetalle || (isCredit ? "Pago a credito" : "Contado")}</p>
           {invoice.fechaVencimiento && <p>Vencimiento: {invoice.fechaVencimiento}</p>}
         </div>
       </div>
