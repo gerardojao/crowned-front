@@ -272,7 +272,7 @@ const getInvoiceVatLines = (breakdown) =>
     { ivaPct: 4, base: Number(breakdown.base4) || 0 },
     { ivaPct: 0, base: Number(breakdown.base0) || 0 },
   ]
-    .filter((line) => line.base > 0)
+    .filter((line) => line.base !== 0)
     .map((line) => {
       const iva = roundMoney((line.base * line.ivaPct) / 100);
       return {
@@ -532,22 +532,22 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
-    if (roundMoney(selectedTotals.base) <= 0) {
-      alert("La base imponible de los albaranes debe ser mayor que 0.");
-      return;
-    }
+    // if (roundMoney(selectedTotals.base) <= 0) {
+    //   alert("La base imponible de los albaranes debe ser mayor que 0.");
+    //   return;
+    // }
 
-    if (invoiceVatLines.length === 0) {
-      alert("Desglosa la base imponible por tipo de IVA.");
-      return;
-    }
+    // if (invoiceVatLines.length === 0) {
+    //   alert("Desglosa la base imponible por tipo de IVA.");
+    //   return;
+    // }
 
-    if (Math.abs(invoiceBaseDifference) >= 0.01) {
-      alert(
-        `La suma del desglose de IVA debe coincidir con la base imponible de los albaranes. Diferencia: ${formatCurrency(invoiceBaseDifference)}.`,
-      );
-      return;
-    }
+    // if (Math.abs(invoiceBaseDifference) >= 0.01) {
+    //   alert(
+    //     `La suma del desglose de IVA debe coincidir con la base imponible de los albaranes. Diferencia: ${formatCurrency(invoiceBaseDifference)}.`,
+    //   );
+    //   return;
+    // }
 
     const payload = {
       albaranIds: selectedNoteIds,
@@ -630,19 +630,19 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
-    const invalidLine = validLines.find(
-      (line) =>
-        Number(line.cantidad) <= 0 ||
-        Number(line.precioCompra) < 0 ||
-        Number.isNaN(Number(line.precioCompra)) ||
-        Number(line.descuentoPct || 0) < 0 ||
-        Number(line.descuentoPct || 0) > 100,
-    );
+    // const invalidLine = validLines.find(
+    //   (line) =>
+    //     Number(line.cantidad) <= 0 ||
+    //     Number(line.precioCompra) < 0 ||
+    //     Number.isNaN(Number(line.precioCompra)) ||
+    //     Number(line.descuentoPct || 0) < 0 ||
+    //     Number(line.descuentoPct || 0) > 100,
+    // );
 
-    if (invalidLine) {
-      alert("Revisa cantidades y precios de las líneas.");
-      return;
-    }
+    // if (invalidLine) {
+    //   alert("Revisa cantidades y precios de las líneas.");
+    //   return;
+    // }
 
     for (const line of validLines) {
       const reference = line.codigoReferencia?.trim();
@@ -945,8 +945,7 @@ export default function SupplierDeliveryNotesPanel({
                         <td className="px-3 py-2 text-right">
                           <input
                             type="number"
-                            min="0.01"
-                            step="0.01"
+
                             value={line.cantidad}
                             onChange={(e) =>
                               setLineField(line.id, "cantidad", e.target.value)
@@ -957,8 +956,8 @@ export default function SupplierDeliveryNotesPanel({
                         <td className="px-3 py-2 text-right">
                           <input
                             type="number"
-                            min="0"
-                            step="0.01"
+                   
+                         
                             value={line.precioCompra}
                             onChange={(e) =>
                               setLineField(
@@ -1209,8 +1208,8 @@ export default function SupplierDeliveryNotesPanel({
                     {label}
                     <input
                       type="number"
-                      min="0"
-                      step="0.01"
+                      // min="0"
+                      // step="0.01"
                       value={invoiceForm.ivaBreakdown[field]}
                       onChange={(e) =>
                         setInvoiceVatBase(field, e.target.value)
