@@ -18,6 +18,7 @@ import {
   localDateInputValue,
 } from "../utils/date";
 import { buildInvoicePaymentContract } from "../utils/invoicePayment";
+import { getBusinessTerminology } from "../utils/businessTerminology";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -271,6 +272,7 @@ export default function SpecialPartsInvoice() {
   }, [bankAccounts, selectedBankId, selectedPaymentMethods]);
   const selectedBankIban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
   const selectedBankName = selectedBank?.nombre ?? selectedBank?.Nombre ?? "";
+  const labels = getBusinessTerminology(taller);
 
   useEffect(() => {
     let alive = true;
@@ -1204,6 +1206,8 @@ export default function SpecialPartsInvoice() {
           items={printableItems}
           totals={totals}
           selectedPaymentMethods={selectedPaymentMethods}
+          warrantyTitle={labels.warrantyTitle}
+          warrantyText={labels.warrantyText}
         />
       ) : (
         <StandardInvoiceDocument
@@ -1222,6 +1226,8 @@ export default function SpecialPartsInvoice() {
           }}
           items={printableItems}
           totals={totals}
+          warrantyTitle={labels.warrantyTitle}
+          warrantyText={labels.warrantyText}
         />
       )}
     </>
@@ -1244,7 +1250,14 @@ function Input({ label, value, onChange, type = "text", readOnly = false, ...pro
   );
 }
 
-function StandardInvoiceDocument({ taller, invoice, items, totals }) {
+function StandardInvoiceDocument({
+  taller,
+  invoice,
+  items,
+  totals,
+  warrantyTitle = "",
+  warrantyText = "",
+}) {
   const logo = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
   const franchiseAmount = Math.max(0, Number(invoice.franquiciaImporte || 0));
   const isInsuranceInvoice =
@@ -1310,6 +1323,15 @@ function StandardInvoiceDocument({ taller, invoice, items, totals }) {
           })}
         </tbody>
       </table>
+
+      {(warrantyTitle || warrantyText) && (
+        <div className="mt-6 max-w-2xl text-sm">
+          {warrantyTitle && <p className="font-extrabold">{warrantyTitle}</p>}
+          {warrantyText && (
+            <p className="mt-2 italic font-semibold leading-5">{warrantyText}</p>
+          )}
+        </div>
+      )}
 
       <div className="ml-auto mt-6 w-full max-w-xs space-y-2 text-sm">
         <div className="flex justify-between">
