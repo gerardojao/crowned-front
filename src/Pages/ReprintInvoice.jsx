@@ -319,10 +319,7 @@ export default function ReprintInvoice() {
   const isFreshlyIssued = searchParams.get("autoprint") === "1";
 
   const isRectificativa = invoice.tipoFactura === "Rectificativa";
-  const isWorkshopDuplicate =
-    !isFreshlyIssued &&
-    !isRectificativa &&
-    !["Recambio", "Rapel", "SinIva"].includes(invoice.tipoFactura);
+  const shouldShowDuplicateWarranty = !isFreshlyIssued && !isRectificativa;
   const labels = getBusinessTerminology(taller);
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
   const documentTaller = {
@@ -539,8 +536,8 @@ export default function ReprintInvoice() {
           totals={totals}
           isRectificativa={isRectificativa}
           isDuplicate={!isFreshlyIssued}
-          warrantyTitle={isWorkshopDuplicate ? labels.warrantyTitle : ""}
-          warrantyText={isWorkshopDuplicate ? labels.warrantyText : ""}
+          warrantyTitle={shouldShowDuplicateWarranty ? labels.warrantyTitle : ""}
+          warrantyText={shouldShowDuplicateWarranty ? labels.warrantyText : ""}
         />
       )}
 
