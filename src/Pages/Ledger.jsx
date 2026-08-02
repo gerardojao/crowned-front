@@ -4,6 +4,10 @@ import { ArrowLeft, Landmark, RefreshCw, Trash2 } from "lucide-react";
 import api from "../Components/api";
 import { amountInput, currency } from "../utils/currency";
 import { signedLedgerAmount } from "../utils/ledgerAmounts";
+import {
+  buildSummaryFromItems,
+  filterDuplicateInitialBalanceRows,
+} from "../utils/ledgerInitialBalances";
 
 const ACCOUNTS = ["Cliente", "Proveedor", "IvaSoportado", "IvaRepercutido", "Banco", "Efectivo"];
 const MOVEMENT_TYPES = ["Ingreso", "Egreso"];
@@ -149,14 +153,18 @@ export default function Ledger() {
             fechaInicio: nextFrom || null,
             fechaFin: nextTo || null,
             busqueda: nextSearchFilter || null,
+            page: 1,
+            pageSize: 100000,
           },
         }),
         api.get("/WorkshopBankAccounts"),
       ]);
       const itemsPack = pickPack(itemsRes);
       const summaryPack = pickPack(summaryRes);
-      setItems(itemsPack.items);
-      setSummary(summaryPack.resumen);
+      const visibleItems = filterDuplicateInitialBalanceRows(itemsPack.items);
+      const summaryItems = filterDuplicateInitialBalanceRows(summaryPack.items);
+      setItems(visibleItems);
+      setSummary(buildSummaryFromItems(summaryItems));
       setPage(itemsPack.page);
       setTotalItems(itemsPack.totalItems);
       setTotalPages(itemsPack.totalPages);

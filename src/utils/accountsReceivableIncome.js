@@ -3,8 +3,10 @@ import { soloFecha } from "./date";
 import {
   appendAccountsReceivableSummary,
   CXC_INCOME_DISPLAY_LABEL,
+  CXC_INITIAL_BALANCE_DISPLAY_LABEL,
   CXC_INCOME_LABEL,
   CXC_INCOME_SOURCE,
+  isAccountsReceivableInitialBalanceIncome,
 } from "./financialStatementSummaries";
 
 export {
@@ -60,7 +62,9 @@ export async function fetchAccountsReceivableIncome({ from = "", to = "" } = {})
         id: `cxc-${read(item, "id", "Id", numeroFactura)}`,
         fecha: read(item, "fecha", "Fecha"),
         mes: "",
-        tipo: CXC_INCOME_DISPLAY_LABEL,
+        tipo: isAccountsReceivableInitialBalanceIncome({ numeroFactura })
+          ? CXC_INITIAL_BALANCE_DISPLAY_LABEL
+          : CXC_INCOME_DISPLAY_LABEL,
         descripcion: `Abono factura ${numeroFactura}${cliente ? ` - ${cliente}` : ""}`,
         importe: totalAbonado,
         totalConIva: totalAbonado,
@@ -95,6 +99,7 @@ export async function fetchAccountsReceivableIncome({ from = "", to = "" } = {})
 
 export const isAccountsReceivableIncome = (item) =>
   (item?.source ?? item?.Source) === CXC_INCOME_SOURCE ||
+  isAccountsReceivableInitialBalanceIncome(item) ||
   Boolean(
     item?.totalIncludesIva ??
       item?.TotalIncludesIva ??

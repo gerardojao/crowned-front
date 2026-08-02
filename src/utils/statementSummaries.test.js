@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   appendAccountsReceivableSummary,
   CXC_INCOME_DISPLAY_LABEL,
+  CXC_INITIAL_BALANCE_DISPLAY_LABEL,
   CXC_INCOME_LABEL,
   appendAccountsPayableSummary,
   CXP_EXPENSE_LABEL,
@@ -43,6 +44,16 @@ test("incomeDisplayLabel shows CxC abonos as Ventas", () => {
       descripcion: "Abono factura MT-2026-T2-0018 - Axel Arrieta",
     }),
     CXC_INCOME_DISPLAY_LABEL,
+  );
+});
+
+test("incomeDisplayLabel shows initial CxC balances separately", () => {
+  assert.equal(
+    incomeDisplayLabel({
+      tipo: CXC_INCOME_LABEL,
+      descripcion: "Abono factura SI-2026000508 - ALQUIBER QUALITY, S.A.",
+    }),
+    CXC_INITIAL_BALANCE_DISPLAY_LABEL,
   );
 });
 

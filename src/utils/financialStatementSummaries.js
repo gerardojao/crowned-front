@@ -1,5 +1,6 @@
 export const CXC_INCOME_LABEL = "Cuentas por cobrar";
 export const CXC_INCOME_DISPLAY_LABEL = "Ventas";
+export const CXC_INITIAL_BALANCE_DISPLAY_LABEL = "Cobro saldo inicial";
 export const CXC_INCOME_SOURCE = "cxc";
 export const CXP_EXPENSE_LABEL = "Cuentas por pagar";
 export const CXP_EXPENSE_SOURCE = "cxp";
@@ -10,6 +11,24 @@ const sameLabel = (left, right) =>
 const startsWithAny = (value, prefixes) => {
   const text = String(value || "").trim().toLowerCase();
   return prefixes.some((prefix) => text.startsWith(prefix));
+};
+
+const containsInitialBalanceInvoiceRef = (value) =>
+  /\bSI-[A-Z0-9-]+/i.test(String(value || ""));
+
+export const isAccountsReceivableInitialBalanceIncome = (item) => {
+  const description = item?.descripcion ?? item?.Descripcion;
+  const reference =
+    item?.referencia ??
+    item?.Referencia ??
+    item?.numeroFactura ??
+    item?.NumeroFactura;
+
+  return (
+    containsInitialBalanceInvoiceRef(description) ||
+    containsInitialBalanceInvoiceRef(reference) ||
+    String(description || "").includes("[SALDO_INICIAL_CXC]")
+  );
 };
 
 export const isAccountsReceivableAbonoIncome = (item) => {
@@ -23,7 +42,9 @@ export const isAccountsReceivableAbonoIncome = (item) => {
 };
 
 export const incomeDisplayLabel = (item) =>
-  isAccountsReceivableAbonoIncome(item)
+  isAccountsReceivableInitialBalanceIncome(item)
+    ? CXC_INITIAL_BALANCE_DISPLAY_LABEL
+    : isAccountsReceivableAbonoIncome(item)
     ? CXC_INCOME_DISPLAY_LABEL
     : item?.tipo ?? item?.Tipo ?? item?.cuenta_Ingreso ?? item?.Cuenta_Ingreso ?? item?.nombre;
 
