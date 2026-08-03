@@ -11,6 +11,7 @@ import SupplierInvoicesPanel from "./components/SupplierInvoicesPanel";
 import { useBankAccounts } from "./hooks/useBankAccounts";
 import { useDeliveryNotes } from "./hooks/useDeliveryNotes";
 import { useSupplierInvoices } from "./hooks/useSupplierInvoices";
+import { getAccountsPayableDisplay } from "./utils/accountsPayableDisplay";
 import { formatCurrency } from "./utils/purchaseFormatters";
 
 function isSameMonth(value, now = new Date()) {
@@ -69,12 +70,7 @@ export default function PurchasesModuleScreen() {
     );
 
     const pendingTotal = pendingInvoices.reduce(
-      (sum, invoice) =>
-        sum +
-        Number(
-          invoice.saldoPendiente ??
-            Number(invoice.total || 0) - Number(invoice.importePagado || 0),
-        ),
+      (sum, invoice) => sum + getAccountsPayableDisplay(invoice).saldoPendiente,
       0,
     );
 

@@ -5,12 +5,28 @@ import {
   buildAccountsPayableQueryParams,
   emptyAccountsPayableFilters,
 } from "../utils/accountsPayableFilters";
+import { getAccountsPayableDisplay } from "../utils/accountsPayableDisplay";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 import PaymentModal from "./PaymentModal";
 
 const CASH_PAYMENT_VALUE = "cash";
 
 function normalizePendingInvoice(item) {
+  const total = Number(item?.total ?? item?.Total ?? 0);
+  const importePagado = Number(item?.importePagado ?? item?.ImportePagado ?? 0);
+  const saldoPendiente = Number(
+    item?.saldoPendiente ??
+      item?.SaldoPendiente ??
+      total - importePagado,
+  );
+  const estado = item?.estado ?? item?.Estado ?? "Pendiente de pago";
+  const display = getAccountsPayableDisplay({
+    total,
+    importePagado,
+    saldoPendiente,
+    estado,
+  });
+
   return {
     id: item?.id ?? item?.Id,
     fecha: item?.fecha ?? item?.Fecha,
@@ -22,15 +38,16 @@ function normalizePendingInvoice(item) {
     tipoDocumento: item?.tipoDocumento ?? item?.TipoDocumento ?? "Factura",
     base: Number(item?.tbase ?? item?.Tbase ?? item?.base ?? item?.Base ?? 0),
     iva: Number(item?.iva ?? item?.Iva ?? 0),
-    total: Number(item?.total ?? item?.Total ?? 0),
-    importePagado: Number(item?.importePagado ?? item?.ImportePagado ?? 0),
-    saldoPendiente: Number(
-      item?.saldoPendiente ??
-        item?.SaldoPendiente ??
-        Number(item?.total ?? item?.Total ?? 0) -
-          Number(item?.importePagado ?? item?.ImportePagado ?? 0),
-    ),
-    estado: item?.estado ?? item?.Estado ?? "Pendiente de pago",
+    total,
+    importePagado,
+    saldoPendiente: display.saldoPendiente,
+    saldoVisual: display.saldoVisual,
+    saldoLabel: display.saldoLabel,
+    saldoAFavor: display.saldoAFavor,
+    estado,
+    estadoVisual: display.estadoVisual,
+    isSupplierCredit: display.isSupplierCredit,
+    canRegisterPayment: display.canRegisterPayment,
     raw: item,
   };
 }
@@ -91,6 +108,8 @@ export default function AccountsPayablePanel({
   };
 
   const openPaymentModal = (invoice, mode = "full") => {
+    if (invoice?.isSupplierCredit) return;
+
     const mainBank =
       bankAccounts.find((bank) => bank.esPrincipal ?? bank.EsPrincipal) ||
       bankAccounts[0];
@@ -126,6 +145,11 @@ export default function AccountsPayablePanel({
   const confirmPayment = async () => {
     const invoice = paymentModal.invoice;
     if (!invoice || paymentModal.loading) return;
+
+    if (invoice.isSupplierCredit) {
+      alert("Este documento es un abono del proveedor y no se liquida desde CxP.");
+      return;
+    }
 
     if (!paymentModal.bankAccountId) {
       alert("Selecciona el metodo de pago.");
@@ -192,9 +216,10 @@ export default function AccountsPayablePanel({
       acc.total += Number(item.total) || 0;
       acc.pagado += Number(item.importePagado) || 0;
       acc.saldo += Number(item.saldoPendiente) || 0;
+      acc.saldoAFavor += Number(item.saldoAFavor) || 0;
       return acc;
     },
-    { base: 0, iva: 0, total: 0, pagado: 0, saldo: 0 },
+    { base: 0, iva: 0, total: 0, pagado: 0, saldo: 0, saldoAFavor: 0 },
   );
 
   return (
@@ -321,31 +346,50 @@ export default function AccountsPayablePanel({
                     <td className="px-4 py-3 text-right">
                       {formatCurrency(item.importePagado)}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-amber-700">
-                      {formatCurrency(item.saldoPendiente)}
+                    <td
+                      className={`px-4 py-3 text-right font-bold ${
+                        item.isSupplierCredit ? "text-sky-700" : "text-amber-700"
+                      }`}
+                    >
+                      <div>{formatCurrency(item.saldoVisual)}</div>
+                      <div className="text-[11px] font-semibold text-slate-500">
+                        {item.saldoLabel}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
-                        {item.estado}
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ${
+                          item.isSupplierCredit
+                            ? "bg-sky-50 text-sky-700 ring-sky-200"
+                            : "bg-amber-50 text-amber-700 ring-amber-200"
+                        }`}
+                      >
+                        {item.estadoVisual}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openPaymentModal(item, "partial")}
-                          className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
-                        >
-                          Pago parcial
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openPaymentModal(item, "full")}
-                          className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
-                        >
-                          Liquidar
-                        </button>
-                      </div>
+                      {item.canRegisterPayment ? (
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openPaymentModal(item, "partial")}
+                            className="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
+                          >
+                            Pago parcial
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openPaymentModal(item, "full")}
+                            className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100"
+                          >
+                            Liquidar
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="inline-flex rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
+                          Sin acciones de pago
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -373,7 +417,12 @@ export default function AccountsPayablePanel({
                   {formatCurrency(totals.pagado)}
                 </th>
                 <th className="px-4 py-3 text-right font-bold text-amber-700">
-                  {formatCurrency(totals.saldo)}
+                  <div>{formatCurrency(totals.saldo)}</div>
+                  {totals.saldoAFavor > 0 && (
+                    <div className="text-[11px] font-semibold text-sky-700">
+                      A favor: {formatCurrency(totals.saldoAFavor)}
+                    </div>
+                  )}
                 </th>
                 <th></th>
                 <th></th>

@@ -1,5 +1,6 @@
 import Loader from "../../../Components/Loader";
 import EmptyState from "./EmptyState";
+import { getAccountsPayableDisplay } from "../utils/accountsPayableDisplay";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 
 function isPendingInvoice(invoice) {
@@ -54,11 +55,14 @@ export default function PurchasesDashboard({
           <EmptyState text="Todavía no hay facturas pendientes de proveedor." />
         ) : (
           <div className="divide-y divide-slate-100">
-            {pendingInvoices.map((invoice) => (
-              <div
-                key={invoice.id}
-                className="flex items-center justify-between gap-4 px-4 py-3"
-              >
+            {pendingInvoices.map((invoice) => {
+              const display = getAccountsPayableDisplay(invoice);
+
+              return (
+                <div
+                  key={invoice.id}
+                  className="flex items-center justify-between gap-4 px-4 py-3"
+                >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-slate-800">
                     {invoice.proveedor}
@@ -68,13 +72,25 @@ export default function PurchasesDashboard({
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-amber-700">
-                    {formatCurrency(invoice.saldoPendiente ?? invoice.total)}
+                  <p
+                    className={`text-sm font-bold ${
+                      display.isSupplierCredit ? "text-sky-700" : "text-amber-700"
+                    }`}
+                  >
+                    {formatCurrency(display.saldoVisual)}
                   </p>
-                  <p className="text-xs text-slate-500">{invoice.estado}</p>
+                  <p className="text-xs text-slate-500">
+                    {display.estadoVisual}
+                  </p>
+                  {display.isSupplierCredit && (
+                    <p className="text-[11px] font-semibold text-sky-600">
+                      {display.saldoLabel}
+                    </p>
+                  )}
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         )}
       </section>
