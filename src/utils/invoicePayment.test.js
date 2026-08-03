@@ -49,15 +49,28 @@ test("mixed counted invoice keeps cash out of bank and keeps each bank id", () =
   ]);
 });
 
-test("credit invoice keeps CxC type but sends initial payment detail", () => {
+test("credit invoice keeps CxC type and separates credit bank from initial payment bank", () => {
   const contract = buildInvoicePaymentContract({
     isCredit: true,
+    selectedBankId: "9",
     selectedPaymentMethods: [{ key: "transferencia", amount: 20, bankAccountId: "7" }],
   });
 
   assert.equal(contract.backendTipoPago, "Credito");
-  assert.equal(contract.bankAccountId, null);
+  assert.equal(contract.bankAccountId, 9);
   assert.deepEqual(contract.pagos, [
     { metodoPago: "Transferencia", importe: 20, bankAccountId: 7 },
   ]);
+});
+
+test("credit invoice without initial payment can still send selected bank account", () => {
+  const contract = buildInvoicePaymentContract({
+    isCredit: true,
+    selectedPaymentMethods: [],
+    selectedBankId: "7",
+  });
+
+  assert.equal(contract.backendTipoPago, "Credito");
+  assert.equal(contract.bankAccountId, 7);
+  assert.deepEqual(contract.pagos, []);
 });

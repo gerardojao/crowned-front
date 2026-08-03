@@ -451,14 +451,23 @@ export default function WorkshopInvoice() {
 
   const selectedPaymentMethods = useMemo(
     () =>
-      PAYMENT_METHODS.map((method) => ({
-        ...method,
-        amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
-        rawAmount: paymentMethods[method.key]?.amount || "",
-        checked: Boolean(paymentMethods[method.key]?.checked),
-        bankAccountId: paymentMethods[method.key]?.bankAccountId || "",
-      })).filter((method) => method.checked),
-    [paymentMethods],
+      PAYMENT_METHODS.map((method) => {
+        const bankAccountId = paymentMethods[method.key]?.bankAccountId || "";
+        const bank = bankAccounts.find(
+          (item) => String(item.id ?? item.Id) === String(bankAccountId),
+        );
+
+        return {
+          ...method,
+          amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
+          rawAmount: paymentMethods[method.key]?.amount || "",
+          checked: Boolean(paymentMethods[method.key]?.checked),
+          bankAccountId,
+          bankAccountName: bank?.nombre ?? bank?.Nombre ?? "",
+          bankAccountIban: bank?.iban ?? bank?.Iban ?? "",
+        };
+      }).filter((method) => method.checked),
+    [bankAccounts, paymentMethods],
   );
 
   const paymentTotal = useMemo(
@@ -506,9 +515,11 @@ export default function WorkshopInvoice() {
     const firstBankPayment = selectedPaymentMethods.find(
       (method) => method.key !== "efectivo" && method.bankAccountId,
     );
-    const effectiveBankId = firstBankPayment?.bankAccountId || selectedBankId;
+    const effectiveBankId = isCredit
+      ? selectedBankId
+      : firstBankPayment?.bankAccountId || selectedBankId;
     return bankAccounts.find((item) => String(item.id ?? item.Id) === String(effectiveBankId));
-  }, [bankAccounts, selectedBankId, selectedPaymentMethods]);
+  }, [bankAccounts, isCredit, selectedBankId, selectedPaymentMethods]);
   const useZagaTemplate = usesZagaInvoiceTemplate(taller);
 
   useEffect(() => {
@@ -1228,6 +1239,27 @@ const printInvoice = async () => {
                   </select>
                 </label>
 
+                <label className="block text-sm font-semibold text-slate-700">
+                  Cuenta bancaria
+                  <select
+                    className={`mt-1 w-full ${inputCls}`}
+                    value={selectedBankId}
+                    onChange={(e) => setSelectedBankId(e.target.value)}
+                  >
+                    <option value="">Banco</option>
+                    {bankAccounts.map((bank) => {
+                      const id = bank.id ?? bank.Id;
+                      const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                      const iban = bank.iban ?? bank.Iban ?? "";
+                      return (
+                        <option key={id} value={id}>
+                          {name} - {iban}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+
                 {/* <label className="block text-sm font-semibold text-slate-700">
                   Fecha de vencimiento
                   <input
@@ -1660,7 +1692,14 @@ const printInvoice = async () => {
             </div>
           </div>
 
-          {taller.iban && hasTransferPayment && (
+          {isCredit && (selectedBank?.iban ?? selectedBank?.Iban) && (
+            <div className="text-center text-sm font-bold italic border-b border-black py-2">
+              Saldo pendiente a la cuenta {selectedBank?.iban ?? selectedBank?.Iban} a nombre de{" "}
+              {taller.razonSocial}
+            </div>
+          )}
+
+          {!isCredit && taller.iban && hasTransferPayment && (
             <div className="text-center text-sm font-bold italic border-b border-black py-2">
               Transferencias a la cuenta {taller.iban} a nombre de{" "}
               {taller.razonSocial}
@@ -1741,6 +1780,7 @@ const printInvoice = async () => {
                     {selectedPaymentMethods.map((method) => (
                       <span key={method.key}>
                         {method.label}: {formatMoney(method.amount)}
+                        {method.bankAccountName && ` - ${method.bankAccountName}`}
                       </span>
                     ))}
                   </div>

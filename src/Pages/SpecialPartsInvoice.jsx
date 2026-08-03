@@ -219,14 +219,23 @@ export default function SpecialPartsInvoice() {
   const totals = { subtotal, iva, otros: 0, total };
   const selectedPaymentMethods = useMemo(
     () =>
-      PAYMENT_METHODS.map((method) => ({
-        ...method,
-        amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
-        rawAmount: paymentMethods[method.key]?.amount || "",
-        checked: Boolean(paymentMethods[method.key]?.checked),
-        bankAccountId: paymentMethods[method.key]?.bankAccountId || "",
-      })).filter((method) => method.checked),
-    [paymentMethods],
+      PAYMENT_METHODS.map((method) => {
+        const bankAccountId = paymentMethods[method.key]?.bankAccountId || "";
+        const bank = bankAccounts.find(
+          (item) => String(item.id ?? item.Id) === String(bankAccountId),
+        );
+
+        return {
+          ...method,
+          amount: round2(Number(paymentMethods[method.key]?.amount || 0)),
+          rawAmount: paymentMethods[method.key]?.amount || "",
+          checked: Boolean(paymentMethods[method.key]?.checked),
+          bankAccountId,
+          bankAccountName: bank?.nombre ?? bank?.Nombre ?? "",
+          bankAccountIban: bank?.iban ?? bank?.Iban ?? "",
+        };
+      }).filter((method) => method.checked),
+    [bankAccounts, paymentMethods],
   );
   const paymentTotal = useMemo(
     () =>
@@ -263,13 +272,15 @@ export default function SpecialPartsInvoice() {
     const firstBankPayment = selectedPaymentMethods.find(
       (method) => method.key !== "efectivo" && method.bankAccountId,
     );
-    const effectiveBankId = firstBankPayment?.bankAccountId || selectedBankId;
+    const effectiveBankId = isCredit
+      ? selectedBankId
+      : firstBankPayment?.bankAccountId || selectedBankId;
     return (
       bankAccounts.find(
         (bank) => String(bank.id ?? bank.Id) === String(effectiveBankId),
       ) || null
     );
-  }, [bankAccounts, selectedBankId, selectedPaymentMethods]);
+  }, [bankAccounts, isCredit, selectedBankId, selectedPaymentMethods]);
   const selectedBankIban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
   const selectedBankName = selectedBank?.nombre ?? selectedBank?.Nombre ?? "";
   const labels = getBusinessTerminology(taller);
@@ -1055,6 +1066,26 @@ export default function SpecialPartsInvoice() {
                 value={invoice.fechaVencimiento}
                 onChange={(v) => setInvoiceField("fechaVencimiento", v)}
               />
+              <label className="block text-sm font-medium text-slate-700">
+                Cuenta bancaria
+                <select
+                  value={selectedBankId}
+                  onChange={(event) => setSelectedBankId(event.target.value)}
+                  className={`${inputCls} mt-1 w-full`}
+                >
+                  <option value="">Banco</option>
+                  {bankAccounts.map((bank) => {
+                    const id = bank.id ?? bank.Id;
+                    const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                    const iban = bank.iban ?? bank.Iban ?? "";
+                    return (
+                      <option key={id} value={id}>
+                        {name} - {iban}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
             </div>
           )}
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1197,8 +1228,8 @@ export default function SpecialPartsInvoice() {
             tipoOperacion: invoiceMode.operationType,
             franquiciaImporte: franchiseAmount,
             clasificacionCliente: invoice.clasificacion,
-            bankAccountName: isCredit ? "" : selectedBankName,
-            bankAccountIban: isCredit ? "" : selectedBankIban,
+            bankAccountName: selectedBankName,
+            bankAccountIban: selectedBankIban,
             totalAbonado: invoiceMode.isRapel ? 0 : isCredit ? paymentTotal : companyPayable,
             saldoPendiente: Math.max(0, paymentDifference),
             metodoPagoDetalle: paymentDetailText,
@@ -1218,14 +1249,15 @@ export default function SpecialPartsInvoice() {
             tipoOperacion: invoiceMode.operationType,
             franquiciaImporte: franchiseAmount,
             clasificacionCliente: invoice.clasificacion,
-            bankAccountName: isCredit ? "" : selectedBankName,
-            bankAccountIban: isCredit ? "" : selectedBankIban,
+            bankAccountName: selectedBankName,
+            bankAccountIban: selectedBankIban,
             totalAbonado: invoiceMode.isRapel ? 0 : isCredit ? paymentTotal : companyPayable,
             saldoPendiente: Math.max(0, paymentDifference),
             metodoPagoDetalle: paymentDetailText,
           }}
           items={printableItems}
           totals={totals}
+          selectedPaymentMethods={selectedPaymentMethods}
           warrantyTitle={labels.warrantyTitle}
           warrantyText={labels.warrantyText}
         />
@@ -1255,10 +1287,15 @@ function StandardInvoiceDocument({
   invoice,
   items,
   totals,
+  selectedPaymentMethods = [],
   warrantyTitle = "",
   warrantyText = "",
 }) {
   const logo = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
+  const isCredit =
+    String(invoice.tipoPago || "")
+      .trim()
+      .toLowerCase() === "credito";
   const franchiseAmount = Math.max(0, Number(invoice.franquiciaImporte || 0));
   const isInsuranceInvoice =
     franchiseAmount > 0 ||
@@ -1295,6 +1332,28 @@ function StandardInvoiceDocument({
         <div className="md:text-right">
           <p>Fecha: {invoice.fecha}</p>
           <p>Pago: {invoice.metodoPagoDetalle || (isCredit ? "Pago a credito" : "Contado")}</p>
+          {invoice.bankAccountIban && (
+            <p>
+              Cuenta saldo: {[invoice.bankAccountName, invoice.bankAccountIban]
+                .filter(Boolean)
+                .join(" - ")}
+            </p>
+          )}
+          {selectedPaymentMethods.length > 0 && (
+            <p>
+              {isCredit ? "Abono inicial" : "Metodos"}:{" "}
+              {selectedPaymentMethods
+                .map((method) =>
+                  [
+                    `${method.label} ${eur.format(Number(method.amount || 0))}`,
+                    method.bankAccountName,
+                  ]
+                    .filter(Boolean)
+                    .join(" - "),
+                )
+                .join(" / ")}
+            </p>
+          )}
           {invoice.fechaVencimiento && <p>Vencimiento: {invoice.fechaVencimiento}</p>}
         </div>
       </div>

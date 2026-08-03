@@ -496,7 +496,7 @@ function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
   const tipo = String(invoice.tipoPago || "")
     .trim()
     .toLowerCase();
-  if (tipo === "credito") return getCreditPaymentLegend(invoice);
+  if (tipo === "credito") return getCreditPaymentLegend(invoice, selectedPaymentMethods);
 
   const labels = selectedPaymentMethods
     .map((method) => {
@@ -558,13 +558,33 @@ function getPaymentDisplayText(invoice, selectedPaymentMethods) {
   return tipo === "contado" ? "Efectivo" : "Contado";
 }
 
-function getCreditPaymentLegend(invoice) {
+function formatInitialPaymentDetail(method) {
+  const label = method.label;
+  const amount = Number(method.amount || 0);
+  const bankName = method.bankAccountName ?? method.BankAccountName ?? "";
+  const bankIban = method.bankAccountIban ?? method.BankAccountIban ?? "";
+  const bankDetail = [bankName, bankIban].filter(Boolean).join(" ");
+  const payment = label && amount > 0 ? `${label} ${eur.format(amount)}` : label;
+
+  return bankDetail ? `${payment} - ${bankDetail}` : payment;
+}
+
+function getCreditPaymentLegend(invoice, selectedPaymentMethods = []) {
   const totalAbonado = Number(invoice.totalAbonado ?? invoice.TotalAbonado ?? 0);
   const saldoPendiente = Number(invoice.saldoPendiente ?? invoice.SaldoPendiente ?? 0);
   const fechaVencimiento = invoice.fechaVencimiento ?? invoice.FechaVencimiento;
   const parts = ["PAGO A CREDITO"];
+  const initialPaymentDetail = selectedPaymentMethods
+    .filter((method) => Number(method.amount || 0) > 0)
+    .map(formatInitialPaymentDetail)
+    .filter(Boolean)
+    .join(" / ");
 
-  if (totalAbonado > 0) parts.push(`CLIENTE ABONO ${eur.format(totalAbonado)}`);
+  if (initialPaymentDetail) {
+    parts.push(`ABONO INICIAL ${initialPaymentDetail.toUpperCase()}`);
+  } else if (totalAbonado > 0) {
+    parts.push(`CLIENTE ABONO ${eur.format(totalAbonado)}`);
+  }
   if (saldoPendiente > 0) parts.push(`SALDO PENDIENTE ${eur.format(saldoPendiente)}`);
   if (fechaVencimiento) parts.push(`VENCIMIENTO ${formatDateShort(fechaVencimiento)}`);
 

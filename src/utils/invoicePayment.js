@@ -49,7 +49,9 @@ export function buildInvoicePaymentContract({
       : hasBankPayment
         ? "Contado"
         : "Efectivo",
-    bankAccountId: !isCredit ? firstBankPayment?.bankAccountId ?? null : null,
+    bankAccountId: isCredit
+      ? normalizeBankId(selectedBankId)
+      : firstBankPayment?.bankAccountId ?? null,
     pagos,
   };
 }
