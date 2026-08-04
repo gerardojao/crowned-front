@@ -35,6 +35,26 @@ function firstNonEmpty(...values) {
   return values.find((value) => String(value ?? "").trim()) ?? "";
 }
 
+function normalizeInvoicePaymentMethods(pagos) {
+  if (!Array.isArray(pagos)) return [];
+
+  return pagos
+    .map((pago) => {
+      const metodoPago = pago.metodoPago ?? pago.MetodoPago ?? "";
+      const amount = Number(pago.importe ?? pago.Importe ?? 0);
+
+      return {
+        key: String(metodoPago).trim().toLowerCase(),
+        label: metodoPago || "Pago",
+        amount,
+        bankAccountId: pago.bankAccountId ?? pago.BankAccountId ?? null,
+        bankAccountName: pago.bankAccountName ?? pago.BankAccountName ?? "",
+        bankAccountIban: pago.bankAccountIban ?? pago.BankAccountIban ?? "",
+      };
+    })
+    .filter((method) => method.label || method.amount > 0);
+}
+
 function normalizeOrderVehicleData(row) {
   if (!row) {
     return {
@@ -85,6 +105,7 @@ export default function ReprintInvoice() {
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
+  const [selectedPaymentMethods, setSelectedPaymentMethods] = useState([]);
 
   const [invoice, setInvoice] = useState({
     id: null,
@@ -210,6 +231,7 @@ export default function ReprintInvoice() {
       const ivaPct = subtotal > 0 ? Math.round((iva / subtotal) * 100) : 21;
       const tipoFactura = f.tipoFactura ?? f.TipoFactura ?? "Normal";
       const rectificativas = f.rectificativas ?? f.Rectificativas ?? [];
+      const pagos = f.pagos ?? f.Pagos ?? [];
       const linkedOrderId = f.idOrdenTrabajo ?? f.IdOrdenTrabajo ?? idOrden ?? "";
       let orderVehicle = normalizeOrderVehicleData(null);
 
@@ -287,6 +309,7 @@ export default function ReprintInvoice() {
         bankAccountIban: f.bankAccountIban ?? f.BankAccountIban ?? "",
       });
 
+      setSelectedPaymentMethods(normalizeInvoicePaymentMethods(pagos));
       setItems(parsedItems);
 
       setTotals({
@@ -533,6 +556,7 @@ export default function ReprintInvoice() {
           invoice={invoice}
           items={items}
           totals={totals}
+          selectedPaymentMethods={selectedPaymentMethods}
           isRectificativa={isRectificativa}
           isDuplicate={!isFreshlyIssued}
           warrantyTitle={labels.warrantyTitle}

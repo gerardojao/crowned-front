@@ -59,6 +59,101 @@ const partValue = (part, field, fallback = "") => {
   return part?.[field] ?? part?.[pascal] ?? fallback;
 };
 
+const getApiMessage = (err, fallback) =>
+  err?.response?.data?.message ||
+  err?.response?.data?.Message ||
+  err?.response?.data?.detail ||
+  err?.message ||
+  fallback;
+
+const getLegacyData = (response) => {
+  const data = response?.data?.data ?? response?.data?.Data;
+  if (Array.isArray(data)) return data[0];
+  return data ?? response?.data;
+};
+
+const getLineSalePrice = (line) => {
+  const price = roundMoney(Number(line?.precioCompra) || 0);
+  return price === 0 ? null : Math.abs(price);
+};
+
+const getStockSalePrice = (part) => {
+  const price = Number(partValue(part, "precioVenta", null));
+  return Number.isFinite(price) && price !== 0 ? Math.abs(roundMoney(price)) : null;
+};
+
+const getDeliveryLinePvp = (line) => {
+  const price = Number(line?.precioVenta);
+  if (Number.isFinite(price) && price !== 0) return Math.abs(roundMoney(price));
+  return Math.abs(roundMoney(Number(line?.precioCompra) || 0));
+};
+
+const getDiscountPctFromPrices = (salePrice, purchasePrice) => {
+  const sale = Number(salePrice);
+  const purchase = Number(purchasePrice);
+  if (!Number.isFinite(sale) || !Number.isFinite(purchase) || sale <= 0) {
+    return "";
+  }
+
+  const discount = roundMoney((1 - purchase / sale) * 100);
+  if (!Number.isFinite(discount) || discount < 0 || discount > 100) return "";
+  return String(discount);
+};
+
+const findPreparedDeliveryLine = (preparedLines, savedLine, index) => {
+  const savedStockId = Number(savedLine?.repuestoStockId);
+  if (savedStockId) {
+    const byStock = preparedLines.find(
+      (line) => Number(line.repuestoStockId) === savedStockId,
+    );
+    if (byStock) return byStock;
+  }
+
+  const savedReference = normalizeReference(savedLine?.codigoReferencia);
+  if (savedReference) {
+    const byReference = preparedLines.find(
+      (line) => normalizeReference(line.codigoReferencia) === savedReference,
+    );
+    if (byReference) return byReference;
+  }
+
+  return preparedLines[index] ?? null;
+};
+
+const enrichDeliveryNoteWithStockPrices = async (note) => {
+  const stockIds = Array.from(
+    new Set(
+      (note?.lineas || [])
+        .map((line) => Number(line.repuestoStockId))
+        .filter(Boolean),
+    ),
+  );
+
+  if (!stockIds.length) return note;
+
+  const results = await Promise.allSettled(
+    stockIds.map(async (id) => {
+      const res = await api.get(`/RepuestoStock/${id}`);
+      const part = getLegacyData(res);
+      return [id, getStockSalePrice(part)];
+    }),
+  );
+  const salePrices = new Map(
+    results
+      .filter((result) => result.status === "fulfilled" && result.value[1] != null)
+      .map((result) => result.value),
+  );
+
+  return {
+    ...note,
+    lineas: (note.lineas || []).map((line) => ({
+      ...line,
+      precioVenta:
+        salePrices.get(Number(line.repuestoStockId)) ?? line.precioVenta ?? null,
+    })),
+  };
+};
+
 function PartReferenceInput({ line, onChange, onSelect }) {
   const [matches, setMatches] = useState([]);
   const [open, setOpen] = useState(false);
@@ -222,7 +317,10 @@ function PartReferenceInput({ line, onChange, onSelect }) {
               const reference = partValue(part, "codigoReferencia");
               const name = partValue(part, "nombre", "Repuesto sin nombre");
               const brand = partValue(part, "marca");
-              const price = Number(partValue(part, "precioCompra", 0) || 0);
+              const price = Number(
+                partValue(part, "precioVenta", partValue(part, "precioCompra", 0)) ||
+                  0,
+              );
 
               return (
                 <button
@@ -435,7 +533,9 @@ export default function SupplierDeliveryNotesPanel({
     setDetailLoading(true);
 
     try {
-      const detail = await loadNoteDetail(note.id);
+      const detail = await enrichDeliveryNoteWithStockPrices(
+        await loadNoteDetail(note.id),
+      );
       setDetailNote(detail);
     } catch (err) {
       setDetailError(
@@ -454,7 +554,9 @@ export default function SupplierDeliveryNotesPanel({
 
     try {
       setLoadingEditId(note.id);
-      const detail = await loadNoteDetail(note.id);
+      const detail = await enrichDeliveryNoteWithStockPrices(
+        await loadNoteDetail(note.id),
+      );
       setEditingNoteId(note.id);
       setHeader({
         idProveedor: String(detail.idProveedor || ""),
@@ -473,8 +575,13 @@ export default function SupplierDeliveryNotesPanel({
               nombre: line.nombre || "",
               marca: line.marca || "",
               cantidad: String(line.cantidad || ""),
-              precioCompra: String(line.precioCompra || ""),
-              descuentoPct: "",
+              precioCompra: String(
+                getDeliveryLinePvp(line) || line.precioCompra || "",
+              ),
+              descuentoPct: getDiscountPctFromPrices(
+                getDeliveryLinePvp(line),
+                line.precioCompra,
+              ),
               ivaPct: "0",
             }))
           : [createEmptyLine()],
@@ -644,9 +751,21 @@ export default function SupplierDeliveryNotesPanel({
     //   return;
     // }
 
+    const seenNewReferences = new Set();
+
     for (const line of validLines) {
       const reference = line.codigoReferencia?.trim();
       if (!reference || line.repuestoStockId) continue;
+      const normalizedReference = normalizeReference(reference);
+
+      if (seenNewReferences.has(normalizedReference)) {
+        alert(
+          `La referencia ${reference} esta repetida en el albaran. Usa una sola linea o selecciona el repuesto existente.`,
+        );
+        return;
+      }
+
+      seenNewReferences.add(normalizedReference);
 
       try {
         const res = await api.get("/RepuestoStock", {
@@ -661,7 +780,7 @@ export default function SupplierDeliveryNotesPanel({
         const existing = items.find(
           (part) =>
             normalizeReference(partValue(part, "codigoReferencia")) ===
-            normalizeReference(reference),
+            normalizedReference,
         );
 
         if (existing) {
@@ -676,30 +795,39 @@ export default function SupplierDeliveryNotesPanel({
       }
     }
 
-    const payload = {
-      idProveedor: Number(header.idProveedor),
-      numeroAlbaran: header.numeroAlbaran.trim(),
-      fecha: header.fecha,
-      observaciones: header.observaciones?.trim() || null,
-      lineas: validLines.map((line) => {
-        const total = calcDeliveryLine(line);
+    const deliveryNumber = header.numeroAlbaran.trim();
 
+    try {
+      setSubmitting(true);
+
+      const preparedLines = validLines.map((line) => {
+        const total = calcDeliveryLine(line);
         return {
+          ...line,
           repuestoStockId: line.repuestoStockId
             ? Number(line.repuestoStockId)
             : null,
+          precioCompraNeto: total.precioCompraNeto,
+          precioVenta: getLineSalePrice(line),
+        };
+      });
+
+      const payload = {
+        idProveedor: Number(header.idProveedor),
+        numeroAlbaran: deliveryNumber,
+        fecha: header.fecha,
+        observaciones: header.observaciones?.trim() || null,
+        lineas: preparedLines.map((line) => ({
+          repuestoStockId: line.repuestoStockId,
           codigoReferencia: line.codigoReferencia?.trim() || null,
           nombre: line.nombre.trim(),
           marca: line.marca?.trim() || null,
           cantidad: Number(line.cantidad),
-          precioCompra: total.precioCompraNeto,
+          precioCompra: line.precioCompraNeto,
           ivaPct: 0,
-        };
-      }),
-    };
+        })),
+      };
 
-    try {
-      setSubmitting(true);
       const res = editingNoteId
         ? await api.put(`/Albaran/${editingNoteId}`, payload)
         : await api.post("/Albaran", payload);
@@ -712,10 +840,60 @@ export default function SupplierDeliveryNotesPanel({
         );
       }
 
+      let salePriceWarning = "";
+      const savedNote = getLegacyData(res);
+      const savedNoteId = Number(savedNote?.id ?? savedNote?.Id ?? editingNoteId);
+      const salePriceUpdates = new Map();
+
+      try {
+        const savedDetail = savedNoteId ? await loadNoteDetail(savedNoteId) : null;
+        if (savedDetail?.lineas?.length) {
+          savedDetail.lineas.forEach((savedLine, index) => {
+            const preparedLine = findPreparedDeliveryLine(
+              preparedLines,
+              savedLine,
+              index,
+            );
+            const stockId = Number(savedLine.repuestoStockId);
+            if (!preparedLine || !stockId || preparedLine.precioVenta == null) {
+              return;
+            }
+            salePriceUpdates.set(stockId, preparedLine.precioVenta);
+          });
+        } else {
+          preparedLines.forEach((line) => {
+            if (!line.repuestoStockId || line.precioVenta == null) return;
+            salePriceUpdates.set(Number(line.repuestoStockId), line.precioVenta);
+          });
+        }
+      } catch (err) {
+        salePriceWarning = getApiMessage(
+          err,
+          "No se pudo leer el detalle del albaran para actualizar el PVP.",
+        );
+      }
+
+      try {
+        await Promise.all(
+          Array.from(salePriceUpdates.entries()).map(([id, precioVenta]) =>
+            api.put(`/RepuestoStock/${id}`, { precioVenta }),
+          ),
+        );
+      } catch (err) {
+        salePriceWarning = getApiMessage(
+          err,
+          "No se pudo actualizar el PVP de uno o mas repuestos.",
+        );
+      }
+
       await loadNotes();
       await onNotesChanged?.();
       resetForm();
       setShowForm(false);
+
+      if (salePriceWarning) {
+        alert(`Albaran guardado, pero revisa stock: ${salePriceWarning}`);
+      }
     } catch (err) {
       alert(
         err?.response?.data?.message ||
@@ -884,9 +1062,9 @@ export default function SupplierDeliveryNotesPanel({
                     <th className="px-3 py-2 text-left">Nombre</th>
                     <th className="px-3 py-2 text-left">Marca</th>
                     <th className="px-3 py-2 text-right">Cantidad</th>
-                    <th className="px-3 py-2 text-right">Precio</th>
+                    <th className="px-3 py-2 text-right">PVP</th>
                     <th className="px-3 py-2 text-right">Dcto %</th>
-                    <th className="px-3 py-2 text-right">Base imponible</th>
+                    <th className="px-3 py-2 text-right">Precio compra</th>
                     <th className="px-3 py-2"></th>
                   </tr>
                 </thead>
@@ -916,7 +1094,11 @@ export default function SupplierDeliveryNotesPanel({
                                 nombre: partValue(part, "nombre"),
                                 marca: partValue(part, "marca"),
                                 precioCompra: String(
-                                  partValue(part, "precioCompra", "") ?? "",
+                                  partValue(
+                                    part,
+                                    "precioVenta",
+                                    partValue(part, "precioCompra", ""),
+                                  ) ?? "",
                                 ),
                               })
                             }
@@ -988,7 +1170,7 @@ export default function SupplierDeliveryNotesPanel({
                           />
                         </td>
                         <td className="px-3 py-2 text-right font-bold text-slate-900">
-                          {formatCurrency(total.base)}
+                          {formatCurrency(total.precioCompraNeto)}
                         </td>
                         <td className="px-3 py-2 text-right">
                           <button
@@ -1007,7 +1189,7 @@ export default function SupplierDeliveryNotesPanel({
                 <tfoot className="bg-slate-50">
                   <tr>
                     <th colSpan={6} className="px-3 py-2 text-right">
-                      Base imponible
+                      Total compra
                     </th>
                     <th className="px-3 py-2 text-right font-bold">
                       {formatCurrency(deliveryTotals.base)}
@@ -1051,7 +1233,7 @@ export default function SupplierDeliveryNotesPanel({
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="font-semibold">
-                {selectedNotes.length} albarán(es) seleccionados · Base imponible{" "}
+                {selectedNotes.length} albarán(es) seleccionados · Total compra{" "}
                 {formatCurrency(selectedTotals.base)}
               </p>
             </div>
@@ -1086,7 +1268,7 @@ export default function SupplierDeliveryNotesPanel({
                 Crear factura desde albaranes
               </h3>
               <p className="mt-1 text-sm text-slate-600">
-                {selectedNotes.length} albarán(es) · Base imponible{" "}
+                {selectedNotes.length} albarán(es) · Total compra{" "}
                 {formatCurrency(selectedTotals.base)}
               </p>
             </div>
@@ -1313,7 +1495,7 @@ export default function SupplierDeliveryNotesPanel({
                     </div>
                     <div>
                       <p className="text-xs font-bold uppercase text-slate-400">
-                        Base
+                        Total compra
                       </p>
                       <p className="mt-1 font-semibold text-slate-800">
                         {formatCurrency(detailNote.base)}
@@ -1337,8 +1519,8 @@ export default function SupplierDeliveryNotesPanel({
                             <th className="px-4 py-3 text-left">Concepto</th>
                             <th className="px-4 py-3 text-left">Marca</th>
                             <th className="px-4 py-3 text-right">Cant.</th>
-                            <th className="px-4 py-3 text-right">Precio</th>
-                            <th className="px-4 py-3 text-right">Base</th>
+                            <th className="px-4 py-3 text-right">PVP</th>
+                            <th className="px-4 py-3 text-right">Precio compra</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1370,10 +1552,10 @@ export default function SupplierDeliveryNotesPanel({
                                   {line.cantidad}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  {formatCurrency(line.precioCompra)}
+                                  {formatCurrency(getDeliveryLinePvp(line))}
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                  {formatCurrency(line.base)}
+                                  {formatCurrency(line.precioCompra)}
                                 </td>
                               </tr>
                             ))
@@ -1499,7 +1681,7 @@ export default function SupplierDeliveryNotesPanel({
                 <th className="px-4 py-3 text-center">Fecha</th>
                 <th className="px-4 py-3 text-center">Proveedor</th>
                 <th className="px-4 py-3 text-center">Número albarán</th>
-                <th className="px-4 py-3 text-center">Base imponible</th>
+                <th className="px-4 py-3 text-center">Total compra</th>
                 <th className="px-4 py-3 text-center">Estado</th>
                 <th className="px-4 py-3 text-center">Acciones</th>
               </tr>

@@ -20,11 +20,13 @@ function normalizePendingInvoice(item) {
       total - importePagado,
   );
   const estado = item?.estado ?? item?.Estado ?? "Pendiente de pago";
+  const tipoDocumento = item?.tipoDocumento ?? item?.TipoDocumento ?? "Factura";
   const display = getAccountsPayableDisplay({
     total,
     importePagado,
     saldoPendiente,
     estado,
+    tipoDocumento,
   });
 
   return {
@@ -35,7 +37,7 @@ function normalizePendingInvoice(item) {
     numeroFactura: item?.numeroFactura ?? item?.NumeroFactura ?? "",
     referencia: item?.referencia ?? item?.Referencia ?? "",
     descripcion: item?.descripcion ?? item?.Descripcion ?? "",
-    tipoDocumento: item?.tipoDocumento ?? item?.TipoDocumento ?? "Factura",
+    tipoDocumento,
     base: Number(item?.tbase ?? item?.Tbase ?? item?.base ?? item?.Base ?? 0),
     iva: Number(item?.iva ?? item?.Iva ?? 0),
     total,

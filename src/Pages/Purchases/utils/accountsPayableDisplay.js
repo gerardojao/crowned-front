@@ -1,4 +1,14 @@
 function toMoneyNumber(value) {
+  if (typeof value === "string") {
+    const normalized = value
+      .replace(/\s/g, "")
+      .replace(/[^\d,.-]/g, "")
+      .replace(/\.(?=\d{3}(?:\D|$))/g, "")
+      .replace(",", ".");
+
+    return Number(normalized) || 0;
+  }
+
   return Number(value ?? 0) || 0;
 }
 
@@ -19,7 +29,12 @@ export function getAccountsPayableDisplay(invoice) {
     invoice?.saldoPendiente,
     invoice?.SaldoPendiente,
   );
-  const isSupplierCredit = total < 0;
+  const tipoDocumento = String(
+    getFirstValue(invoice?.tipoDocumento, invoice?.TipoDocumento) ?? "",
+  )
+    .trim()
+    .toLowerCase();
+  const isSupplierCredit = total < 0 || tipoDocumento.includes("abono");
   const normalSaldo = toMoneyNumber(providedSaldo ?? total - importePagado);
   let saldoAFavor = 0;
 

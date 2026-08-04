@@ -490,13 +490,13 @@ function sumItems(items) {
 }
 
 function getPaymentLegend(invoice, taller, selectedPaymentMethods) {
-  const explicit = invoice.leyendaPago ?? invoice.LeyendaPago;
-  if (explicit) return explicit.replace(/^\*\s*/, "");
-
   const tipo = String(invoice.tipoPago || "")
     .trim()
     .toLowerCase();
   if (tipo === "credito") return getCreditPaymentLegend(invoice, selectedPaymentMethods);
+
+  const explicit = invoice.leyendaPago ?? invoice.LeyendaPago;
+  if (explicit) return explicit.replace(/^\*\s*/, "");
 
   const labels = selectedPaymentMethods
     .map((method) => {
@@ -573,6 +573,9 @@ function getCreditPaymentLegend(invoice, selectedPaymentMethods = []) {
   const totalAbonado = Number(invoice.totalAbonado ?? invoice.TotalAbonado ?? 0);
   const saldoPendiente = Number(invoice.saldoPendiente ?? invoice.SaldoPendiente ?? 0);
   const fechaVencimiento = invoice.fechaVencimiento ?? invoice.FechaVencimiento;
+  const bankName = invoice.bankAccountName ?? invoice.BankAccountName ?? "";
+  const bankIban = invoice.bankAccountIban ?? invoice.BankAccountIban ?? "";
+  const bankDetail = [bankName, bankIban].filter(Boolean).join(" ");
   const parts = ["PAGO A CREDITO"];
   const initialPaymentDetail = selectedPaymentMethods
     .filter((method) => Number(method.amount || 0) > 0)
@@ -585,7 +588,10 @@ function getCreditPaymentLegend(invoice, selectedPaymentMethods = []) {
   } else if (totalAbonado > 0) {
     parts.push(`CLIENTE ABONO ${eur.format(totalAbonado)}`);
   }
-  if (saldoPendiente > 0) parts.push(`SALDO PENDIENTE ${eur.format(saldoPendiente)}`);
+  if (saldoPendiente > 0) {
+    const saldoText = `SALDO PENDIENTE ${eur.format(saldoPendiente)}`;
+    parts.push(bankDetail ? `${saldoText} A LA CUENTA ${bankDetail}` : saldoText);
+  }
   if (fechaVencimiento) parts.push(`VENCIMIENTO ${formatDateShort(fechaVencimiento)}`);
 
   return parts.join(". ");
