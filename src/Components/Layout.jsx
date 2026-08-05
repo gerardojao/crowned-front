@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   Menu,
@@ -33,6 +33,31 @@ const heroBtnIcon =
 
 const mobileLink = "px-3 py-2 rounded-lg hover:bg-slate-100";
 const DEMO_SITE_URL = "https://demo.zagapro.store";
+const CROWER_BILLING_NOTICE = {
+  amount: 198,
+  dueDate: "2026-08-10",
+};
+
+function getLocalDateValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isCrowerWorkshop(workshop) {
+  const haystack = [
+    workshop?.nombre,
+    workshop?.Nombre,
+    workshop?.razonSocial,
+    workshop?.RazonSocial,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes("crower");
+}
 
 export default function Layout({ children }) {
   const [open, setOpen] = useState(false);
@@ -52,6 +77,7 @@ export default function Layout({ children }) {
   });
   const [helpSubmitting, setHelpSubmitting] = useState(false);
   const [helpStatus, setHelpStatus] = useState(null);
+  const [billingNoticeOpen, setBillingNoticeOpen] = useState(false);
 
   const isAuthRoute = /^\/(login|register)(\/|$)?/.test(location.pathname);
   const isPrintRoute = /^\/print-order\/.+/.test(location.pathname);
@@ -120,6 +146,13 @@ export default function Layout({ children }) {
   const activeWorkshop = workshops.find(
     (x) => String(x.id ?? x.Id) === String(activeWorkshopId),
   );
+  const todayValue = getLocalDateValue();
+  const showCrowerBillingNotice =
+    isAuthed &&
+    !isAuthRoute &&
+    !isPrintRoute &&
+    isCrowerWorkshop(activeWorkshop) &&
+    todayValue <= CROWER_BILLING_NOTICE.dueDate;
   const activeWorkshopLogo = activeWorkshop?.logoUrl ?? activeWorkshop?.LogoUrl ?? "";
   const navbarLogo = isAuthed && activeWorkshopLogo
     ? resolveApiAssetUrl(activeWorkshopLogo)
@@ -131,6 +164,44 @@ export default function Layout({ children }) {
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
+  };
+
+  useEffect(() => {
+    if (!showCrowerBillingNotice || !activeWorkshopId) {
+      setBillingNoticeOpen(false);
+      return;
+    }
+
+    const key = `tc:crower-billing-notice:${activeWorkshopId}:${todayValue}`;
+    setBillingNoticeOpen(localStorage.getItem(key) !== "dismissed");
+  }, [showCrowerBillingNotice, activeWorkshopId, todayValue]);
+
+  const closeBillingNotice = () => {
+    if (activeWorkshopId) {
+      localStorage.setItem(
+        `tc:crower-billing-notice:${activeWorkshopId}:${todayValue}`,
+        "dismissed",
+      );
+    }
+    setBillingNoticeOpen(false);
+  };
+
+  const contactBillingSupport = () => {
+    setHelpForm((current) => ({
+      ...current,
+      business:
+        current.business ||
+        activeWorkshop?.nombre ||
+        activeWorkshop?.Nombre ||
+        "Multiservicios Crower",
+      email: current.email || user?.email || "",
+      type: "Otra consulta",
+      message:
+        current.message ||
+        `Consulta sobre la segunda mensualidad con vencimiento 10/08/2026 por importe de ${CROWER_BILLING_NOTICE.amount} €.`,
+    }));
+    closeBillingNotice();
+    setHelpOpen(true);
   };
 
   const setHelpField = (field) => (event) => {
@@ -610,6 +681,30 @@ export default function Layout({ children }) {
 
       <TrialBanner />
 
+      {showCrowerBillingNotice && (
+        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p>
+                <span className="font-extrabold">Recordatorio administrativo:</span>{" "}
+                la segunda mensualidad vence el 10/08/2026. Importe pendiente:{" "}
+                <span className="font-extrabold">
+                  {CROWER_BILLING_NOTICE.amount} €
+                </span>
+                .
+              </p>
+              <button
+                type="button"
+                onClick={contactBillingSupport}
+                className="self-start rounded-xl bg-white px-3 py-2 text-xs font-bold text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100 sm:self-auto"
+              >
+                Contactar soporte
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main
         className={
           isPrintRoute
@@ -620,6 +715,63 @@ export default function Layout({ children }) {
         {children}
       </main>
       <ClientAlertModal workshop={activeWorkshop} />
+
+      {billingNoticeOpen && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+          <section className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.16em] text-amber-700">
+                  Recordatorio administrativo
+                </p>
+                <h2 className="mt-1 text-2xl font-extrabold text-slate-950">
+                  Segunda mensualidad pendiente
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={closeBillingNotice}
+                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                aria-label="Cerrar aviso"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-950 ring-1 ring-amber-200">
+              <p>
+                Le recordamos que el proximo <strong>10 de agosto de 2026</strong>{" "}
+                vence su segunda mensualidad del servicio.
+              </p>
+              <p className="mt-3">
+                Importe pendiente:{" "}
+                <strong>{CROWER_BILLING_NOTICE.amount} €</strong>.
+              </p>
+              <p className="mt-3">
+                Si ya realizo el pago, puede ignorar este aviso.
+              </p>
+            </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeBillingNotice}
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+              >
+                Entendido
+              </button>
+              <button
+                type="button"
+                onClick={contactBillingSupport}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-amber-700"
+              >
+                Contactar soporte
+                <ArrowRight size={17} />
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {isAuthed && !isAuthRoute && !isPrintRoute && (
         <button
