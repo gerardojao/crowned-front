@@ -458,7 +458,6 @@ export default function SupplierDeliveryNotesPanel({
 
   const setNoteFilter = (field, value) => {
     updateFilters({ [field]: value, page: 1 });
-    setSelectedNotes([]);
   };
 
   const setLineField = (id, field, value) => {
@@ -1674,7 +1673,6 @@ export default function SupplierDeliveryNotesPanel({
                 fechaFin: "",
                 page: 1,
               });
-              setSelectedNotes([]);
             }}
             className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
           >
