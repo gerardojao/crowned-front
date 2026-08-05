@@ -404,7 +404,7 @@ export default function SupplierDeliveryNotesPanel({
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
   const [header, setHeader] = useState(initialHeader);
   const [lines, setLines] = useState([createEmptyLine()]);
-  const [selectedNoteIds, setSelectedNoteIds] = useState([]);
+  const [selectedNotes, setSelectedNotes] = useState([]);
   const [detailNote, setDetailNote] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
@@ -420,9 +420,9 @@ export default function SupplierDeliveryNotesPanel({
   });
 
   const deliveryTotals = sumDeliveryLines(lines);
-  const selectedNotes = useMemo(
-    () => notes.filter((note) => selectedNoteIds.includes(note.id)),
-    [notes, selectedNoteIds],
+  const selectedNoteIds = useMemo(
+    () => selectedNotes.map((note) => note.id),
+    [selectedNotes],
   );
   const selectedTotals = selectedNotes.reduce(
     (acc, note) => {
@@ -458,7 +458,7 @@ export default function SupplierDeliveryNotesPanel({
 
   const setNoteFilter = (field, value) => {
     updateFilters({ [field]: value, page: 1 });
-    setSelectedNoteIds([]);
+    setSelectedNotes([]);
   };
 
   const setLineField = (id, field, value) => {
@@ -483,11 +483,11 @@ export default function SupplierDeliveryNotesPanel({
     );
   };
 
-  const toggleNote = (noteId) => {
-    setSelectedNoteIds((prev) =>
-      prev.includes(noteId)
-        ? prev.filter((id) => id !== noteId)
-        : [...prev, noteId],
+  const toggleNote = (note) => {
+    setSelectedNotes((prev) =>
+      prev.some((selected) => selected.id === note.id)
+        ? prev.filter((selected) => selected.id !== note.id)
+        : [...prev, note],
     );
   };
 
@@ -692,7 +692,7 @@ export default function SupplierDeliveryNotesPanel({
       await loadNotes();
       await onNotesChanged?.();
       await onInvoicesChanged?.();
-      setSelectedNoteIds([]);
+      setSelectedNotes([]);
       setInvoiceForm((prev) => ({
         ...prev,
         open: false,
@@ -920,7 +920,9 @@ export default function SupplierDeliveryNotesPanel({
       await api.post(`/Albaran/${note.id}/anular`, {
         motivo: reason.trim(),
       });
-      setSelectedNoteIds((prev) => prev.filter((id) => id !== note.id));
+      setSelectedNotes((prev) =>
+        prev.filter((selected) => selected.id !== note.id),
+      );
       await loadNotes();
       await onNotesChanged?.();
     } catch (err) {
@@ -1237,13 +1239,22 @@ export default function SupplierDeliveryNotesPanel({
                 {formatCurrency(selectedTotals.base)}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openInvoiceForm}
-              className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
-            >
-              Crear factura desde seleccion
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={openInvoiceForm}
+                className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
+              >
+                Crear factura desde seleccion
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedNotes([])}
+                className="rounded-xl bg-sky-100 px-4 py-2 text-xs font-bold text-sky-800 ring-1 ring-sky-200 hover:bg-sky-200"
+              >
+                Limpiar seleccion
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1663,7 +1674,7 @@ export default function SupplierDeliveryNotesPanel({
                 fechaFin: "",
                 page: 1,
               });
-              setSelectedNoteIds([]);
+              setSelectedNotes([]);
             }}
             className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
           >
@@ -1720,7 +1731,7 @@ export default function SupplierDeliveryNotesPanel({
                           type="checkbox"
                           disabled={!selectable}
                           checked={selectedNoteIds.includes(note.id)}
-                          onChange={() => toggleNote(note.id)}
+                          onChange={() => toggleNote(note)}
                           className="h-4 w-4 rounded border-slate-300"
                         />
                       </td>
