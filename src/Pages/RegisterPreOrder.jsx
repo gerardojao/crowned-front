@@ -13,7 +13,6 @@ import {
   UserPlus,
 } from "lucide-react";
 import api from "../Components/api";
-import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import SignatureModal from "../Components/SignatureModal";
 import SmallSuccessModal from "../Components/SmallSuccessModal";
@@ -273,7 +272,7 @@ export default function RegisterPreOrder() {
         const settings = res?.data || {};
         const moduleEnabled =
           settings.enablePreOrders ?? settings.EnablePreOrders ?? true;
-        setAllowed(usesZagaInvoiceTemplate(settings) && moduleEnabled);
+        setAllowed(moduleEnabled);
         setReceptionPhotosEnabled(
           settings.enableReceptionPhotos ??
             settings.EnableReceptionPhotos ??

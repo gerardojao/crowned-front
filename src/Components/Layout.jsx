@@ -32,7 +32,6 @@ import TrialBanner from "./TrialBanner";
 import zagaProLogo from "../assets/logozagapro.png";
 import ClientAlertModal from "./ClienteAlertModal";
 import { getBusinessTerminology } from "../utils/businessTerminology";
-import { usesZagaInvoiceTemplate } from "./ZagaInvoiceDocument";
 import { sendSupportRequest } from "./supportRequest";
 
 const ProductTour = lazy(() => import("./ProductTour"));
@@ -180,12 +179,10 @@ export default function Layout({ children }) {
     ? `${activeWorkshop?.nombre ?? activeWorkshop?.Nombre ?? "Negocio"}`
     : "ZagaPro - Gestion inteligente de negocios";
   const labels = getBusinessTerminology(activeWorkshop);
-  const useZagaDocuments = usesZagaInvoiceTemplate(activeWorkshop);
   const preOrdersEnabled =
-    useZagaDocuments &&
-    (activeWorkshop?.enablePreOrders ??
-      activeWorkshop?.EnablePreOrders ??
-      true);
+    activeWorkshop?.enablePreOrders ??
+    activeWorkshop?.EnablePreOrders ??
+    true;
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
   const accountsReceivableEnabled =
     activeWorkshop?.enableAccountsReceivable ??

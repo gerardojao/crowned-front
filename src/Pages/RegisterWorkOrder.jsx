@@ -346,7 +346,7 @@ export default function RegisterWorkOrder() {
       const preOrderModuleEnabled =
         data.enablePreOrders ?? data.EnablePreOrders ?? true;
       setUseZagaDocuments(zagaDocuments);
-      setPreOrdersEnabled(zagaDocuments && preOrderModuleEnabled);
+      setPreOrdersEnabled(preOrderModuleEnabled);
       setReceptionPhotosEnabled(
         data.enableReceptionPhotos ?? data.EnableReceptionPhotos ?? true,
       );

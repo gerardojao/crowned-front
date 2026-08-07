@@ -8,6 +8,7 @@ import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import useAutoPrint from "../hooks/useAutoPrint";
 
 const DEFAULT_TALLER = {
+  id: null,
   nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: "61407055E",
@@ -155,6 +156,17 @@ function formatLineQuantity(value) {
   });
 }
 
+function usesJetbOrderTemplate(taller) {
+  const workshopId = Number(taller?.id ?? taller?.Id ?? 0);
+  if (workshopId === 4) return true;
+
+  const haystack = `${taller?.nombre ?? ""} ${taller?.razonSocial ?? ""} ${
+    taller?.logoUrl ?? ""
+  }`.toLowerCase();
+  const compact = haystack.replace(/[\s_-]/g, "");
+  return compact.includes("jetb") || compact.includes("autoservicio");
+}
+
 export default function PrintWorkOrder() {
   const { id } = useParams();
   const [params] = useSearchParams();
@@ -189,6 +201,7 @@ export default function PrintWorkOrder() {
 
       const settings = settingsRes?.data || {};
       setTaller({
+        id: settings.id ?? settings.Id ?? DEFAULT_TALLER.id,
         nombre: settings.nombre ?? settings.Nombre ?? DEFAULT_TALLER.nombre,
         razonSocial:
           settings.razonSocial ??
@@ -288,7 +301,8 @@ export default function PrintWorkOrder() {
     );
   }
 
-  const useZagaTemplate = usesZagaInvoiceTemplate(taller);
+  const useZagaTemplate =
+    usesZagaInvoiceTemplate(taller) || usesJetbOrderTemplate(taller);
   const title = "ORDEN DE TRABAJO";
   const baseDocumentNumber = String(order.id || "").padStart(9, "0");
   const documentNumber = baseDocumentNumber;

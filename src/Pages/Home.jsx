@@ -25,7 +25,6 @@ import api from "../Components/api";
 import KPIs from "../Components/Kpi";
 import { useAuth } from "../Components/AuthContext";
 import { useBusinessTerminology } from "../utils/businessTerminology";
-import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import {
   getWorkOrderOperationTypeBadgeClass,
   getWorkOrderOperationTypeLabel,
@@ -136,7 +135,6 @@ export default function Home() {
     gastos: 0,
   });
   const [lastStatement, setLastStatement] = useState(null);
-  const [useZagaDocuments, setUseZagaDocuments] = useState(false);
   const [showUrlMigrationNotice, setShowUrlMigrationNotice] = useState(false);
   const [urlMigrationModalOpen, setUrlMigrationModalOpen] = useState(false);
 
@@ -197,7 +195,6 @@ export default function Home() {
       });
       setDashboardTotals({ ingresos: 0, gastos: 0 });
       setLastStatement(null);
-      setUseZagaDocuments(false);
       return;
     }
 
@@ -231,7 +228,6 @@ export default function Home() {
         ]);
 
         const settings = settingsRes?.data || {};
-        setUseZagaDocuments(usesZagaInvoiceTemplate(settings));
         const enableAccountsReceivable =
           settings.enableAccountsReceivable ??
           settings.EnableAccountsReceivable ??
@@ -334,7 +330,7 @@ export default function Home() {
     dashboardFeatures.enableDashboardRepairVehicles ||
     dashboardFeatures.enableDashboardBilling ||
     dashboardFeatures.enableAccountsReceivable;
-  const preOrdersEnabled = useZagaDocuments && dashboardFeatures.enablePreOrders;
+  const preOrdersEnabled = dashboardFeatures.enablePreOrders;
   const stockAccessLabel = dashboardFeatures.enableAccountsPayable
     ? labels.stockTitle
     : "Repuestos facturados";

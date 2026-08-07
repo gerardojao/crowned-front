@@ -7,6 +7,7 @@ import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 
 const DEFAULT_TALLER = {
+  id: null,
   nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: "61407055E",
@@ -49,6 +50,7 @@ export default function PrintBudget() {
       const data = res?.data || {};
 
       setTaller({
+        id: data.id ?? data.Id ?? DEFAULT_TALLER.id,
         nombre: data.nombre ?? data.Nombre ?? DEFAULT_TALLER.nombre,
         razonSocial: data.razonSocial ?? data.RazonSocial ?? DEFAULT_TALLER.razonSocial,
         nif: data.nif ?? data.Nif ?? DEFAULT_TALLER.nif,
@@ -180,7 +182,8 @@ export default function PrintBudget() {
     );
   }
 
-  const useMasterTouchTemplate = usesZagaInvoiceTemplate(taller);
+  const useMasterTouchTemplate =
+    usesZagaInvoiceTemplate(taller) || usesJetbDocumentTemplate(taller);
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
   const documentNumber = budget.numeroPresupuesto || String(budget.id || "");
   const operationType = String(
@@ -1029,6 +1032,17 @@ function getBudgetPrintLineTotal(item) {
     Number(item.precioUnitario || 0) *
     (1 - discount / 100)
   );
+}
+
+function usesJetbDocumentTemplate(taller) {
+  const workshopId = Number(taller?.id ?? taller?.Id ?? 0);
+  if (workshopId === 4) return true;
+
+  const haystack = `${taller?.nombre ?? ""} ${taller?.razonSocial ?? ""} ${
+    taller?.logoUrl ?? ""
+  }`.toLowerCase();
+  const compact = haystack.replace(/[\s_-]/g, "");
+  return compact.includes("jetb") || compact.includes("autoservicio");
 }
 
 function parseBudgetItems(itemsJson) {

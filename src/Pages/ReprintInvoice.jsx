@@ -13,6 +13,7 @@ import {
 import { getBusinessTerminology } from "../utils/businessTerminology";
 
 const DEFAULT_TALLER = {
+  id: null,
   nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: "61407055E",
@@ -82,6 +83,17 @@ function normalizeOrderVehicleData(row) {
     km: row.kilometraje ?? row.Kilometraje ?? "",
     tipoOperacion: row.tipoOperacion ?? row.TipoOperacion ?? "",
   };
+}
+
+function usesJetbDocumentTemplate(taller) {
+  const workshopId = Number(taller?.id ?? taller?.Id ?? 0);
+  if (workshopId === 4) return true;
+
+  const haystack = `${taller?.nombre ?? ""} ${taller?.razonSocial ?? ""} ${
+    taller?.logoUrl ?? ""
+  }`.toLowerCase();
+  const compact = haystack.replace(/[\s_-]/g, "");
+  return compact.includes("jetb") || compact.includes("autoservicio");
 }
 
 export default function ReprintInvoice() {
@@ -168,6 +180,7 @@ export default function ReprintInvoice() {
       const data = res?.data || {};
 
       setTaller({
+        id: data.id ?? data.Id ?? DEFAULT_TALLER.id,
         nombre: data.nombre ?? data.Nombre ?? DEFAULT_TALLER.nombre,
         razonSocial: data.razonSocial ?? data.RazonSocial ?? DEFAULT_TALLER.razonSocial,
         nif: data.nif ?? data.Nif ?? DEFAULT_TALLER.nif,
@@ -343,7 +356,8 @@ export default function ReprintInvoice() {
 
   const isRectificativa = invoice.tipoFactura === "Rectificativa";
   const labels = getBusinessTerminology(taller);
-  const useZagaTemplate = usesZagaInvoiceTemplate(taller);
+  const useZagaTemplate =
+    usesZagaInvoiceTemplate(taller) || usesJetbDocumentTemplate(taller);
   const documentTaller = {
     ...taller,
     iban: invoice.bankAccountIban || taller.iban,

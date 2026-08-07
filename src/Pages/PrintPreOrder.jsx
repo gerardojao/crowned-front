@@ -8,6 +8,7 @@ import { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
 import useAutoPrint from "../hooks/useAutoPrint";
 
 const DEFAULT_TALLER = {
+  id: null,
   nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: "61407055E",
@@ -56,6 +57,17 @@ function buildCustomerAddressLines(preOrder) {
   return address.length ? address : [];
 }
 
+function usesJetbPreOrderTemplate(taller) {
+  const workshopId = Number(taller?.id ?? taller?.Id ?? 0);
+  if (workshopId === 4) return true;
+
+  const haystack = `${taller?.nombre ?? ""} ${taller?.razonSocial ?? ""} ${
+    taller?.logoUrl ?? ""
+  }`.toLowerCase();
+  const compact = haystack.replace(/[\s_-]/g, "");
+  return compact.includes("jetb") || compact.includes("autoservicio");
+}
+
 export default function PrintPreOrder() {
   const { id } = useParams();
   const [params] = useSearchParams();
@@ -88,6 +100,7 @@ export default function PrintPreOrder() {
 
       const settings = settingsRes?.data || {};
       setTaller({
+        id: settings.id ?? settings.Id ?? DEFAULT_TALLER.id,
         nombre: settings.nombre ?? settings.Nombre ?? DEFAULT_TALLER.nombre,
         razonSocial:
           settings.razonSocial ??
@@ -171,7 +184,7 @@ export default function PrintPreOrder() {
 
  
 
-  const useZaga = usesZagaInvoiceTemplate(taller);
+  const useZaga = usesZagaInvoiceTemplate(taller) || usesJetbPreOrderTemplate(taller);
   const preOrderModuleEnabled =
     taller.enablePreOrders ?? taller.EnablePreOrders ?? true;
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;

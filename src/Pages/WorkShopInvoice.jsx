@@ -51,6 +51,7 @@ const normalizeFrequentServiceName = (value) => {
 };
 
 const DEFAULT_TALLER = {
+  id: null,
   nombre: "Multiservicios Crower",
   razonSocial: "JUAN CARLOS FERNANDEZ SILVA",
   nif: " 61407055E",
@@ -96,6 +97,17 @@ const EMPTY_PAYMENT_METHODS = PAYMENT_METHODS.reduce(
 const inputCls = "rounded-xl border border-slate-300 px-3 py-2 text-sm";
 const lockedInputCls =
   "rounded-xl border border-slate-200 bg-slate-100 px-3 py-2 text-sm text-slate-600";
+
+function usesJetbDocumentTemplate(taller) {
+  const workshopId = Number(taller?.id ?? taller?.Id ?? 0);
+  if (workshopId === 4) return true;
+
+  const haystack = `${taller?.nombre ?? ""} ${taller?.razonSocial ?? ""} ${
+    taller?.logoUrl ?? ""
+  }`.toLowerCase();
+  const compact = haystack.replace(/[\s_-]/g, "");
+  return compact.includes("jetb") || compact.includes("autoservicio");
+}
 
 export default function WorkshopInvoice() {
   const { id } = useParams();
@@ -269,6 +281,7 @@ export default function WorkshopInvoice() {
       const data = res?.data || {};
 
       const next = {
+        id: data.id ?? data.Id ?? DEFAULT_TALLER.id,
         nombre: data.nombre ?? data.Nombre ?? DEFAULT_TALLER.nombre,
         razonSocial: data.razonSocial ?? data.RazonSocial ?? DEFAULT_TALLER.razonSocial,
         nif: data.nif ?? data.Nif ?? DEFAULT_TALLER.nif,
@@ -520,7 +533,8 @@ export default function WorkshopInvoice() {
       : firstBankPayment?.bankAccountId || selectedBankId;
     return bankAccounts.find((item) => String(item.id ?? item.Id) === String(effectiveBankId));
   }, [bankAccounts, isCredit, selectedBankId, selectedPaymentMethods]);
-  const useZagaTemplate = usesZagaInvoiceTemplate(taller);
+  const useZagaTemplate =
+    usesZagaInvoiceTemplate(taller) || usesJetbDocumentTemplate(taller);
 
   useEffect(() => {
     const iban = selectedBank?.iban ?? selectedBank?.Iban ?? "";
