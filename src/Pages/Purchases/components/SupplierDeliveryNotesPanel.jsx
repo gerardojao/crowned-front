@@ -416,6 +416,8 @@ export default function SupplierDeliveryNotesPanel({
     descripcion: "",
     estado: "Pendiente de pago",
     bankAccountId: "",
+    ajusteDescripcion: "",
+    ajusteBase: "",
     ivaBreakdown: createEmptyInvoiceVatBreakdown(),
   });
 
@@ -446,8 +448,12 @@ export default function SupplierDeliveryNotesPanel({
     },
     { base: 0, iva: 0, total: 0 },
   );
+  const invoiceAdjustmentBase = roundMoney(Number(invoiceForm.ajusteBase) || 0);
+  const expectedInvoiceBase = roundMoney(
+    selectedTotals.base + invoiceAdjustmentBase,
+  );
   const invoiceBaseDifference = roundMoney(
-    selectedTotals.base - invoiceVatTotals.base,
+    expectedInvoiceBase - invoiceVatTotals.base,
   );
 
   const resetForm = () => {
@@ -638,6 +644,11 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
+    if (invoiceAdjustmentBase !== 0 && !invoiceForm.ajusteDescripcion.trim()) {
+      alert("Indica el concepto del ajuste de la factura.");
+      return;
+    }
+
     // if (roundMoney(selectedTotals.base) <= 0) {
     //   alert("La base imponible de los albaranes debe ser mayor que 0.");
     //   return;
@@ -648,12 +659,12 @@ export default function SupplierDeliveryNotesPanel({
     //   return;
     // }
 
-    // if (Math.abs(invoiceBaseDifference) >= 0.01) {
-    //   alert(
-    //     `La suma del desglose de IVA debe coincidir con la base imponible de los albaranes. Diferencia: ${formatCurrency(invoiceBaseDifference)}.`,
-    //   );
-    //   return;
-    // }
+    if (Math.abs(invoiceBaseDifference) >= 0.01) {
+      alert(
+        `La suma del desglose de IVA debe coincidir con la base de factura ajustada. Diferencia: ${formatCurrency(invoiceBaseDifference)}.`,
+      );
+      return;
+    }
 
     const payload = {
       albaranIds: selectedNoteIds,
@@ -661,6 +672,8 @@ export default function SupplierDeliveryNotesPanel({
       numeroFactura: invoiceForm.numeroFactura.trim(),
       referencia: invoiceForm.referencia.trim() || null,
       descripcion: invoiceForm.descripcion.trim() || null,
+      ajusteBase: invoiceAdjustmentBase,
+      ajusteDescripcion: invoiceForm.ajusteDescripcion.trim() || null,
       estado: invoiceForm.estado,
       bankAccountId:
         invoiceForm.estado === "Pagada"
@@ -698,6 +711,8 @@ export default function SupplierDeliveryNotesPanel({
         numeroFactura: "",
         referencia: "",
         descripcion: "",
+        ajusteDescripcion: "",
+        ajusteBase: "",
         estado: "Pendiente de pago",
         ivaBreakdown: createEmptyInvoiceVatBreakdown(),
       }));
@@ -1386,6 +1401,34 @@ export default function SupplierDeliveryNotesPanel({
                 </div>
               </div>
 
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px]">
+                <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
+                  Concepto ajuste
+                  <input
+                    type="text"
+                    value={invoiceForm.ajusteDescripcion}
+                    onChange={(e) =>
+                      setInvoiceField("ajusteDescripcion", e.target.value)
+                    }
+                    placeholder="Descuento, penalizacion, redondeo..."
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
+                  Importe ajuste
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={invoiceForm.ajusteBase}
+                    onChange={(e) =>
+                      setInvoiceField("ajusteBase", e.target.value)
+                    }
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm font-medium text-slate-800"
+                  />
+                </label>
+              </div>
+
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 {[
                   ["base21", "Base 21%"],
@@ -1413,7 +1456,7 @@ export default function SupplierDeliveryNotesPanel({
               </div>
 
               <div className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-white p-3 text-xs font-semibold text-slate-700 sm:grid-cols-4">
-                <span>Base: {formatCurrency(invoiceVatTotals.base)}</span>
+                <span>Base ajustada: {formatCurrency(expectedInvoiceBase)}</span>
                 <span>IVA: {formatCurrency(invoiceVatTotals.iva)}</span>
                 <span>Total factura: {formatCurrency(invoiceVatTotals.total)}</span>
                 <span

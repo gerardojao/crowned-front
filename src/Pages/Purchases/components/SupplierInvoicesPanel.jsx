@@ -189,8 +189,9 @@ export default function SupplierInvoicesPanel({
     }
 
     const isCredit = form.tipoDocumento === "Rappel" || form.tipoDocumento === "Abono";
-    if (isCredit && !form.facturaOriginalId) {
-      alert("Selecciona la factura original del abono o rappel.");
+    const requiresOriginalInvoice = form.tipoDocumento === "Abono";
+    if (requiresOriginalInvoice && !form.facturaOriginalId) {
+      alert("Selecciona la factura original del abono.");
       return;
     }
     if (!isCredit && (invoiceTotals.base <= 0 || invoiceTotals.total <= 0)) {
@@ -244,7 +245,7 @@ export default function SupplierInvoicesPanel({
           form.bankAccountId && form.bankAccountId !== CASH_PAYMENT_VALUE
             ? Number(form.bankAccountId)
             : null,
-        facturaOriginalId: form.facturaOriginalId
+        facturaOriginalId: requiresOriginalInvoice && form.facturaOriginalId
           ? Number(form.facturaOriginalId)
           : null,
         lineasIva,
@@ -562,8 +563,7 @@ export default function SupplierInvoicesPanel({
               </select>
             </div>
 
-            {(form.tipoDocumento === "Abono" ||
-              form.tipoDocumento === "Rappel") && (
+            {form.tipoDocumento === "Abono" && (
               <div className="md:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   Factura original
