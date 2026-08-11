@@ -5,6 +5,8 @@
   useMemo,
   useRef,
 } from "react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../Components/api";
 import Loader from "../Components/Loader";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -19,6 +21,7 @@ import {
   Mail,
   Eye,
   FileWarning,
+  Download,
 } from "lucide-react";
 
 const eur = new Intl.NumberFormat("es-ES", {
@@ -436,6 +439,177 @@ export default function InvoiceHistory() {
     );
   };
 
+  const exportExcel = async () => {
+    try {
+      const rowsToExport = applyLocalSearch(await fetchAllFilteredRows());
+
+      if (rowsToExport.length === 0) {
+        setNotice({
+          type: "error",
+          text: "No hay facturas para exportar con los filtros seleccionados.",
+        });
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Libro de ventas", {
+        pageSetup: {
+          paperSize: 9,
+          orientation: "landscape",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          margins: {
+            left: 0.3,
+            right: 0.3,
+            top: 0.5,
+            bottom: 0.5,
+            header: 0.2,
+            footer: 0.2,
+          },
+        },
+      });
+
+      worksheet.mergeCells("A1:J1");
+      worksheet.getCell("A1").value = "LIBRO REGISTRO DE VENTAS";
+      worksheet.getCell("A1").font = { bold: true, size: 16 };
+      worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+      worksheet.mergeCells("A2:J2");
+      worksheet.getCell("A2").value = `Periodo: ${
+        from ? soloFecha(from) : "Inicio"
+      } - ${to ? soloFecha(to) : "Actualidad"}`;
+      worksheet.getCell("A2").alignment = { horizontal: "center" };
+
+      worksheet.mergeCells("A3:J3");
+      worksheet.getCell("A3").value = `Fecha de exportación: ${soloFecha(new Date())}`;
+      worksheet.getCell("A3").alignment = { horizontal: "center" };
+
+      worksheet.addRow([]);
+
+      const headerRow = worksheet.addRow([
+        "Fecha",
+        "Nº Factura",
+        "Cliente",
+        "NIF",
+        "Origen",
+        "Tipo",
+        "Matrícula",
+        "Base",
+        "IVA",
+        "Total",
+      ]);
+
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF334155" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+
+      rowsToExport.forEach((row) => {
+        worksheet.addRow([
+          row.date ? soloFecha(row.date) : "",
+          row.invoiceNumber || "",
+          row.customerName || "",
+          row.nif || "",
+          getOriginLabel(row),
+          getTypeLabel(row),
+          row.matricula || row.vehiclePlate || "",
+          Number(row.baseAmount || 0),
+          Number(row.ivaAmount || 0),
+          Number(row.totalAmount || 0),
+        ]);
+      });
+
+      worksheet.addRow([]);
+
+      const totalRow = worksheet.addRow([
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "TOTALES",
+        rowsToExport.reduce((sum, row) => sum + Number(row.baseAmount || 0), 0),
+        rowsToExport.reduce((sum, row) => sum + Number(row.ivaAmount || 0), 0),
+        rowsToExport.reduce((sum, row) => sum + Number(row.totalAmount || 0), 0),
+      ]);
+
+      totalRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE2E8F0" },
+        };
+        cell.border = {
+          top: { style: "thin" },
+          bottom: { style: "double" },
+        };
+      });
+
+      worksheet.columns = [
+        { width: 12 },
+        { width: 18 },
+        { width: 30 },
+        { width: 16 },
+        { width: 14 },
+        { width: 16 },
+        { width: 14 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+      ];
+
+      worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell, colNumber) => {
+          cell.alignment = {
+            vertical: "middle",
+            horizontal: colNumber >= 8 && colNumber <= 10 ? "right" : "left",
+          };
+
+          if (rowNumber > 5) {
+            cell.border = {
+              top: { style: "thin", color: { argb: "FFE2E8F0" } },
+              left: { style: "thin", color: { argb: "FFE2E8F0" } },
+              bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+              right: { style: "thin", color: { argb: "FFE2E8F0" } },
+            };
+          }
+
+          if (colNumber >= 8 && colNumber <= 10 && typeof cell.value === "number") {
+            cell.numFmt = '#,##0.00 €';
+          }
+        });
+      });
+
+      worksheet.views = [{ state: "frozen", ySplit: 5 }];
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+
+      saveAs(blob, `libro-ventas-${from || "inicio"}-a-${to || "actualidad"}.xlsx`);
+    } catch {
+      setNotice({
+        type: "error",
+        text: "No se pudo exportar el libro de ventas a Excel.",
+      });
+    }
+  };
+
   const printSalesBookPdf = async () => {
     try {
       const rowsToPrint = applyLocalSearch(await fetchAllFilteredRows());
@@ -797,13 +971,25 @@ export default function InvoiceHistory() {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={printSalesBookPdf}
-                className="rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition text-sm flex items-center gap-2"
-              >
-                Imprimir Ventas
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={exportExcel}
+                  disabled={filteredRows.length === 0}
+                  className="rounded-xl px-4 py-2 bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 transition text-sm flex items-center gap-2 disabled:opacity-60"
+                >
+                  <Download size={17} />
+                  Exportar Excel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={printSalesBookPdf}
+                  className="rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition text-sm flex items-center gap-2"
+                >
+                  Imprimir Ventas
+                </button>
+              </div>
 
               <div className="text-sm font-medium text-slate-600">
                 Total:{" "}
