@@ -676,17 +676,39 @@ export default function WorkshopInvoice() {
   };
 
   const setItemField = (index, name, value) => {
+    const amountFields = new Set([
+      "cantidad",
+      "tiempo",
+      "precioUnitario",
+      "importe",
+      "descuentoPct",
+      "section",
+    ]);
+
     setItems((prev) =>
       prev.map((item, i) =>
         i === index
-          ? normalizeInvoiceLineForTotals(
-              {
+          ? (() => {
+              const nextItem = {
                 ...item,
                 [name]: value,
-              },
-              invoice.ivaPct,
-              useDetailedRepairLines,
-            )
+              };
+
+              if (amountFields.has(name)) {
+                delete nextItem.lineTotal;
+                delete nextItem.LineTotal;
+                delete nextItem.totalLinea;
+                delete nextItem.TotalLinea;
+                delete nextItem.netTotal;
+                delete nextItem.NetTotal;
+              }
+
+              return normalizeInvoiceLineForTotals(
+                nextItem,
+                invoice.ivaPct,
+                useDetailedRepairLines,
+              );
+            })()
           : item,
       ),
     );

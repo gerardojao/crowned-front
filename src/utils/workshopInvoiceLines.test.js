@@ -27,6 +27,24 @@ test("keeps original line net total when rounded unit net would inflate it", () 
   assert.equal(buildInvoicePayloadItems([line])[0].importe, 10.005);
 });
 
+test("keeps original line net total after repeated detailed normalization", () => {
+  const line = normalizeInvoiceLineForTotals(
+    {
+      descripcion: "Ajuste fino",
+      section: "Piezas",
+      cantidad: 10,
+      precioUnitario: 10.005,
+      descuentoPct: 0,
+    },
+    21,
+    true,
+  );
+  const normalizedAgain = normalizeInvoiceLineForTotals(line, 21, true);
+
+  assert.equal(getInvoiceLineTotal(normalizedAgain), 100.05);
+  assert.equal(buildInvoicePayloadItems([normalizedAgain])[0].importe, 10.005);
+});
+
 test("quantity 1 keeps current line behavior", () => {
   const line = normalizeInvoiceLineForTotals(
     {

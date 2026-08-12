@@ -36,17 +36,22 @@ export function getInvoiceLineQuantity(item) {
 }
 
 export function getInvoiceLineTotal(item) {
-  const storedTotal =
+  const storedTotal = getStoredInvoiceLineTotal(item);
+  const numericStoredTotal = Number(storedTotal);
+  if (Number.isFinite(numericStoredTotal)) return round2(numericStoredTotal);
+
+  return round2(Number(item?.cantidad || 0) * Number(item?.importe || 0));
+}
+
+function getStoredInvoiceLineTotal(item) {
+  return (
     item?.lineTotal ??
     item?.LineTotal ??
     item?.totalLinea ??
     item?.TotalLinea ??
     item?.netTotal ??
-    item?.NetTotal;
-  const numericStoredTotal = Number(storedTotal);
-  if (Number.isFinite(numericStoredTotal)) return round2(numericStoredTotal);
-
-  return round2(Number(item?.cantidad || 0) * Number(item?.importe || 0));
+    item?.NetTotal
+  );
 }
 
 export function normalizeInvoiceLineForTotals(
@@ -74,7 +79,10 @@ export function normalizeInvoiceLineForTotals(
     100,
     Math.max(0, Number(item?.descuentoPct ?? item?.DescuentoPct ?? 0)),
   );
-  const lineTotal = round2(quantity * price * (1 - discount / 100));
+  const storedLineTotal = Number(getStoredInvoiceLineTotal(item));
+  const lineTotal = Number.isFinite(storedLineTotal)
+    ? round2(storedLineTotal)
+    : round2(quantity * price * (1 - discount / 100));
   const unitNet = quantity > 0 ? round2(lineTotal / quantity) : 0;
   const kind = section === "Piezas" ? "repuesto" : "labor";
 
