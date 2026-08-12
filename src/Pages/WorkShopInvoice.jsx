@@ -21,6 +21,16 @@ import {
   localDateInputValue,
 } from "../utils/date";
 import { buildInvoicePaymentContract } from "../utils/invoicePayment";
+import {
+  buildInvoicePayloadItems,
+  getInvoiceLineQuantity,
+  getInvoiceLineSection,
+  getInvoiceLineTotal,
+  getInvoiceSubtotal,
+  normalizeInvoiceLineForTotals,
+  parseOrderItems,
+  round2,
+} from "../utils/workshopInvoiceLines";
 
 const EMPTY_ITEM = {
   codigo: "",
@@ -71,9 +81,6 @@ const eur = new Intl.NumberFormat("es-ES", {
   style: "currency",
   currency: "EUR",
 });
-
-const round2 = (value) =>
-  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
 const PAYMENT_METHODS = [
   { key: "efectivo", label: "Efectivo" },
@@ -419,15 +426,23 @@ export default function WorkshopInvoice() {
     }
   };
 
-  const baseAntesOtros = useMemo(() => {
-    return round2(
-      items.reduce(
-        (sum, item) =>
-          sum + Number(item.cantidad || 0) * Number(item.importe || 0),
-        0,
+  const useDetailedRepairLines = Boolean(taller.enableDetailedRepairInvoiceLines);
+
+  const invoiceItems = useMemo(
+    () =>
+      items.map((item) =>
+        normalizeInvoiceLineForTotals(
+          item,
+          invoice.ivaPct,
+          useDetailedRepairLines,
+        ),
       ),
-    );
-  }, [items]);
+    [items, invoice.ivaPct, useDetailedRepairLines],
+  );
+
+  const baseAntesOtros = useMemo(() => {
+    return getInvoiceSubtotal(invoiceItems);
+  }, [invoiceItems]);
 
   const otros = useMemo(() => {
     return round2(Number(invoice.otros || 0));
@@ -460,8 +475,6 @@ export default function WorkshopInvoice() {
   const companyPayable = useMemo(() => {
     return round2(Math.max(0, totalFinal - franchiseAmount));
   }, [totalFinal, franchiseAmount]);
-  const useDetailedRepairLines = Boolean(taller.enableDetailedRepairInvoiceLines);
-
   const selectedPaymentMethods = useMemo(
     () =>
       PAYMENT_METHODS.map((method) => {
@@ -769,18 +782,11 @@ export default function WorkshopInvoice() {
   };
 
 const saveIssuedInvoice = async () => {
-  const billableItems = items
-    .map((item) =>
-      normalizeInvoiceLineForTotals(
-        item,
-        invoice.ivaPct,
-        useDetailedRepairLines,
-      ),
-    )
+  const billableItems = invoiceItems
     .filter(
       (item) =>
         String(item.descripcion || item.codigo || "").trim() &&
-        round2(Number(item.cantidad || 0) * Number(item.importe || 0)) > 0,
+        getInvoiceLineTotal(item) > 0,
     );
 
   if (billableItems.length === 0) {
@@ -814,7 +820,7 @@ const saveIssuedInvoice = async () => {
     fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
     bankAccountId,
     pagos,
-    items: billableItems,
+    items: buildInvoicePayloadItems(billableItems),
   };
 
   return await api.post("/FacturaEmitida/emitir", payload);
@@ -1475,7 +1481,7 @@ const printInvoice = async () => {
         </div>
 
         <div className="space-y-3">
-          {items.map((item, index) => {
+          {invoiceItems.map((item, index) => {
             const lineTotal = getInvoiceLineTotal(item);
             const qtyLabel = item.section === "Piezas" ? "Cantidad" : "Tiempo";
 
@@ -1621,7 +1627,7 @@ const printInvoice = async () => {
             bankAccountName: selectedBank?.nombre ?? selectedBank?.Nombre ?? "",
             bankAccountIban: selectedBank?.iban ?? selectedBank?.Iban ?? taller.iban
           }}
-          items={items}
+          items={invoiceItems}
           totals={{
             subtotal,
             iva,
@@ -1751,7 +1757,7 @@ const printInvoice = async () => {
             </thead>
 
             <tbody>
-              {items.map((item, index) => (
+              {invoiceItems.map((item, index) => (
                 <tr key={index}>
                   <td className="border border-black px-2 py-2 text-center">
                     {item.cantidad}
@@ -1763,9 +1769,7 @@ const printInvoice = async () => {
                     {formatMoney(Number(item.importe || 0))}
                   </td>
                   <td className="border border-black px-2 py-2 text-right">
-                    {formatMoney(
-                      Number(item.cantidad || 0) * Number(item.importe || 0),
-                    )}
+                    {formatMoney(getInvoiceLineTotal(item))}
                   </td>
                 </tr>
               ))}
@@ -1894,116 +1898,6 @@ function formatCustomerAddress(invoice) {
   ]
     .filter(Boolean)
     .join(", ");
-}
-
-function getInvoiceLineSection(item) {
-  const raw = String(item.section ?? item.Section ?? item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? "")
-    .trim()
-    .toLowerCase();
-  if (raw.includes("pintura")) return "Pintura";
-  if (
-    raw.includes("pieza") ||
-    raw.includes("recambio") ||
-    raw.includes("repuesto") ||
-    raw.includes("material")
-  )
-    return "Piezas";
-  return "ManoObra";
-}
-
-function getInvoiceLineQuantity(item) {
-  const section = getInvoiceLineSection(item);
-  const value =
-    section === "Piezas"
-      ? item.cantidad ?? item.Cantidad
-      : item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad;
-  const number = Number(value || 0);
-  return number > 0 ? number : 1;
-}
-
-function getInvoiceLineTotal(item) {
-  return round2(Number(item.cantidad || 0) * Number(item.importe || 0));
-}
-
-function normalizeInvoiceLineForTotals(item, invoiceIvaPct = 21, detailed = false) {
-  if (!detailed) return item;
-
-  const section = getInvoiceLineSection(item);
-  const quantity = getInvoiceLineQuantity({ ...item, section });
-  const price = Number(
-    item.precioUnitario ?? item.PrecioUnitario ?? item.importe ?? item.Importe ?? 0,
-  );
-  const discount = Math.min(100, Math.max(0, Number(item.descuentoPct ?? item.DescuentoPct ?? 0)));
-  const netTotal = round2(quantity * price * (1 - discount / 100));
-  const unitNet = quantity > 0 ? round2(netTotal / quantity) : 0;
-  const kind = section === "Piezas" ? "repuesto" : "labor";
-
-  return {
-    ...item,
-    codigo: item.codigo ?? item.Codigo ?? "",
-    section,
-    cantidad: quantity,
-    tiempo: section === "Piezas" ? item.tiempo ?? item.Tiempo ?? "" : quantity,
-    precioUnitario: round2(price),
-    descuentoPct: discount,
-    ivaPct: Number(item.ivaPct ?? item.IvaPct ?? invoiceIvaPct ?? 21),
-    importe: unitNet,
-    kind,
-  };
-}
-
-function parseOrderItems(itemsJson) {
-  if (!itemsJson) return [];
-
-  try {
-    const parsed = JSON.parse(itemsJson);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .map((item) => ({
-        codigo: item.codigo ?? item.Codigo ?? "",
-        section: getInvoiceLineSection(item),
-        descripcion: item.descripcion || item.Descripcion || "",
-        cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
-        tiempo: item.tiempo ?? item.Tiempo ?? item.cantidad ?? item.Cantidad ?? 1,
-        precioUnitario: Number(
-          item.precioUnitario ??
-            item.PrecioUnitario ??
-            item.precio ??
-            item.Precio ??
-            item.importe ??
-            item.Importe ??
-            0,
-        ),
-        descuentoPct: Number(item.descuentoPct ?? item.DescuentoPct ?? 0),
-        ivaPct: Number(item.ivaPct ?? item.IvaPct ?? 21),
-        importe: Number(
-          item.importe ??
-            item.Importe ??
-            item.precioUnitario ??
-            item.PrecioUnitario ??
-            0,
-        ),
-        kind: item.kind ?? item.Kind ?? item.tipo ?? item.Tipo ?? null,
-        repuestoStockId:
-          item.repuestoStockId ??
-          item.RepuestoStockId ??
-          item.idRepuesto ??
-          item.IdRepuesto ??
-          null,
-        idProveedor: item.idProveedor ?? item.IdProveedor ?? null,
-        nombreProveedor: item.nombreProveedor ?? item.NombreProveedor ?? null,
-        precioCompra: item.precioCompra ?? item.PrecioCompra ?? null,
-      }))
-      .filter(
-        (item) =>
-          item.descripcion.trim() &&
-          item.cantidad > 0 &&
-          item.importe >= 0,
-      );
-  } catch {
-    return [];
-  }
 }
 
 function formatDate(value) {

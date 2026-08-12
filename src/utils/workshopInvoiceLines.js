@@ -1,0 +1,184 @@
+export const round2 = (value) =>
+  Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+
+export function getInvoiceLineSection(item) {
+  const raw = String(
+    item?.section ??
+      item?.Section ??
+      item?.kind ??
+      item?.Kind ??
+      item?.tipo ??
+      item?.Tipo ??
+      "",
+  )
+    .trim()
+    .toLowerCase();
+  if (raw.includes("pintura")) return "Pintura";
+  if (
+    raw.includes("pieza") ||
+    raw.includes("recambio") ||
+    raw.includes("repuesto") ||
+    raw.includes("material")
+  ) {
+    return "Piezas";
+  }
+  return "ManoObra";
+}
+
+export function getInvoiceLineQuantity(item) {
+  const section = getInvoiceLineSection(item);
+  const value =
+    section === "Piezas"
+      ? item?.cantidad ?? item?.Cantidad
+      : item?.tiempo ?? item?.Tiempo ?? item?.cantidad ?? item?.Cantidad;
+  const number = Number(value || 0);
+  return number > 0 ? number : 1;
+}
+
+export function getInvoiceLineTotal(item) {
+  const storedTotal =
+    item?.lineTotal ??
+    item?.LineTotal ??
+    item?.totalLinea ??
+    item?.TotalLinea ??
+    item?.netTotal ??
+    item?.NetTotal;
+  const numericStoredTotal = Number(storedTotal);
+  if (Number.isFinite(numericStoredTotal)) return round2(numericStoredTotal);
+
+  return round2(Number(item?.cantidad || 0) * Number(item?.importe || 0));
+}
+
+export function normalizeInvoiceLineForTotals(
+  item,
+  invoiceIvaPct = 21,
+  detailed = false,
+) {
+  if (!detailed) {
+    return {
+      ...item,
+      lineTotal: getInvoiceLineTotal(item),
+    };
+  }
+
+  const section = getInvoiceLineSection(item);
+  const quantity = getInvoiceLineQuantity({ ...item, section });
+  const price = Number(
+    item?.precioUnitario ??
+      item?.PrecioUnitario ??
+      item?.importe ??
+      item?.Importe ??
+      0,
+  );
+  const discount = Math.min(
+    100,
+    Math.max(0, Number(item?.descuentoPct ?? item?.DescuentoPct ?? 0)),
+  );
+  const lineTotal = round2(quantity * price * (1 - discount / 100));
+  const unitNet = quantity > 0 ? round2(lineTotal / quantity) : 0;
+  const kind = section === "Piezas" ? "repuesto" : "labor";
+
+  return {
+    ...item,
+    codigo: item?.codigo ?? item?.Codigo ?? "",
+    section,
+    cantidad: quantity,
+    tiempo: section === "Piezas" ? item?.tiempo ?? item?.Tiempo ?? "" : quantity,
+    precioUnitario: round2(price),
+    descuentoPct: discount,
+    ivaPct: Number(item?.ivaPct ?? item?.IvaPct ?? invoiceIvaPct ?? 21),
+    importe: unitNet,
+    lineTotal,
+    kind,
+  };
+}
+
+export function parseOrderItems(itemsJson) {
+  if (!itemsJson) return [];
+
+  try {
+    const parsed = JSON.parse(itemsJson);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .map((item) =>
+        normalizeInvoiceLineForTotals(
+          {
+            codigo: item?.codigo ?? item?.Codigo ?? "",
+            section: getInvoiceLineSection(item),
+            descripcion: item?.descripcion || item?.Descripcion || "",
+            cantidad: Number(item?.cantidad ?? item?.Cantidad ?? 1),
+            tiempo:
+              item?.tiempo ??
+              item?.Tiempo ??
+              item?.cantidad ??
+              item?.Cantidad ??
+              1,
+            precioUnitario: Number(
+              item?.precioUnitario ??
+                item?.PrecioUnitario ??
+                item?.precio ??
+                item?.Precio ??
+                item?.importe ??
+                item?.Importe ??
+                0,
+            ),
+            descuentoPct: Number(item?.descuentoPct ?? item?.DescuentoPct ?? 0),
+            ivaPct: Number(item?.ivaPct ?? item?.IvaPct ?? 21),
+            importe: Number(
+              item?.importe ??
+                item?.Importe ??
+                item?.precioUnitario ??
+                item?.PrecioUnitario ??
+                0,
+            ),
+            lineTotal:
+              item?.lineTotal ??
+              item?.LineTotal ??
+              item?.totalLinea ??
+              item?.TotalLinea ??
+              item?.netTotal ??
+              item?.NetTotal,
+            kind: item?.kind ?? item?.Kind ?? item?.tipo ?? item?.Tipo ?? null,
+            repuestoStockId:
+              item?.repuestoStockId ??
+              item?.RepuestoStockId ??
+              item?.idRepuesto ??
+              item?.IdRepuesto ??
+              null,
+            idProveedor: item?.idProveedor ?? item?.IdProveedor ?? null,
+            nombreProveedor: item?.nombreProveedor ?? item?.NombreProveedor ?? null,
+            precioCompra: item?.precioCompra ?? item?.PrecioCompra ?? null,
+          },
+          Number(item?.ivaPct ?? item?.IvaPct ?? 21),
+          true,
+        ),
+      )
+      .filter(
+        (item) =>
+          item.descripcion.trim() &&
+          item.cantidad > 0 &&
+          getInvoiceLineTotal(item) >= 0,
+      );
+  } catch {
+    return [];
+  }
+}
+
+export function getInvoiceSubtotal(items) {
+  return round2(
+    items.reduce((sum, item) => sum + getInvoiceLineTotal(item), 0),
+  );
+}
+
+export function buildInvoicePayloadItems(items) {
+  return items.map((item) => {
+    const quantity = Number(item.cantidad || 0);
+    const lineTotal = getInvoiceLineTotal(item);
+
+    return {
+      ...item,
+      importe: quantity > 0 ? Number((lineTotal / quantity).toFixed(6)) : 0,
+    };
+  });
+}

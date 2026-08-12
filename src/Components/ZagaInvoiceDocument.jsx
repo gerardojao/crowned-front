@@ -346,7 +346,7 @@ function LineItems({ items, ivaPct, invoiceType, operationType }) {
             );
             const discount = Number(item.descuentoPct ?? item.DescuentoPct ?? 0);
             const lineIva = Number(item.ivaPct ?? item.IvaPct ?? ivaPct);
-            const amount = quantity * price * (1 - Math.min(100, Math.max(0, discount)) / 100);
+            const amount = getLineTotal(item);
             return (
               <div
                 key={`${group.title}-${index}`}
@@ -457,6 +457,16 @@ function getLineQuantity(item) {
 }
 
 function getLineTotal(item) {
+  const storedTotal =
+    item.lineTotal ??
+    item.LineTotal ??
+    item.totalLinea ??
+    item.TotalLinea ??
+    item.netTotal ??
+    item.NetTotal;
+  const numericStoredTotal = Number(storedTotal);
+  if (Number.isFinite(numericStoredTotal)) return numericStoredTotal;
+
   const quantity = getLineQuantity(item);
   const price = Number(
     item.precioUnitario ??
