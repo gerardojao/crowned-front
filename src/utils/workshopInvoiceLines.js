@@ -180,13 +180,48 @@ export function getInvoiceSubtotal(items) {
 }
 
 export function buildInvoicePayloadItems(items) {
-  return items.map((item) => {
+  return items.flatMap((item) => {
     const quantity = Number(item.cantidad || 0);
     const lineTotal = getInvoiceLineTotal(item);
+    const normalizedUnit = quantity > 0 ? round2(lineTotal / quantity) : 0;
 
-    return {
+    if (
+      quantity > 1 &&
+      Number.isInteger(quantity) &&
+      round2(quantity * normalizedUnit) !== lineTotal
+    ) {
+      return splitLineForBackendTwoDecimalUnit(item, quantity, lineTotal);
+    }
+
+    return [{
       ...item,
-      importe: quantity > 0 ? Number((lineTotal / quantity).toFixed(6)) : 0,
-    };
+      importe: normalizedUnit,
+    }];
   });
+}
+
+function splitLineForBackendTwoDecimalUnit(item, quantity, lineTotal) {
+  const totalCents = Math.round(lineTotal * 100);
+  const baseUnitCents = Math.floor(totalCents / quantity);
+  const higherUnitCount = totalCents - baseUnitCents * quantity;
+  const lowerUnitCount = quantity - higherUnitCount;
+  const rows = [];
+
+  if (higherUnitCount > 0) {
+    rows.push({
+      ...item,
+      cantidad: higherUnitCount,
+      importe: round2((baseUnitCents + 1) / 100),
+    });
+  }
+
+  if (lowerUnitCount > 0) {
+    rows.push({
+      ...item,
+      cantidad: lowerUnitCount,
+      importe: round2(baseUnitCents / 100),
+    });
+  }
+
+  return rows;
 }

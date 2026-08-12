@@ -24,7 +24,7 @@ test("keeps original line net total when rounded unit net would inflate it", () 
 
   assert.equal(getInvoiceLineTotal(line), 100.05);
   assert.notEqual(round2(line.cantidad * line.importe), 100.05);
-  assert.equal(buildInvoicePayloadItems([line])[0].importe, 10.005);
+  assert.equal(backendSubtotal(buildInvoicePayloadItems([line])), 100.05);
 });
 
 test("keeps original line net total after repeated detailed normalization", () => {
@@ -42,7 +42,7 @@ test("keeps original line net total after repeated detailed normalization", () =
   const normalizedAgain = normalizeInvoiceLineForTotals(line, 21, true);
 
   assert.equal(getInvoiceLineTotal(normalizedAgain), 100.05);
-  assert.equal(buildInvoicePayloadItems([normalizedAgain])[0].importe, 10.005);
+  assert.equal(backendSubtotal(buildInvoicePayloadItems([normalizedAgain])), 100.05);
 });
 
 test("quantity 1 keeps current line behavior", () => {
@@ -173,3 +173,67 @@ test("credit, split payments and franchise calculations keep existing contracts"
   ]);
   assert.equal(round2(companyPayable - paymentTotal) >= 0, true);
 });
+
+test("payload matches backend two-decimal unit normalization for real invoice lines", () => {
+  const lines = [
+    normalizeInvoiceLineForTotals(
+      {
+        descripcion: "Servicio reparacion mayor",
+        section: "ManoObra",
+        tiempo: 1,
+        precioUnitario: 46,
+        descuentoPct: 10,
+      },
+      21,
+      true,
+    ),
+    normalizeInvoiceLineForTotals(
+      {
+        descripcion: "Diagnosis",
+        section: "ManoObra",
+        tiempo: 1,
+        precioUnitario: 40,
+      },
+      21,
+      true,
+    ),
+    normalizeInvoiceLineForTotals(
+      {
+        descripcion: "NGK91039 - BUJIA - 9063KSK",
+        section: "Piezas",
+        cantidad: 4,
+        precioUnitario: 40.56,
+        descuentoPct: 10,
+      },
+      21,
+      true,
+    ),
+    normalizeInvoiceLineForTotals(
+      {
+        descripcion: "NGK48404 - BOBINA DE ENCENDIDO - 9063KSK",
+        section: "Piezas",
+        cantidad: 1,
+        precioUnitario: 257.77,
+        descuentoPct: 10,
+      },
+      21,
+      true,
+    ),
+  ];
+  const subtotal = getInvoiceSubtotal(lines);
+  const total = round2(subtotal * 1.21);
+  const payloadItems = buildInvoicePayloadItems(lines);
+
+  assert.equal(subtotal, 459.41);
+  assert.equal(total, 555.89);
+  assert.equal(backendSubtotal(payloadItems), subtotal);
+});
+
+function backendSubtotal(items) {
+  return round2(
+    items.reduce(
+      (sum, item) => sum + round2(Number(item.cantidad || 0) * round2(item.importe)),
+      0,
+    ),
+  );
+}
