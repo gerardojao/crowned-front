@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, HandCoins, RefreshCw } from "lucide-react";
+import { ArrowLeft, Download, HandCoins, RefreshCw } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../Components/api";
 import { currency, amountInput } from "../utils/currency";
 import { soloFecha } from "../utils/date";
@@ -173,6 +175,147 @@ export default function AccountsReceivable() {
     );
   }, [filteredItems]);
 
+  const exportExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Facturas por cobrar", {
+      pageSetup: {
+        paperSize: 9,
+        orientation: "landscape",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+      },
+    });
+
+    worksheet.mergeCells("A1:J1");
+    worksheet.getCell("A1").value = "FACTURAS POR COBRAR";
+    worksheet.getCell("A1").font = { bold: true, size: 16 };
+    worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+    worksheet.mergeCells("A2:J2");
+    worksheet.getCell("A2").value = `Estado: ${estado}`;
+    worksheet.getCell("A2").alignment = { horizontal: "center" };
+
+    worksheet.mergeCells("A3:J3");
+    worksheet.getCell("A3").value = `Fecha de exportacion: ${dateOnly(new Date())}`;
+    worksheet.getCell("A3").alignment = { horizontal: "center" };
+
+    worksheet.addRow([]);
+
+    const headerRow = worksheet.addRow([
+      "Factura",
+      "Cliente",
+      "Matricula",
+      "Fecha",
+      "Vencimiento",
+      "Dias atraso",
+      "Total",
+      "Abonado",
+      "Saldo",
+      "Estado",
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF334155" },
+      };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    filteredItems.forEach((factura) => {
+      const estadoCxC = factura.estadoCxC ?? factura.EstadoCxC;
+      worksheet.addRow([
+        factura.numeroFactura ?? factura.NumeroFactura ?? "",
+        factura.cliente ?? factura.Cliente ?? "",
+        factura.matricula ?? factura.Matricula ?? "",
+        soloFecha(factura.fecha ?? factura.Fecha) || "",
+        soloFecha(factura.fechaVencimiento ?? factura.FechaVencimiento) || "",
+        daysOverdue(factura.fechaVencimiento ?? factura.FechaVencimiento, estadoCxC),
+        Number(factura.totalFactura ?? factura.TotalFactura ?? 0),
+        Number(factura.totalAbonado ?? factura.TotalAbonado ?? 0),
+        Number(factura.saldoPendiente ?? factura.SaldoPendiente ?? 0),
+        estadoCxC ?? "",
+      ]);
+    });
+
+    worksheet.addRow([]);
+    const totalRow = worksheet.addRow([
+      "",
+      "",
+      "",
+      "",
+      "",
+      "TOTALES",
+      summary.total,
+      summary.abonado,
+      summary.saldo,
+      "",
+    ]);
+
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE2E8F0" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        bottom: { style: "double" },
+      };
+    });
+
+    worksheet.columns = [
+      { width: 18 },
+      { width: 30 },
+      { width: 14 },
+      { width: 12 },
+      { width: 14 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 18 },
+    ];
+
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell, colNumber) => {
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: colNumber >= 6 && colNumber <= 9 ? "right" : "left",
+        };
+        if (rowNumber > 5) {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+        }
+        if (colNumber >= 7 && colNumber <= 9 && typeof cell.value === "number") {
+          cell.numFmt = "#,##0.00";
+        }
+      });
+    });
+
+    worksheet.views = [{ state: "frozen", ySplit: 5 }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(blob, `facturas-por-cobrar-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const clearDateFilter = () => {
     setFrom("");
     setTo("");
@@ -254,6 +397,15 @@ export default function AccountsReceivable() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={exportExcel}
+              disabled={loading || filteredItems.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Download size={17} />
+              Exportar Excel
+            </button>
             <Link
               to="/"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"

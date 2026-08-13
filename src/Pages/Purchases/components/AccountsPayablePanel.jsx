@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { Download } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
 import {
@@ -224,15 +227,170 @@ export default function AccountsPayablePanel({
     { base: 0, iva: 0, total: 0, pagado: 0, saldo: 0, saldoAFavor: 0 },
   );
 
+  const exportExcel = async () => {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Cuentas por pagar", {
+      pageSetup: {
+        paperSize: 9,
+        orientation: "landscape",
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 0,
+      },
+    });
+
+    worksheet.mergeCells("A1:J1");
+    worksheet.getCell("A1").value = "CUENTAS POR PAGAR";
+    worksheet.getCell("A1").font = { bold: true, size: 16 };
+    worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+    worksheet.mergeCells("A2:J2");
+    worksheet.getCell("A2").value = `Periodo: ${
+      appliedFilters.fechaInicio ? formatDate(appliedFilters.fechaInicio) : "Inicio"
+    } - ${appliedFilters.fechaFin ? formatDate(appliedFilters.fechaFin) : "Actualidad"}`;
+    worksheet.getCell("A2").alignment = { horizontal: "center" };
+
+    worksheet.mergeCells("A3:J3");
+    worksheet.getCell("A3").value = `Fecha de exportacion: ${formatDate(new Date())}`;
+    worksheet.getCell("A3").alignment = { horizontal: "center" };
+
+    worksheet.addRow([]);
+
+    const headerRow = worksheet.addRow([
+      "Fecha",
+      "Proveedor",
+      "Documento",
+      "Referencia",
+      "Base",
+      "IVA",
+      "Total",
+      "Pagado",
+      "Saldo",
+      "Estado",
+    ]);
+
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF334155" },
+      };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    pendingInvoices.forEach((item) => {
+      worksheet.addRow([
+        formatDate(item.fecha),
+        item.proveedor,
+        `${item.tipoDocumento || ""} ${item.numeroFactura || "-"}`,
+        item.referencia || "-",
+        Number(item.base) || 0,
+        Number(item.iva) || 0,
+        Number(item.total) || 0,
+        Number(item.importePagado) || 0,
+        Number(item.saldoVisual) || 0,
+        item.estadoVisual || item.estado || "",
+      ]);
+    });
+
+    worksheet.addRow([]);
+    const totalRow = worksheet.addRow([
+      "",
+      "",
+      "",
+      "TOTALES",
+      totals.base,
+      totals.iva,
+      totals.total,
+      totals.pagado,
+      totals.saldo,
+      "",
+    ]);
+
+    totalRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE2E8F0" },
+      };
+      cell.border = {
+        top: { style: "thin" },
+        bottom: { style: "double" },
+      };
+    });
+
+    worksheet.columns = [
+      { width: 12 },
+      { width: 30 },
+      { width: 24 },
+      { width: 18 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 12 },
+      { width: 18 },
+    ];
+
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell, colNumber) => {
+        cell.alignment = {
+          vertical: "middle",
+          horizontal: colNumber >= 5 && colNumber <= 9 ? "right" : "left",
+        };
+        if (rowNumber > 5) {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+        }
+        if (colNumber >= 5 && colNumber <= 9 && typeof cell.value === "number") {
+          cell.numFmt = "#,##0.00";
+        }
+      });
+    });
+
+    worksheet.views = [{ state: "frozen", ySplit: 5 }];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(blob, `cuentas-por-pagar-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <h3 className="text-base font-bold text-slate-900">
-          Cuentas por pagar
-        </h3>
-        <p className="text-sm text-slate-500">
-          Facturas recibidas pendientes de pago.
-        </p>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">
+              Cuentas por pagar
+            </h3>
+            <p className="text-sm text-slate-500">
+              Facturas recibidas pendientes de pago.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={loading || pendingInvoices.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50 md:w-auto"
+          >
+            <Download size={16} />
+            Exportar Excel
+          </button>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
