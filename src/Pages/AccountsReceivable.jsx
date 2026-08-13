@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Download, HandCoins, RefreshCw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download, HandCoins, RefreshCw } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import api from "../Components/api";
@@ -9,6 +10,8 @@ import { soloFecha } from "../utils/date";
 
 const ESTADOS = ["Todas", "Pendiente", "Parcial", "Rectificada", "Parcial rectificada", "Pagada"];
 const CASH_PAYMENT_VALUE = "cash";
+
+const todayInput = () => new Date().toISOString().slice(0, 10);
 
 const pickItems = (res) => {
   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? [];
@@ -68,9 +71,15 @@ export default function AccountsReceivable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [abonos, setAbonos] = useState({});
-  const [abonoBanks, setAbonoBanks] = useState({});
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [abonoModal, setAbonoModal] = useState({
+    open: false,
+    factura: null,
+    fecha: todayInput(),
+    importe: "",
+    bankAccountId: "",
+    loading: false,
+  });
   const [moduleEnabled, setModuleEnabled] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [from, setFrom] = useState("");
@@ -329,23 +338,52 @@ export default function AccountsReceivable() {
     setFacturaFilter("");
   };
 
-  const setAbono = (id, value) => {
-    setAbonos((prev) => ({ ...prev, [id]: value }));
+  const openAbonoModal = (factura, mode = "partial") => {
+    const mainBank =
+      bankAccounts.find((bank) => bank.esPrincipal ?? bank.EsPrincipal) ||
+      bankAccounts[0];
+    const defaultBankId = mainBank?.id ?? mainBank?.Id ?? CASH_PAYMENT_VALUE;
+    const saldo = Number(factura.saldoPendiente ?? factura.SaldoPendiente ?? 0);
+
+    setError("");
+    setAbonoModal({
+      open: true,
+      factura,
+      fecha: todayInput(),
+      importe: mode === "full" ? amountInput(String(saldo)) : "",
+      bankAccountId: String(defaultBankId || CASH_PAYMENT_VALUE),
+      loading: false,
+    });
   };
 
-  const setAbonoBank = (id, value) => {
-    setAbonoBanks((prev) => ({ ...prev, [id]: value }));
+  const closeAbonoModal = () => {
+    if (abonoModal.loading) return;
+    setAbonoModal({
+      open: false,
+      factura: null,
+      fecha: todayInput(),
+      importe: "",
+      bankAccountId: "",
+      loading: false,
+    });
   };
 
-  const registrarAbono = async (factura) => {
+  const setAbonoModalField = (name, value) => {
+    setAbonoModal((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const registrarAbono = async () => {
+    const factura = abonoModal.factura;
+    if (!factura) return;
+
     const id = factura.id ?? factura.Id;
-    const importe = Number(abonos[id] || 0);
+    const importe = Number(abonoModal.importe || 0);
     if (importe <= 0) {
       setError("Indica un abono mayor que 0.");
       return;
     }
 
-    const paymentMethod = abonoBanks[id];
+    const paymentMethod = abonoModal.bankAccountId;
     if (!paymentMethod) {
       setError("Selecciona el metodo de pago del abono.");
       return;
@@ -355,17 +393,25 @@ export default function AccountsReceivable() {
     try {
       setError("");
       setNotice("");
+      setAbonoModal((prev) => ({ ...prev, loading: true }));
       const res = await api.put(`/FacturaEmitida/${id}/abono`, {
         importe,
         metodoPago: isCash ? "Efectivo" : "Transferencia",
         bankAccountId: isCash ? null : Number(paymentMethod),
+        fecha: abonoModal.fecha || null,
       });
       if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
         throw new Error(res?.data?.message || res?.data?.Message);
       }
       setNotice("Abono registrado correctamente.");
-      setAbonos((prev) => ({ ...prev, [id]: "" }));
-      setAbonoBanks((prev) => ({ ...prev, [id]: "" }));
+      setAbonoModal({
+        open: false,
+        factura: null,
+        fecha: todayInput(),
+        importe: "",
+        bankAccountId: "",
+        loading: false,
+      });
       await load();
     } catch (err) {
       console.error(err);
@@ -375,6 +421,7 @@ export default function AccountsReceivable() {
           err?.message ||
           "No se pudo registrar el abono.",
       );
+      setAbonoModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -602,12 +649,7 @@ export default function AccountsReceivable() {
                 <FacturaRow
                   key={factura.id ?? factura.Id}
                   factura={factura}
-                  abonos={abonos}
-                  abonoBanks={abonoBanks}
-                  bankAccounts={bankAccounts}
-                  setAbono={setAbono}
-                  setAbonoBank={setAbonoBank}
-                  registrarAbono={registrarAbono}
+                  onOpenAbonoModal={openAbonoModal}
                 />
               ))}
             </tbody>
@@ -662,28 +704,20 @@ export default function AccountsReceivable() {
                   />
                 </div>
                 {!["Pagada", "Rectificada"].includes(estadoCxC) && (
-                  <div className="mt-3 grid gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={abonos[id] || ""}
-                      onChange={(e) => setAbono(id, e.target.value)}
-                      onBlur={(e) => setAbono(id, amountInput(e.target.value))}
-                      className="min-w-0 flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                      placeholder="Abono"
-                    />
-                    <BankSelect
-                      value={abonoBanks[id] || ""}
-                      bankAccounts={bankAccounts}
-                      onChange={(value) => setAbonoBank(id, value)}
-                    />
+                  <div className="mt-3 grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => registrarAbono(factura)}
-                      className="rounded-xl bg-sky-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                      onClick={() => openAbonoModal(factura, "partial")}
+                      className="rounded-xl bg-sky-50 px-3 py-2 text-sm font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
                     >
-                      Aplicar
+                      Abonar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openAbonoModal(factura, "full")}
+                      className="rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-700"
+                    >
+                      Liquidar
                     </button>
                   </div>
                 )}
@@ -692,6 +726,20 @@ export default function AccountsReceivable() {
           })}
         </div>
       </section>
+      <AccountsReceivablePaymentModal
+        open={abonoModal.open}
+        factura={abonoModal.factura}
+        fecha={abonoModal.fecha}
+        importe={abonoModal.importe}
+        bankAccountId={abonoModal.bankAccountId}
+        bankAccounts={bankAccounts}
+        loading={abonoModal.loading}
+        onChangeFecha={(value) => setAbonoModalField("fecha", value)}
+        onChangeImporte={(value) => setAbonoModalField("importe", value)}
+        onChangeBank={(value) => setAbonoModalField("bankAccountId", value)}
+        onCancel={closeAbonoModal}
+        onConfirm={registrarAbono}
+      />
       </>
       )}
     </section>
@@ -720,14 +768,8 @@ function SummaryCard({ label, value, detail = "", tone = "slate" }) {
 
 function FacturaRow({
   factura,
-  abonos,
-  abonoBanks,
-  bankAccounts,
-  setAbono,
-  setAbonoBank,
-  registrarAbono,
+  onOpenAbonoModal,
 }) {
-  const id = factura.id ?? factura.Id;
   const estado = factura.estadoCxC ?? factura.EstadoCxC;
   const atraso = daysOverdue(factura.fechaVencimiento ?? factura.FechaVencimiento, estado);
   return (
@@ -777,29 +819,19 @@ function FacturaRow({
     <span className="text-xs font-bold text-emerald-700">Completa</span>
   ) : (
     <div className="flex items-center justify-center gap-2">
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={abonos[id] || ""}
-        onChange={(e) => setAbono(id, e.target.value)}
-        onBlur={(e) => setAbono(id, amountInput(e.target.value))}
-        className="w-24 rounded-xl border border-slate-300 px-3 py-2 text-sm"
-        placeholder="0.00"
-      />
-
-      <BankSelect
-        value={abonoBanks[id] || ""}
-        bankAccounts={bankAccounts}
-        onChange={(value) => setAbonoBank(id, value)}
-      />
-
       <button
         type="button"
-        onClick={() => registrarAbono(factura)}
-        className="rounded-xl bg-sky-600 px-3 py-2 text-xs font-bold text-white hover:bg-sky-700 disabled:opacity-60"
+        onClick={() => onOpenAbonoModal(factura, "partial")}
+        className="rounded-xl bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700 ring-1 ring-sky-200 hover:bg-sky-100"
       >
-        Aplicar
+        Abonar
+      </button>
+      <button
+        type="button"
+        onClick={() => onOpenAbonoModal(factura, "full")}
+        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700"
+      >
+        Liquidar
       </button>
     </div>
   )}
@@ -808,12 +840,120 @@ function FacturaRow({
   );
 }
 
+function AccountsReceivablePaymentModal({
+  open,
+  factura,
+  fecha,
+  importe,
+  bankAccountId,
+  bankAccounts,
+  loading,
+  onChangeFecha,
+  onChangeImporte,
+  onChangeBank,
+  onCancel,
+  onConfirm,
+}) {
+  if (!open || !factura) return null;
+
+  const saldo = Number(factura.saldoPendiente ?? factura.SaldoPendiente ?? 0);
+  const modal = (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-6 md:py-12"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="absolute inset-0 bg-slate-900/45"
+        onClick={loading ? undefined : onCancel}
+      />
+
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-white p-5 shadow-xl ring-1 ring-slate-200">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-sky-50 p-2 text-sky-600">
+            <CheckCircle2 size={20} />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">
+              Registrar abono
+            </h3>
+            <p className="mt-1 text-sm text-slate-600">
+              {factura.cliente ?? factura.Cliente} · {factura.numeroFactura ?? factura.NumeroFactura}
+            </p>
+            <p className="mt-1 text-xs font-semibold text-rose-700">
+              Saldo pendiente: {currency(saldo)}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3">
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Importe abonado
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={saldo || undefined}
+              value={importe}
+              onChange={(event) => onChangeImporte(event.target.value)}
+              onBlur={(event) => onChangeImporte(amountInput(event.target.value))}
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Fecha del abono
+            <input
+              type="date"
+              value={fecha}
+              onChange={(event) => onChangeFecha(event.target.value)}
+              className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+            Metodo de pago *
+            <BankSelect
+              value={bankAccountId}
+              bankAccounts={bankAccounts}
+              onChange={onChangeBank}
+            />
+          </label>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onCancel}
+            className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            disabled={loading || !bankAccountId || !importe}
+            onClick={onConfirm}
+            className="rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-sky-700 disabled:opacity-60"
+          >
+            {loading ? "Registrando..." : "Registrar abono"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(modal, document.body);
+}
+
 function BankSelect({ value, bankAccounts, onChange }) {
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="w-44 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
     >
       <option value="">Metodo de pago</option>
       <option value={CASH_PAYMENT_VALUE}>Efectivo</option>

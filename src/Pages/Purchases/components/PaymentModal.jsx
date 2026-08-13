@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { CheckCircle2 } from "lucide-react";
 
 const CASH_PAYMENT_VALUE = "cash";
@@ -22,9 +23,9 @@ export default function PaymentModal({
 }) {
   if (!open) return null;
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-6 md:py-12"
       role="dialog"
       aria-modal="true"
     >
@@ -125,4 +126,6 @@ export default function PaymentModal({
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }
