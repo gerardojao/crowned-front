@@ -89,6 +89,9 @@ const PAYMENT_METHODS = [
   { key: "bizum", label: "Bizum" },
 ];
 
+const CREDIT_TERM_OPTIONS = [30, 60];
+const CUSTOM_CREDIT_TERM = "custom";
+
 const EMPTY_PAYMENT_METHODS = PAYMENT_METHODS.reduce(
   (acc, method) => ({
     ...acc,
@@ -158,6 +161,7 @@ export default function WorkshopInvoice() {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [selectedBankId, setSelectedBankId] = useState("");
   const [paymentMethods, setPaymentMethods] = useState(EMPTY_PAYMENT_METHODS);
+  const [creditTermMode, setCreditTermMode] = useState("30");
 
   const [items, setItems] = useState([
     { descripcion: "Repuestos", cantidad: 1, importe: 0 },
@@ -556,16 +560,17 @@ export default function WorkshopInvoice() {
   }, [selectedBank]);
 
   useEffect(() => {
-    if (!isCredit) return;
+    if (!isCredit || creditTermMode === CUSTOM_CREDIT_TERM) return;
 
     const baseDate = invoice.fecha || new Date().toISOString().slice(0, 10);
     const due = new Date(`${baseDate}T00:00:00`);
-    due.setDate(due.getDate() + Number(invoice.plazoCreditoDias || 30));
+    due.setDate(due.getDate() + Number(creditTermMode || 30));
     setInvoice((prev) => ({
       ...prev,
+      plazoCreditoDias: Number(creditTermMode || 30),
       fechaVencimiento: due.toISOString().slice(0, 10),
     }));
-  }, [isCredit, invoice.fecha, invoice.plazoCreditoDias]);
+  }, [isCredit, invoice.fecha, creditTermMode]);
 
   useEffect(() => {
     if (accountsReceivableEnabled || !isCredit) return;
@@ -663,6 +668,17 @@ export default function WorkshopInvoice() {
       return;
     }
 
+    if (tipoPago === "Credito") {
+      const creditDays = Number(invoice.plazoCreditoDias || 30);
+      setCreditTermMode(
+        CREDIT_TERM_OPTIONS.includes(creditDays)
+          ? String(creditDays)
+          : CUSTOM_CREDIT_TERM,
+      );
+    } else {
+      setCreditTermMode("30");
+    }
+
     setInvoice((prev) => ({
       ...prev,
       tipoPago,
@@ -673,6 +689,21 @@ export default function WorkshopInvoice() {
     if (tipoPago === "Credito") {
       setPaymentMethods(EMPTY_PAYMENT_METHODS);
     }
+  };
+
+  const setCreditTerm = (value) => {
+    setCreditTermMode(value);
+    if (value === CUSTOM_CREDIT_TERM) return;
+    setInvoiceField("plazoCreditoDias", Number(value || 30));
+  };
+
+  const setCreditDueDate = (value) => {
+    const creditDays = calculateCreditDays(invoice.fecha, value);
+    setInvoice((prev) => ({
+      ...prev,
+      fechaVencimiento: value,
+      plazoCreditoDias: creditDays === null ? prev.plazoCreditoDias : Math.max(0, creditDays),
+    }));
   };
 
   const setItemField = (index, name, value) => {
@@ -856,6 +887,10 @@ const printInvoice = async () => {
 
     if (isCredit && !accountsReceivableEnabled) {
       throw new Error("El módulo de cuentas por cobrar no está habilitado para este taller.");
+    }
+
+    if (isCredit && !isValidCreditDueDate(invoice.fecha, invoice.fechaVencimiento)) {
+      throw new Error("La fecha de vencimiento no puede ser anterior a la fecha de factura.");
     }
 
     if (!isCredit && !hasPaymentMethods) {
@@ -1271,14 +1306,27 @@ const printInvoice = async () => {
                   Plan de credito
                   <select
                     className={`mt-1 w-full ${inputCls}`}
-                    value={invoice.plazoCreditoDias}
-                    onChange={(e) =>
-                      setInvoiceField("plazoCreditoDias", Number(e.target.value))
-                    }
+                    value={creditTermMode}
+                    onChange={(e) => setCreditTerm(e.target.value)}
                   >
                     <option value={30}>30 días</option>
                     <option value={60}>60 días</option>
+                    <option value={CUSTOM_CREDIT_TERM}>Personalizado</option>
                   </select>
+                </label>
+
+                <label className="block text-sm font-semibold text-slate-700">
+                  Fecha de vencimiento
+                  <input
+                    type="date"
+                    className={`mt-1 w-full ${inputCls}`}
+                    value={invoice.fechaVencimiento}
+                    min={invoice.fecha || currentFiscalYearStart()}
+                    onChange={(e) => {
+                      setCreditTermMode(CUSTOM_CREDIT_TERM);
+                      setCreditDueDate(e.target.value);
+                    }}
+                  />
                 </label>
 
                 <label className="block text-sm font-semibold text-slate-700">
@@ -1302,17 +1350,6 @@ const printInvoice = async () => {
                   </select>
                 </label>
 
-                {/* <label className="block text-sm font-semibold text-slate-700">
-                  Fecha de vencimiento
-                  <input
-                    type="date"
-                    className={`mt-1 w-full ${inputCls}`}
-                    value={invoice.fechaVencimiento}
-                    onChange={(e) =>
-                      setInvoiceField("fechaVencimiento", e.target.value)
-                    }
-                  />
-                </label> */}
               </>
             )}
           </div>
@@ -1920,6 +1957,21 @@ function formatCustomerAddress(invoice) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function calculateCreditDays(invoiceDate, dueDate) {
+  if (!invoiceDate || !dueDate) return null;
+
+  const start = new Date(`${invoiceDate}T00:00:00`);
+  const end = new Date(`${dueDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+
+  return Math.round((end - start) / 86400000);
+}
+
+function isValidCreditDueDate(invoiceDate, dueDate) {
+  const creditDays = calculateCreditDays(invoiceDate, dueDate);
+  return creditDays !== null && creditDays >= 0;
 }
 
 function formatDate(value) {
