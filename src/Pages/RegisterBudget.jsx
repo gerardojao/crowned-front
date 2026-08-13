@@ -1434,38 +1434,6 @@ export default function RegisterBudget() {
               </div>
             )}
 
-            {showNewCustomer && (
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={createCustomerFromBudget}
-                  disabled={savingCustomer}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  <UserPlus size={17} />
-
-                  {savingCustomer
-                    ? "Guardando..."
-                    : budget.ClienteId
-                      ? "Guardar vehículo en cliente"
-                      : hasVehicleDataForQuickCreate({
-                            matricula: budget.Matricula,
-                            marca: budget.Marca,
-                            modelo: budget.Modelo,
-                            bastidor: budget.Bastidor,
-                          })
-                        ? "Guardar cliente con vehículo"
-                        : "Guardar solo cliente"}
-                </button>
-
-                {budget.ClienteId && (
-                  <p className="text-xs font-medium text-emerald-700">
-                    Se guardará como nuevo vehículo de {budget.Cliente}.
-                  </p>
-                )}
-              </div>
-            )}
-
             {quickCreateNotice && (
               <div className="mt-4 flex items-start justify-between gap-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-emerald-200">
                 <span>{quickCreateNotice}</span>
@@ -1674,6 +1642,38 @@ export default function RegisterBudget() {
                   ))}
                 </select>
               </div>
+
+              {showNewCustomer && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  {budget.ClienteId && (
+                    <p className="text-xs font-medium text-emerald-700">
+                      Se guardará como nuevo vehículo de {budget.Cliente}.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={createCustomerFromBudget}
+                    disabled={savingCustomer}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
+                  >
+                    <UserPlus size={17} />
+
+                    {savingCustomer
+                      ? "Guardando..."
+                      : budget.ClienteId
+                        ? "Guardar vehículo en cliente"
+                        : hasVehicleDataForQuickCreate({
+                              matricula: budget.Matricula,
+                              marca: budget.Marca,
+                              modelo: budget.Modelo,
+                              bastidor: budget.Bastidor,
+                            })
+                          ? "Guardar cliente con vehículo"
+                          : "Guardar solo cliente"}
+                  </button>
+                </div>
+              )}
 
                              <h3 className="text-lg font-semibold text-slate-800 mb-4">
             Trabajo y costes

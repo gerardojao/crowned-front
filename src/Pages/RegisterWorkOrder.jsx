@@ -41,7 +41,11 @@ import {
   requiresCompletionConfirmation,
   VISIBLE_WORK_ORDER_STATES,
 } from "../utils/workOrderWorkflow";
-import { parseOrderIdSearch } from "../utils/workOrderSearch";
+import {
+  includesWorkOrderSearchText,
+  matchesWorkOrderPlateSearch,
+  parseExplicitOrderIdSearch,
+} from "../utils/workOrderSearch";
 
 const EMPTY_ORDER = {
   ClienteId: "",
@@ -99,26 +103,8 @@ const DEFAULT_FREQUENT_SERVICES = [
 ];
 
 const SERVICE_PREFIX = "Servicio ";
-const normalizeOrderSearchText = (value) =>
-  String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-
-const compactOrderSearchText = (value) =>
-  normalizeOrderSearchText(value).replace(/[^a-z0-9]/g, "");
-
-const includesOrderSearchText = (value, term) => {
-  const cleanValue = normalizeOrderSearchText(value);
-  const cleanTerm = normalizeOrderSearchText(term);
-  if (!cleanTerm) return true;
-  if (cleanValue.includes(cleanTerm)) return true;
-  return compactOrderSearchText(value).includes(compactOrderSearchText(term));
-};
-
 const matchesWorkOrderOperationSearch = (order, term) =>
-  includesOrderSearchText(getWorkOrderOperationTypeLabel(order), term);
+  includesWorkOrderSearchText(getWorkOrderOperationTypeLabel(order), term);
 const normalizeFrequentServiceName = (value) => {
   const name = value.trim();
   if (!name) return "";
@@ -1164,15 +1150,21 @@ export default function RegisterWorkOrder() {
       setError("");
 
       const search = plateSearch.trim();
-      const orderIdSearch = parseOrderIdSearch(search);
+      const orderIdSearch = parseExplicitOrderIdSearch(search);
       const isOperationTypeSearch =
         !orderIdSearch &&
         search &&
         ["Mecanica", "Mecánica", "Chapa y pintura"].some((type) =>
-          includesOrderSearchText(type, search),
+          includesWorkOrderSearchText(type, search),
         );
+      const isPlateTextSearch = Boolean(
+        search && !orderIdSearch && !isOperationTypeSearch,
+      );
       const baseParams = {
-        matricula: orderIdSearch || isOperationTypeSearch ? null : search || null,
+        matricula:
+          orderIdSearch || isOperationTypeSearch || isPlateTextSearch
+            ? null
+            : search || null,
         estado: statusFilter || null,
         fechaDesde: dateFrom || null,
         fechaHasta: dateTo || null,
@@ -1197,7 +1189,7 @@ export default function RegisterWorkOrder() {
         return;
       }
 
-      if (billedFilter || isOperationTypeSearch) {
+      if (billedFilter || isOperationTypeSearch || isPlateTextSearch) {
         const pageSize = 100;
         let apiPage = 1;
         let apiTotal = 0;
@@ -1226,7 +1218,9 @@ export default function RegisterWorkOrder() {
             (billedFilter === "facturadas" ? isBilled : !isBilled);
           const matchesOperation =
             !isOperationTypeSearch || matchesWorkOrderOperationSearch(item, search);
-          return matchesBilled && matchesOperation;
+          const matchesPlate =
+            !isPlateTextSearch || matchesWorkOrderPlateSearch(item, search);
+          return matchesBilled && matchesOperation && matchesPlate;
         });
         const start = (page - 1) * orderPageSize;
         setOrders(filteredItems.slice(start, start + orderPageSize));
@@ -2029,29 +2023,6 @@ export default function RegisterWorkOrder() {
                     ? "Agregar otro vehículo"
                     : "Registrar nuevo"}
               </button>
-              {showNewCustomer && order.ClienteId && (
-                <p className="mt-2 text-xs font-medium text-emerald-700 ">
-                  Se guardará como nuevo vehículo de {order.Cliente}.
-                </p>
-              )}
-
-              {showNewCustomer && (
-                <button
-                  type="button"
-                  onClick={createCustomerFromOrder}
-                  disabled={savingCustomer}
-                  className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-                >
-                  <UserPlus size={17} />
-
-                  {savingCustomer
-                    ? "Guardando..."
-                    : order.ClienteId
-                      ? "Guardar vehículo en cliente"
-                      : "Guardar cliente nuevo"}
-                </button>
-              )}
-
               {quickCreateNotice && (
                 <div className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <div>
@@ -2241,6 +2212,31 @@ export default function RegisterWorkOrder() {
                   placeholder="KW"
                 />
               </FormSection>
+
+              {showNewCustomer && (
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+                  {order.ClienteId && (
+                    <p className="text-xs font-medium text-emerald-700">
+                      Se guardará como nuevo vehículo de {order.Cliente}.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={createCustomerFromOrder}
+                    disabled={savingCustomer}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60 sm:w-auto"
+                  >
+                    <UserPlus size={17} />
+
+                    {savingCustomer
+                      ? "Guardando..."
+                      : order.ClienteId
+                        ? "Guardar vehículo en cliente"
+                        : "Guardar cliente nuevo"}
+                  </button>
+                </div>
+              )}
 
               <FormSection title="Recepción">
                 <Field label="Fecha recepción">
