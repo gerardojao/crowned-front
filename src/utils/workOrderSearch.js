@@ -21,6 +21,14 @@ export const includesWorkOrderSearchText = (value, term) => {
 export const matchesWorkOrderPlateSearch = (order, term) =>
   includesWorkOrderSearchText(order?.Matricula ?? order?.matricula ?? "", term);
 
+export const matchesWorkOrderTextSearch = (order, term) =>
+  [
+    order?.Matricula ?? order?.matricula,
+    order?.Cliente ?? order?.cliente,
+    order?.Dni ?? order?.dni,
+    order?.Telefono ?? order?.telefono,
+  ].some((value) => includesWorkOrderSearchText(value ?? "", term));
+
 export const parseExplicitOrderIdSearch = (value) => {
   const clean = String(value || "").trim();
   return clean.startsWith("#") ? parseOrderIdSearch(clean) : null;

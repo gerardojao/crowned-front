@@ -43,7 +43,7 @@ import {
 } from "../utils/workOrderWorkflow";
 import {
   includesWorkOrderSearchText,
-  matchesWorkOrderPlateSearch,
+  matchesWorkOrderTextSearch,
   parseExplicitOrderIdSearch,
 } from "../utils/workOrderSearch";
 
@@ -1219,7 +1219,7 @@ export default function RegisterWorkOrder() {
           const matchesOperation =
             !isOperationTypeSearch || matchesWorkOrderOperationSearch(item, search);
           const matchesPlate =
-            !isPlateTextSearch || matchesWorkOrderPlateSearch(item, search);
+            !isPlateTextSearch || matchesWorkOrderTextSearch(item, search);
           return matchesBilled && matchesOperation && matchesPlate;
         });
         const start = (page - 1) * orderPageSize;
@@ -2702,7 +2702,7 @@ export default function RegisterWorkOrder() {
               </h3>
 
               <p className="text-sm text-slate-500 mt-1">
-                Busca rápidamente una orden por matrícula.
+                Busca rápidamente una orden por matrícula, cliente o empresa.
               </p>
             </div>
 
@@ -2710,7 +2710,7 @@ export default function RegisterWorkOrder() {
               type="text"
               value={plateSearch}
               onChange={(e) => setPlateSearch(e.target.value)}
-              placeholder={`${labels.referenceSearchPlaceholder} u orden #`}
+              placeholder={`${labels.referenceSearchPlaceholder}, cliente/empresa u orden #`}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
             <select
@@ -2966,7 +2966,7 @@ export default function RegisterWorkOrder() {
 
                 <p className="mt-2 text-sm text-slate-500">
                   {plateSearch || statusFilter || billedFilter || dateFrom || dateTo
-                    ? "Prueba buscando otra matrícula."
+                    ? "Prueba buscando otra matrícula, cliente o empresa."
                     : "Las nuevas órdenes aparecerán aquí automáticamente."}
                 </p>
               </div>

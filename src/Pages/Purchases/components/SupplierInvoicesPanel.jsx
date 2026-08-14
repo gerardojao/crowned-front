@@ -25,6 +25,7 @@ const createEmptyLine = () => ({
 
 const initialForm = {
   fecha: "",
+  fechaVencimiento: "",
   proveedor: "",
   proveedorId: "",
   numeroFactura: "",
@@ -230,6 +231,9 @@ export default function SupplierInvoicesPanel({
     try {
       const payload = {
         fecha: form.fecha,
+        fechaVencimiento: estadoFactura.includes("pagad")
+          ? null
+          : form.fechaVencimiento || null,
         proveedorId: form.proveedorId ? Number(form.proveedorId) : null,
         proveedorNombre,
         numeroFactura: numeroFactura || null,
@@ -328,7 +332,7 @@ export default function SupplierInvoicesPanel({
               />
             </div>
 
-            <div className="relative md:col-span-2">
+            <div className="relative md:col-span-3">
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Proveedor
               </label>
@@ -646,6 +650,21 @@ export default function SupplierInvoicesPanel({
               </select>
             </div>
 
+            {form.estado !== "Pagada" && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Vencimiento
+                </label>
+                <input
+                  type="date"
+                  name="fechaVencimiento"
+                  value={form.fechaVencimiento}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                />
+              </div>
+            )}
+
             {form.estado === "Pagada" && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -882,6 +901,11 @@ export default function SupplierInvoicesPanel({
                       >
                         {item.estado}
                       </span>
+                      {item.estado !== "Pagada" && item.fechaVencimiento ? (
+                        <div className="mt-1 text-xs font-semibold text-slate-500">
+                          Vence {formatDate(item.fechaVencimiento)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {item.estado === "Pagada" ? (
@@ -902,7 +926,7 @@ export default function SupplierInvoicesPanel({
             <tfoot className="bg-slate-50">
               <tr>
                 <th
-                  colSpan={4}
+                  colSpan={3}
                   className="px-4 py-3 text-right font-bold text-slate-700"
                 >
                   Totales
@@ -926,3 +950,4 @@ export default function SupplierInvoicesPanel({
     </div>
   );
 }
+

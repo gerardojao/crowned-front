@@ -412,6 +412,7 @@ export default function SupplierDeliveryNotesPanel({
     open: false,
     numeroFactura: "",
     fecha: new Date().toISOString().slice(0, 10),
+    fechaVencimiento: "",
     referencia: "",
     descripcion: "",
     estado: "Pendiente de pago",
@@ -513,6 +514,7 @@ export default function SupplierDeliveryNotesPanel({
       ...prev,
       open: true,
       fecha: new Date().toISOString().slice(0, 10),
+      fechaVencimiento: "",
       ivaBreakdown: {
         ...createEmptyInvoiceVatBreakdown(),
         base21: selectedTotals.base ? selectedTotals.base.toFixed(2) : "",
@@ -669,6 +671,8 @@ export default function SupplierDeliveryNotesPanel({
     const payload = {
       albaranIds: selectedNoteIds,
       fecha: invoiceForm.fecha,
+      fechaVencimiento:
+        invoiceForm.estado === "Pagada" ? null : invoiceForm.fechaVencimiento || null,
       numeroFactura: invoiceForm.numeroFactura.trim(),
       referencia: invoiceForm.referencia.trim() || null,
       descripcion: invoiceForm.descripcion.trim() || null,
@@ -709,6 +713,7 @@ export default function SupplierDeliveryNotesPanel({
         ...prev,
         open: false,
         numeroFactura: "",
+        fechaVencimiento: "",
         referencia: "",
         descripcion: "",
         ajusteDescripcion: "",
@@ -1320,6 +1325,20 @@ export default function SupplierDeliveryNotesPanel({
                   className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
                 />
               </label>
+
+              {invoiceForm.estado !== "Pagada" && (
+                <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
+                  Vencimiento
+                  <input
+                    type="date"
+                    value={invoiceForm.fechaVencimiento}
+                    onChange={(e) =>
+                      setInvoiceField("fechaVencimiento", e.target.value)
+                    }
+                    className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+              )}
 
               <label className="flex flex-col gap-1 text-sm font-medium text-slate-700">
                 Estado *

@@ -2,6 +2,8 @@ export const emptyAccountsPayableFilters = {
   search: "",
   fechaInicio: "",
   fechaFin: "",
+  fechaVencimientoInicio: "",
+  fechaVencimientoFin: "",
 };
 
 export function buildAccountsPayableQueryParams(filters = {}) {
@@ -15,6 +17,15 @@ export function buildAccountsPayableQueryParams(filters = {}) {
 
   const fechaFin = String(filters.fechaFin || "").trim();
   if (fechaFin) params.fechaFin = fechaFin;
+
+  const fechaVencimientoInicio = String(
+    filters.fechaVencimientoInicio || "",
+  ).trim();
+  if (fechaVencimientoInicio)
+    params.fechaVencimientoInicio = fechaVencimientoInicio;
+
+  const fechaVencimientoFin = String(filters.fechaVencimientoFin || "").trim();
+  if (fechaVencimientoFin) params.fechaVencimientoFin = fechaVencimientoFin;
 
   return params;
 }

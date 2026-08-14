@@ -51,6 +51,7 @@ function normalizeSupplierInvoice(item) {
   return {
     id: item?.id ?? item?.Id,
     fecha: item?.fecha ?? item?.Fecha,
+    fechaVencimiento: item?.fechaVencimiento ?? item?.FechaVencimiento ?? null,
     proveedor: item?.proveedorNombre ?? item?.ProveedorNombre ?? "Proveedor no indicado",
     proveedorId: item?.proveedorId ?? item?.ProveedorId ?? null,
     numeroFactura: item?.numeroFactura ?? item?.NumeroFactura,

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   matchesWorkOrderPlateSearch,
+  matchesWorkOrderTextSearch,
   parseExplicitOrderIdSearch,
   parseOrderIdSearch,
 } from "./workOrderSearch.js";
@@ -22,6 +23,19 @@ test("matchesWorkOrderPlateSearch finds partial plate coincidences", () => {
   assert.equal(matchesWorkOrderPlateSearch({ Matricula: "KBD 20 G" }, "bd20"), true);
   assert.equal(matchesWorkOrderPlateSearch({ matricula: "9876XYZ" }, "76x"), true);
   assert.equal(matchesWorkOrderPlateSearch({ Matricula: "1234ABC" }, "999"), false);
+});
+
+test("matchesWorkOrderTextSearch finds client or company coincidences", () => {
+  assert.equal(
+    matchesWorkOrderTextSearch({ Cliente: "Autoservicios JETB", Matricula: "1234ABC" }, "jetb"),
+    true,
+  );
+  assert.equal(
+    matchesWorkOrderTextSearch({ cliente: "MasterTouch Automotive Group" }, "touch auto"),
+    true,
+  );
+  assert.equal(matchesWorkOrderTextSearch({ Telefono: "961524953" }, "4953"), true);
+  assert.equal(matchesWorkOrderTextSearch({ Cliente: "Taller Norte" }, "sur"), false);
 });
 
 test("parseExplicitOrderIdSearch requires hash prefix", () => {

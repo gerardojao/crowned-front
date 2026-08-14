@@ -17,11 +17,15 @@ test("buildAccountsPayableQueryParams maps general search", () => {
       search: " FRA-26 ",
       fechaInicio: "2026-07-01",
       fechaFin: "2026-07-31",
+      fechaVencimientoInicio: "2026-08-01",
+      fechaVencimientoFin: "2026-08-31",
     }),
     {
       search: "FRA-26",
       fechaInicio: "2026-07-01",
       fechaFin: "2026-07-31",
+      fechaVencimientoInicio: "2026-08-01",
+      fechaVencimientoFin: "2026-08-31",
     },
   );
 });

@@ -35,6 +35,7 @@ function normalizePendingInvoice(item) {
   return {
     id: item?.id ?? item?.Id,
     fecha: item?.fecha ?? item?.Fecha,
+    fechaVencimiento: item?.fechaVencimiento ?? item?.FechaVencimiento ?? null,
     proveedor: item?.proveedorNombre ?? item?.ProveedorNombre ?? "Proveedor no indicado",
     proveedorId: item?.proveedorId ?? item?.ProveedorId ?? null,
     numeroFactura: item?.numeroFactura ?? item?.NumeroFactura ?? "",
@@ -296,7 +297,9 @@ export default function AccountsPayablePanel({
         Number(item.total) || 0,
         Number(item.importePagado) || 0,
         Number(item.saldoVisual) || 0,
-        item.estadoVisual || item.estado || "",
+        item.fechaVencimiento
+          ? `${item.estadoVisual || item.estado || ""} - vence ${formatDate(item.fechaVencimiento)}`
+          : item.estadoVisual || item.estado || "",
       ]);
     });
 
@@ -394,7 +397,7 @@ export default function AccountsPayablePanel({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(220px,1fr)_170px_170px_auto] md:items-end">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(220px,1fr)_170px_170px_170px_170px_auto] md:items-end">
           <div className="min-w-0">
             <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
               Buscar
@@ -410,7 +413,7 @@ export default function AccountsPayablePanel({
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-              Desde
+              Factura desde
             </label>
             <input
               type="date"
@@ -424,13 +427,41 @@ export default function AccountsPayablePanel({
 
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-              Hasta
+              Factura hasta
             </label>
             <input
               type="date"
               value={filters.fechaFin}
               onChange={(event) =>
                 setFilterField("fechaFin", event.target.value)
+              }
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+              Vence desde
+            </label>
+            <input
+              type="date"
+              value={filters.fechaVencimientoInicio}
+              onChange={(event) =>
+                setFilterField("fechaVencimientoInicio", event.target.value)
+              }
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+              Vence hasta
+            </label>
+            <input
+              type="date"
+              value={filters.fechaVencimientoFin}
+              onChange={(event) =>
+                setFilterField("fechaVencimientoFin", event.target.value)
               }
               className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
             />
@@ -468,7 +499,7 @@ export default function AccountsPayablePanel({
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-10 text-center">
+                    <td colSpan={11} className="px-4 py-10 text-center">
                     <Loader />
                   </td>
                 </tr>
@@ -526,6 +557,11 @@ export default function AccountsPayablePanel({
                       >
                         {item.estadoVisual}
                       </span>
+                      {item.fechaVencimiento ? (
+                        <div className="mt-1 text-xs font-semibold text-slate-500">
+                          Vence {formatDate(item.fechaVencimiento)}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-right">
                       {item.canRegisterPayment ? (
