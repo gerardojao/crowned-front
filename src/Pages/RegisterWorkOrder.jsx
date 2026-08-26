@@ -1277,6 +1277,13 @@ export default function RegisterWorkOrder() {
         const data = res?.data?.data?.[0];
         if (!alive || !data) return;
 
+        const presupuestoId = data.presupuestoId ?? data.PresupuestoId;
+        let sourceBudget = null;
+        if (presupuestoId) {
+          const budgetRes = await api.get(`/Presupuesto/${presupuestoId}`);
+          sourceBudget = budgetRes?.data?.data?.[0] ?? null;
+        }
+
         const diagnostico =
           data.diagnosticoMecanico ?? data.DiagnosticoMecanico ?? "";
         const repuestos =
@@ -1321,9 +1328,13 @@ export default function RegisterWorkOrder() {
             : "",
           TiempoEstimadoHoras: tiempoEstimado ?? "",
           TipoOperacion: data.tipoOperacion ?? data.TipoOperacion ?? "Mecanica",
-          Trabajo: diagnostico,
-          Items:
-            diagnostico && tiempoEstimadoNumero > 0
+          Trabajo:
+            sourceBudget?.trabajo ?? sourceBudget?.Trabajo ?? diagnostico,
+          Items: sourceBudget
+            ? parseDetailItems(
+                sourceBudget.itemsJson ?? sourceBudget.ItemsJson,
+              )
+            : diagnostico && tiempoEstimadoNumero > 0
               ? [
                   createDetailItem(
                     diagnostico,
@@ -1337,6 +1348,12 @@ export default function RegisterWorkOrder() {
                   ),
                 ]
               : [],
+          Repuestos:
+            sourceBudget?.repuestos ?? sourceBudget?.Repuestos ?? "",
+          Cantidad:
+            sourceBudget?.cantidad ?? sourceBudget?.Cantidad ?? "1",
+          ManoObra:
+            sourceBudget?.manoObra ?? sourceBudget?.ManoObra ?? "",
           Observaciones: observaciones,
           CodigoPostal: data.codigoPostal ?? data.CodigoPostal ?? "",
           Poblacion: data.poblacion ?? data.Poblacion ?? "",

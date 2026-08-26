@@ -139,6 +139,7 @@ export default function RegisterBudget() {
   const [operationTypes, setOperationTypes] = useState(["Mecanica"]);
   const [digitalSignaturesEnabled, setDigitalSignaturesEnabled] =
     useState(false);
+  const [preOrdersEnabled, setPreOrdersEnabled] = useState(false);
   const [signatureModal, setSignatureModal] = useState({
     open: false,
     budget: null,
@@ -209,9 +210,13 @@ export default function RegisterBudget() {
       setDigitalSignaturesEnabled(
         data.enableDigitalSignatures ?? data.EnableDigitalSignatures ?? false,
       );
+      setPreOrdersEnabled(
+        data.enablePreOrders ?? data.EnablePreOrders ?? false,
+      );
     } catch {
       setOperationTypes(["Mecanica"]);
       setDigitalSignaturesEnabled(false);
+      setPreOrdersEnabled(false);
     }
   };
 
@@ -398,6 +403,10 @@ export default function RegisterBudget() {
     Observaciones: x.observaciones ?? x.Observaciones ?? "",
     ConvertidoEnOrden: x.convertidoEnOrden ?? x.ConvertidoEnOrden ?? false,
     IdOrdenTrabajo: x.idOrdenTrabajo ?? x.IdOrdenTrabajo ?? null,
+    ConvertidoEnPreOrden:
+      x.convertidoEnPreOrden ?? x.ConvertidoEnPreOrden ?? false,
+    IdPreOrdenTrabajo:
+      x.idPreOrdenTrabajo ?? x.IdPreOrdenTrabajo ?? null,
     AcceptanceSignatureBase64:
       x.acceptanceSignatureBase64 ?? x.AcceptanceSignatureBase64 ?? "",
     AcceptanceSignatureDate:
@@ -1120,9 +1129,16 @@ export default function RegisterBudget() {
       setError("");
       setNotice("");
 
-      await api.post(`/Presupuesto/${p.Id}/convertir-orden`);
+      const res = await api.post(`/Presupuesto/${p.Id}/convertir-orden`);
+      const result = firstResponseItem(res?.data);
+      const convertedToPreOrder =
+        (result?.tipoConversion ?? result?.TipoConversion) === "PreOrden";
 
-      setSuccessModal("Presupuesto convertido en orden correctamente.");
+      setSuccessModal(
+        convertedToPreOrder
+          ? "Presupuesto convertido en pre-orden. Complétala con las fotos y la firma de recepción."
+          : "Presupuesto convertido en orden correctamente.",
+      );
       await loadBudgets();
     } catch (err) {
       console.error(err);
@@ -1961,7 +1977,7 @@ export default function RegisterBudget() {
       Presupuestos recientes
     </h3>
     <p className="mt-1 text-sm text-slate-500">
-      Busca por número, cliente, matrícula, vehículo o trabajo.
+      Busca presupuestos por matrícula en todas las páginas.
     </p>
   </div>
 
@@ -1979,7 +1995,7 @@ export default function RegisterBudget() {
           setBudgetSearch(e.target.value);
           setBudgetPage(1);
         }}
-        placeholder="Buscar presupuesto..."
+        placeholder="Buscar por matrícula..."
         className="w-full rounded-2xl border border-slate-300 bg-white py-3 pl-10 pr-10 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
       />
 
@@ -2094,13 +2110,15 @@ export default function RegisterBudget() {
                     Editar
                   </button>
 
-                  {!p.ConvertidoEnOrden && (
+                  {!p.ConvertidoEnOrden && !p.ConvertidoEnPreOrden && (
                     <button
                       type="button"
                       onClick={() => convertToOrder(p)}
                       className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                     >
-                      Convertir en orden
+                      {preOrdersEnabled
+                        ? "Convertir en pre-orden"
+                        : "Convertir en orden"}
                     </button>
                   )}
 
@@ -2110,6 +2128,17 @@ export default function RegisterBudget() {
                       className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-sm font-medium"
                     >
                       Orden creada #{p.IdOrdenTrabajo}
+                    </Link>
+                  )}
+
+                  {p.ConvertidoEnPreOrden &&
+                    !p.ConvertidoEnOrden &&
+                    p.IdPreOrdenTrabajo && (
+                    <Link
+                      to="/pre-ordenes"
+                      className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 bg-amber-50 text-amber-700 ring-1 ring-amber-200 text-sm font-medium"
+                    >
+                      Completar pre-orden #{p.IdPreOrdenTrabajo}
                     </Link>
                   )}
 
@@ -2153,7 +2182,7 @@ export default function RegisterBudget() {
            {budgets.length === 0 && (
               <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
                 <h4 className="text-lg font-semibold text-slate-800">
-                  {dateFrom || dateTo
+                  {budgetSearch || dateFrom || dateTo
                     ? "No se encontraron presupuestos"
                     : "No hay presupuestos registrados"}
                 </h4>
