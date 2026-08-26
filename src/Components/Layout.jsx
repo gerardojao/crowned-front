@@ -182,7 +182,7 @@ export default function Layout({ children }) {
   const preOrdersEnabled =
     activeWorkshop?.enablePreOrders ??
     activeWorkshop?.EnablePreOrders ??
-    true;
+    false;
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
   const accountsReceivableEnabled =
     activeWorkshop?.enableAccountsReceivable ??

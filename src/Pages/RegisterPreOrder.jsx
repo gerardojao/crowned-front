@@ -271,7 +271,7 @@ export default function RegisterPreOrder() {
       .then((res) => {
         const settings = res?.data || {};
         const moduleEnabled =
-          settings.enablePreOrders ?? settings.EnablePreOrders ?? true;
+          settings.enablePreOrders ?? settings.EnablePreOrders ?? false;
         setAllowed(moduleEnabled);
         setReceptionPhotosEnabled(
           settings.enableReceptionPhotos ??

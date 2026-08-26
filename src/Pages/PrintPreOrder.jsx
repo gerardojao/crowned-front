@@ -118,7 +118,7 @@ export default function PrintPreOrder() {
           settings.DocumentTemplateKey ??
           DEFAULT_TALLER.documentTemplateKey,
         enablePreOrders:
-          settings.enablePreOrders ?? settings.EnablePreOrders ?? true,
+          settings.enablePreOrders ?? settings.EnablePreOrders ?? false,
       });
 
       const data = preOrderRes?.data?.data?.[0];
@@ -186,7 +186,7 @@ export default function PrintPreOrder() {
 
   const useZaga = usesZagaInvoiceTemplate(taller) || usesJetbPreOrderTemplate(taller);
   const preOrderModuleEnabled =
-    taller.enablePreOrders ?? taller.EnablePreOrders ?? true;
+    taller.enablePreOrders ?? taller.EnablePreOrders ?? false;
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoTaller;
   const isCustody =
     params.get("type") === "resguardo" || params.get("type") === "deposito";

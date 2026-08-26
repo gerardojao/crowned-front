@@ -330,7 +330,7 @@ export default function RegisterWorkOrder() {
       setWhatsappEnabled(enabled);
       const zagaDocuments = usesZagaInvoiceTemplate(data);
       const preOrderModuleEnabled =
-        data.enablePreOrders ?? data.EnablePreOrders ?? true;
+        data.enablePreOrders ?? data.EnablePreOrders ?? false;
       setUseZagaDocuments(zagaDocuments);
       setPreOrdersEnabled(preOrderModuleEnabled);
       setReceptionPhotosEnabled(

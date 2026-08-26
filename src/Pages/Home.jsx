@@ -291,7 +291,7 @@ export default function Home() {
           enablePreOrders:
             settings.enablePreOrders ??
             settings.EnablePreOrders ??
-            true,
+            false,
           enableAccountsReceivable,
           enableAccountsPayable:
             settings.enableAccountsPayable ??
