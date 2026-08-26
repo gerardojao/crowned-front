@@ -910,7 +910,7 @@ export default function RegisterBudget() {
         params: {
           fechaDesde: dateFrom || null,
           fechaHasta: dateTo || null,
-          search: budgetSearch || null,
+          matricula: budgetSearch || null,
           page,
           pageSize: budgetPageSize,
         },
@@ -1199,26 +1199,6 @@ export default function RegisterBudget() {
 
   const budgetTotalPages = Math.max(1, Math.ceil(budgetTotal / budgetPageSize));
   const isFormVisible = viewMode === "create" || viewMode === "edit";
-
-  const filteredBudgets = budgets.filter((p) => {
-  const term = normalizeLookup(budgetSearch);
-
-  if (!term) return true;
-
-  const text = normalizeLookup(`
-    ${p.NumeroPresupuesto}
-    ${p.Cliente}
-    ${p.Dni}
-    ${p.Telefono}
-    ${p.Matricula}
-    ${p.Marca}
-    ${p.Modelo}
-    ${p.Trabajo}
-    ${p.Estado}
-  `);
-
-  return text.includes(term);
-});
 
   return (
     <>
@@ -2053,7 +2033,7 @@ export default function RegisterBudget() {
           </div>
 
           <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4">
-           {filteredBudgets.map((p) => (
+           {budgets.map((p) => (
               <article
                 key={p.Id}
                 className="rounded-2xl border border-violet-200 bg-violet-50/30 p-5 shadow-sm"
@@ -2170,7 +2150,7 @@ export default function RegisterBudget() {
               </article>
             ))}
 
-           {filteredBudgets.length === 0 && (
+           {budgets.length === 0 && (
               <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-10 text-center">
                 <h4 className="text-lg font-semibold text-slate-800">
                   {dateFrom || dateTo
