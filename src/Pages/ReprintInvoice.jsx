@@ -114,6 +114,8 @@ export default function ReprintInvoice() {
     importe: "",
     descripcion: "",
     bankAccountId: "",
+    devolverStock: false,
+    repuestosDevueltos: {},
   });
 
   const [taller, setTaller] = useState(DEFAULT_TALLER);
@@ -150,6 +152,44 @@ export default function ReprintInvoice() {
   });
 
   const [items, setItems] = useState([]);
+
+  const returnableParts = useMemo(
+    () =>
+      items
+        .map((item, index) => ({
+          key: `${item.repuestoStockId ?? item.RepuestoStockId ?? item.idRepuesto ?? item.IdRepuesto}-${index}`,
+          lineaIndice: index,
+          repuestoStockId: Number(
+            item.repuestoStockId ??
+              item.RepuestoStockId ??
+              item.idRepuesto ??
+              item.IdRepuesto ??
+              0,
+          ),
+          descripcion: item.descripcion ?? item.Descripcion ?? "Recambio",
+          cantidad: Number(item.cantidad ?? item.Cantidad ?? 1),
+          precioUnitario: Number(
+            item.precioUnitario ??
+              item.PrecioUnitario ??
+              item.importe ??
+              item.Importe ??
+              0,
+          ),
+          descuentoPct: Number(item.descuentoPct ?? item.DescuentoPct ?? 0),
+        }))
+        .filter((item) => item.repuestoStockId > 0 && item.cantidad > 0),
+    [items],
+  );
+
+  const returnedStockBase = useMemo(
+    () =>
+      returnableParts.reduce((total, item) => {
+        const quantity = Number(rectForm.repuestosDevueltos[item.key] || 0);
+        const discount = Math.min(100, Math.max(0, item.descuentoPct));
+        return total + quantity * item.precioUnitario * (1 - discount / 100);
+      }, 0),
+    [rectForm.repuestosDevueltos, returnableParts],
+  );
 
   const [totals, setTotals] = useState({
     subtotal: 0,
@@ -396,6 +436,8 @@ export default function ReprintInvoice() {
       importe: "",
       descripcion: "",
       bankAccountId: isCreditInvoice ? "" : String(mainBank?.id ?? mainBank?.Id ?? ""),
+      devolverStock: false,
+      repuestosDevueltos: {},
     });
     setShowRectModal(true);
   };
@@ -414,8 +456,25 @@ export default function ReprintInvoice() {
       return;
     }
 
-    if (rectForm.tipo === "Parcial" && Number(rectForm.importe || 0) <= 0) {
+    if (
+      rectForm.tipo === "Parcial" &&
+      !rectForm.devolverStock &&
+      Number(rectForm.importe || 0) <= 0
+    ) {
       setRectError("El importe parcial debe ser mayor que 0.");
+      return;
+    }
+
+    const returnedParts = returnableParts
+      .map((item) => ({
+        repuestoStockId: item.repuestoStockId,
+        lineaIndice: item.lineaIndice,
+        cantidad: Number(rectForm.repuestosDevueltos[item.key] || 0),
+      }))
+      .filter((item) => item.cantidad > 0);
+
+    if (rectForm.devolverStock && returnedParts.length === 0) {
+      setRectError("Selecciona al menos un recambio y una cantidad a devolver.");
       return;
     }
 
@@ -431,11 +490,18 @@ export default function ReprintInvoice() {
         fecha: rectForm.fecha || null,
         motivo: rectForm.motivo.trim(),
         descripcion: rectForm.descripcion.trim() || null,
-        importe: rectForm.tipo === "Parcial" ? Number(rectForm.importe) : null,
+        importe:
+          rectForm.devolverStock
+            ? Number(returnedStockBase.toFixed(2))
+            : rectForm.tipo === "Parcial"
+              ? Number(rectForm.importe)
+              : null,
         bankAccountId:
           !isCreditInvoice && rectForm.bankAccountId
             ? Number(rectForm.bankAccountId)
             : null,
+        devolverStock: rectForm.devolverStock,
+        repuestosDevueltos: rectForm.devolverStock ? returnedParts : [],
       };
 
       const res = await api.post(`/FacturaEmitida/${invoice.id}/rectificativa`, payload);
@@ -824,7 +890,7 @@ export default function ReprintInvoice() {
                 />
               </label>
 
-              {rectForm.tipo === "Parcial" && (
+              {rectForm.tipo === "Parcial" && !rectForm.devolverStock && (
                 <label className="block text-sm font-medium text-slate-700">
                   Base imponible a rectificar
                   <input
@@ -894,6 +960,77 @@ export default function ReprintInvoice() {
                 required
               />
             </label>
+
+            {returnableParts.length > 0 && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={rectForm.devolverStock}
+                    onChange={(event) =>
+                      setRectForm((current) => ({
+                        ...current,
+                        devolverStock: event.target.checked,
+                        tipo: event.target.checked ? "Parcial" : current.tipo,
+                      }))
+                    }
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600"
+                  />
+                  <span>
+                    Devolver recambios al stock
+                    <span className="mt-1 block text-xs font-normal text-slate-500">
+                      Actívalo únicamente cuando el material haya regresado físicamente al taller.
+                    </span>
+                  </span>
+                </label>
+
+                {rectForm.devolverStock && (
+                  <div className="mt-4 space-y-3">
+                    {returnableParts.map((item) => (
+                      <div
+                        key={item.key}
+                        className="grid gap-2 rounded-lg bg-white p-3 ring-1 ring-slate-200 sm:grid-cols-[1fr_130px] sm:items-center"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">
+                            {item.descripcion}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            Cantidad facturada: {item.cantidad} · Precio: {eur.format(item.precioUnitario)} ·
+                            Descuento: {item.descuentoPct.toFixed(2)} %
+                          </p>
+                        </div>
+                        <label className="text-xs font-semibold text-slate-600">
+                          Cantidad devuelta
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.cantidad}
+                            step="0.01"
+                            value={rectForm.repuestosDevueltos[item.key] ?? ""}
+                            onChange={(event) =>
+                              setRectForm((current) => ({
+                                ...current,
+                                repuestosDevueltos: {
+                                  ...current.repuestosDevueltos,
+                                  [item.key]: event.target.value,
+                                },
+                              }))
+                            }
+                            placeholder="0"
+                            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                          />
+                        </label>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                      <span>Base imponible calculada</span>
+                      <span>{eur.format(returnedStockBase)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-5 flex justify-end gap-2">
               <button
