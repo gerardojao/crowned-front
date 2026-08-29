@@ -363,6 +363,22 @@ const createEmptyInvoiceVatBreakdown = () => ({
   base0: "",
 });
 
+const VAT_FIELD_BY_RATE = {
+  21: "base21",
+  10: "base10",
+  4: "base4",
+  0: "base0",
+};
+
+const applyInvoiceBaseAdjustment = (breakdown, adjustmentBase, vatRate) => {
+  const adjusted = { ...breakdown };
+  const field = VAT_FIELD_BY_RATE[Number(vatRate)] ?? "base21";
+  adjusted[field] = roundMoney(
+    (Number(adjusted[field]) || 0) + adjustmentBase,
+  );
+  return adjusted;
+};
+
 const getInvoiceVatLines = (breakdown) =>
   [
     { ivaPct: 21, base: Number(breakdown.base21) || 0 },
@@ -419,6 +435,7 @@ export default function SupplierDeliveryNotesPanel({
     bankAccountId: "",
     ajusteDescripcion: "",
     ajusteBase: "",
+    ajusteIvaPct: "21",
     ivaBreakdown: createEmptyInvoiceVatBreakdown(),
   });
 
@@ -436,9 +453,23 @@ export default function SupplierDeliveryNotesPanel({
     },
     { base: 0, iva: 0, total: 0 },
   );
+  const invoiceAdjustmentBase = roundMoney(Number(invoiceForm.ajusteBase) || 0);
+  const adjustedInvoiceVatBreakdown = useMemo(
+    () =>
+      applyInvoiceBaseAdjustment(
+        invoiceForm.ivaBreakdown,
+        invoiceAdjustmentBase,
+        invoiceForm.ajusteIvaPct,
+      ),
+    [
+      invoiceForm.ivaBreakdown,
+      invoiceForm.ajusteIvaPct,
+      invoiceAdjustmentBase,
+    ],
+  );
   const invoiceVatLines = useMemo(
-    () => getInvoiceVatLines(invoiceForm.ivaBreakdown),
-    [invoiceForm.ivaBreakdown],
+    () => getInvoiceVatLines(adjustedInvoiceVatBreakdown),
+    [adjustedInvoiceVatBreakdown],
   );
   const invoiceVatTotals = invoiceVatLines.reduce(
     (acc, line) => {
@@ -449,7 +480,6 @@ export default function SupplierDeliveryNotesPanel({
     },
     { base: 0, iva: 0, total: 0 },
   );
-  const invoiceAdjustmentBase = roundMoney(Number(invoiceForm.ajusteBase) || 0);
   const expectedInvoiceBase = roundMoney(
     selectedTotals.base + invoiceAdjustmentBase,
   );
@@ -515,6 +545,7 @@ export default function SupplierDeliveryNotesPanel({
       open: true,
       fecha: new Date().toISOString().slice(0, 10),
       fechaVencimiento: "",
+      ajusteIvaPct: "21",
       ivaBreakdown: {
         ...createEmptyInvoiceVatBreakdown(),
         base21: selectedTotals.base ? selectedTotals.base.toFixed(2) : "",
@@ -651,6 +682,13 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
+    const adjustmentVatField =
+      VAT_FIELD_BY_RATE[Number(invoiceForm.ajusteIvaPct)] ?? "base21";
+    if (Number(adjustedInvoiceVatBreakdown[adjustmentVatField]) < 0) {
+      alert("El ajuste no puede dejar una base de IVA negativa.");
+      return;
+    }
+
     // if (roundMoney(selectedTotals.base) <= 0) {
     //   alert("La base imponible de los albaranes debe ser mayor que 0.");
     //   return;
@@ -718,6 +756,7 @@ export default function SupplierDeliveryNotesPanel({
         descripcion: "",
         ajusteDescripcion: "",
         ajusteBase: "",
+        ajusteIvaPct: "21",
         estado: "Pendiente de pago",
         ivaBreakdown: createEmptyInvoiceVatBreakdown(),
       }));
@@ -756,19 +795,30 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
-    // const invalidLine = validLines.find(
-    //   (line) =>
-    //     Number(line.cantidad) <= 0 ||
-    //     Number(line.precioCompra) < 0 ||
-    //     Number.isNaN(Number(line.precioCompra)) ||
-    //     Number(line.descuentoPct || 0) < 0 ||
-    //     Number(line.descuentoPct || 0) > 100,
-    // );
+    const invalidLine = validLines.find(
+      (line) =>
+        !Number.isFinite(Number(line.cantidad)) ||
+        Number(line.cantidad) === 0 ||
+        !Number.isFinite(Number(line.precioCompra)) ||
+        Number(line.precioCompra) < 0 ||
+        Number(line.descuentoPct || 0) < 0 ||
+        Number(line.descuentoPct || 0) > 100,
+    );
 
-    // if (invalidLine) {
-    //   alert("Revisa cantidades y precios de las líneas.");
-    //   return;
-    // }
+    if (invalidLine) {
+      alert("Revisa cantidades, precios y descuentos de las líneas.");
+      return;
+    }
+
+    const negativeNewPart = validLines.find(
+      (line) => Number(line.cantidad) < 0 && !line.repuestoStockId,
+    );
+    if (negativeNewPart) {
+      alert(
+        "Una devolución con cantidad negativa debe seleccionar un repuesto existente del stock.",
+      );
+      return;
+    }
 
     const seenNewReferences = new Set();
 
@@ -1148,7 +1198,7 @@ export default function SupplierDeliveryNotesPanel({
                         <td className="px-3 py-2 text-right">
                           <input
                             type="number"
-
+                            step="0.01"
                             value={line.cantidad}
                             onChange={(e) =>
                               setLineField(line.id, "cantidad", e.target.value)
@@ -1420,7 +1470,7 @@ export default function SupplierDeliveryNotesPanel({
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px]">
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_180px_150px]">
                 <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
                   Concepto ajuste
                   <input
@@ -1446,7 +1496,27 @@ export default function SupplierDeliveryNotesPanel({
                     className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-right text-sm font-medium text-slate-800"
                   />
                 </label>
+
+                <label className="flex flex-col gap-1 text-xs font-bold text-slate-600">
+                  IVA del ajuste
+                  <select
+                    value={invoiceForm.ajusteIvaPct}
+                    onChange={(e) =>
+                      setInvoiceField("ajusteIvaPct", e.target.value)
+                    }
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800"
+                  >
+                    <option value="21">21 %</option>
+                    <option value="10">10 %</option>
+                    <option value="4">4 %</option>
+                    <option value="0">0 % / exenta</option>
+                  </select>
+                </label>
               </div>
+
+              <p className="mt-2 text-xs text-slate-500">
+                El ajuste se aplicará automáticamente a la base del IVA seleccionado.
+              </p>
 
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
                 {[
