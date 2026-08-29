@@ -81,6 +81,7 @@ export default function InvoiceHistory() {
   const [notice, setNotice] = useState(null);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const autoTimerRef = useRef(null);
 
@@ -108,6 +109,7 @@ export default function InvoiceHistory() {
         const t = opts.to ?? to;
         const o = opts.origin ?? origin;
         const type = opts.invoiceType ?? invoiceType;
+        const search = opts.search ?? debouncedSearch;
         const nextPage = opts.page ?? 1;
 
         const params = new URLSearchParams();
@@ -116,6 +118,7 @@ export default function InvoiceHistory() {
         if (t) params.set("fechaFin", t);
         if (o) params.set("origin", o);
         if (type) params.set("invoiceType", type);
+        if (search.trim()) params.set("search", search.trim());
         params.set("page", String(nextPage));
         params.set("pageSize", String(PAGE_SIZE));
 
@@ -140,8 +143,16 @@ export default function InvoiceHistory() {
         setLoading(false);
       }
     },
-    [from, to, origin, invoiceType],
+    [from, to, origin, invoiceType, debouncedSearch],
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchFilter.trim());
+    }, 350);
+
+    return () => window.clearTimeout(timer);
+  }, [searchFilter]);
 
   useEffect(() => {
     fetchData();
@@ -183,7 +194,9 @@ export default function InvoiceHistory() {
 
   const onSubmit = (e) => {
     e.preventDefault();
-    fetchData({ page: 1 });
+    const search = searchFilter.trim();
+    setDebouncedSearch(search);
+    fetchData({ page: 1, search });
   };
 
   const onClear = () => {
@@ -197,6 +210,7 @@ export default function InvoiceHistory() {
       to: "",
       origin: "",
       invoiceType: "",
+      search: "",
       page: 1,
     });
   };
@@ -324,17 +338,7 @@ export default function InvoiceHistory() {
   //       )
   //   );
   // }, [rows, searchFilter]);
-  const filteredRows = useMemo(() => {
-    const search = searchFilter.trim().toLowerCase();
-
-    if (!search) return rows;
-
-    return rows.filter((row) =>
-      Object.values(row)
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(search)),
-    );
-  }, [rows, searchFilter]);
+  const filteredRows = rows;
 
   const pageStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(total, page * PAGE_SIZE);
@@ -392,6 +396,7 @@ export default function InvoiceHistory() {
     if (to) params.set("fechaFin", to);
     if (origin) params.set("origin", origin);
     if (invoiceType) params.set("invoiceType", invoiceType);
+    if (searchFilter.trim()) params.set("search", searchFilter.trim());
     params.set("page", String(targetPage));
     params.set("pageSize", String(targetPageSize));
 
@@ -441,7 +446,7 @@ export default function InvoiceHistory() {
 
   const exportExcel = async () => {
     try {
-      const rowsToExport = applyLocalSearch(await fetchAllFilteredRows());
+      const rowsToExport = await fetchAllFilteredRows();
 
       if (rowsToExport.length === 0) {
         setNotice({
