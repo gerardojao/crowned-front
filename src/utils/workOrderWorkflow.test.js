@@ -73,9 +73,8 @@ test("hidden legacy states are not offered as selectable options", () => {
   ]);
 });
 
-test("repairing work orders remain editable", () => {
-  assert.equal(isWorkOrderEditLocked("Reparando"), false);
-  assert.equal(isWorkOrderEditLocked("Esperando repuesto"), true);
-  assert.equal(isWorkOrderEditLocked("Terminado"), true);
-  assert.equal(isWorkOrderEditLocked("Entregado"), true);
+test("work orders are editable until they are invoiced", () => {
+  assert.equal(isWorkOrderEditLocked(false), false);
+  assert.equal(isWorkOrderEditLocked(undefined), false);
+  assert.equal(isWorkOrderEditLocked(true), true);
 });

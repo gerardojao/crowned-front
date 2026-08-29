@@ -68,10 +68,6 @@ export function requiresCompletionConfirmation(currentState, nextState) {
   );
 }
 
-export function isWorkOrderEditLocked(state) {
-  return [
-    "Esperando repuesto",
-    "Terminado",
-    "Entregado",
-  ].includes(normalizeWorkOrderState(state));
+export function isWorkOrderEditLocked(isInvoiced) {
+  return Boolean(isInvoiced);
 }
