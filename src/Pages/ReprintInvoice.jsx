@@ -355,6 +355,7 @@ export default function ReprintInvoice() {
   const isFreshlyIssued = searchParams.get("autoprint") === "1";
 
   const isRectificativa = invoice.tipoFactura === "Rectificativa";
+  const isNormalInvoice = invoice.tipoFactura === "Normal";
   const labels = getBusinessTerminology(taller);
   const useZagaTemplate =
     usesZagaInvoiceTemplate(taller) || usesJetbDocumentTemplate(taller);
@@ -575,6 +576,8 @@ export default function ReprintInvoice() {
           isDuplicate={!isFreshlyIssued}
           warrantyTitle={labels.warrantyTitle}
           warrantyText={labels.warrantyText}
+          otherSummaryLabel={isNormalInvoice ? "Descuento / Otros" : "Otros"}
+          showOtherAsDiscount={isNormalInvoice}
         />
       )}
 
@@ -737,7 +740,10 @@ export default function ReprintInvoice() {
                 <Row label="BASE IMPONIBLE" value={formatMoney(totals.subtotal)} />
                 <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
                 <Row label="IVA" value={formatMoney(totals.iva)} />
-                <Row label="OTROS" value={`- ${formatMoney(totals.otros)}`} />
+                <Row
+                  label={isNormalInvoice ? "DESCUENTO / OTROS" : "OTROS"}
+                  value={`- ${formatMoney(totals.otros)}`}
+                />
                 {isInsuranceInvoice && (
                   <>
                     <Row label="FRANQUICIA" value={`- ${formatMoney(franchiseAmount)}`} />

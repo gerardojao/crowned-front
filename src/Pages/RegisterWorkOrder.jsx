@@ -2,13 +2,17 @@ import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
+  Archive,
+  Download,
   Images,
   Search,
-  Trash2,
   UserPlus,
   Wrench,
   X,
+  Trash2
 } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api, { getCurrentWorkshopId } from "../Components/api";
 import { useBusinessTerminology } from "../utils/businessTerminology";
 import PartPicker, {
@@ -24,6 +28,7 @@ import ReceptionPhotosModal from "../Components/ReceptionPhotosModal";
 import { amountInput } from "../utils/currency";
 import SmallSuccessModal from "../Components/SmallSuccessModal";
 import ConfirmActionModal from "../Components/ConfirmActionModal";
+import MoneyInput from "../Components/MoneyInput";
 import {
   buildWorkOrderPayload,
   getWorkOrderOperationTypeBadgeClass,
@@ -263,12 +268,14 @@ export default function RegisterWorkOrder() {
   const [plateSearch, setPlateSearch] = useState("");
   const [error, setError] = useState("");
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [exportingOrders, setExportingOrders] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [billedFilter, setBilledFilter] = useState("");
+  const [archiveFilter, setArchiveFilter] = useState("activas");
   const [customerSearch, setCustomerSearch] = useState("");
   const [customerMatches, setCustomerMatches] = useState([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
@@ -600,6 +607,7 @@ export default function RegisterWorkOrder() {
         Number(o.repuestos ?? o.Repuestos ?? 0) *
           Number(o.cantidad ?? o.Cantidad ?? 1),
     Facturada: o.facturada ?? o.Facturada ?? false,
+    Archivada: o.eliminado ?? o.Eliminado ?? false,
      VehicleCount:
       o.vehicleCount ??
       o.VehicleCount ??
@@ -1166,6 +1174,7 @@ export default function RegisterWorkOrder() {
             ? null
             : search || null,
         estado: statusFilter || null,
+        archivo: archiveFilter,
         fechaDesde: dateFrom || null,
         fechaHasta: dateTo || null,
       };
@@ -1179,9 +1188,13 @@ export default function RegisterWorkOrder() {
         const matchesBilled =
           !billedFilter ||
           (billedFilter === "facturadas" ? isBilled : !isBilled);
+        const matchesArchive =
+          archiveFilter === "todas" ||
+          (archiveFilter === "archivadas" ? item.Archivada : !item.Archivada);
         const matchesFrom = !dateFrom || fecha >= dateFrom;
         const matchesTo = !dateTo || fecha <= dateTo;
-        const matches = matchesStatus && matchesBilled && matchesFrom && matchesTo;
+        const matches =
+          matchesStatus && matchesBilled && matchesArchive && matchesFrom && matchesTo;
 
         setOrders(matches ? [item] : []);
         setOrderTotal(matches ? 1 : 0);
@@ -1252,6 +1265,190 @@ export default function RegisterWorkOrder() {
       );
     } finally {
       setLoadingOrders(false);
+    }
+  };
+
+  const getAllFilteredOrders = async () => {
+    const search = plateSearch.trim();
+    const orderIdSearch = parseExplicitOrderIdSearch(search);
+    const isOperationTypeSearch =
+      !orderIdSearch &&
+      search &&
+      ["Mecanica", "Mecánica", "Chapa y pintura"].some((type) =>
+        includesWorkOrderSearchText(type, search),
+      );
+    const isPlateTextSearch = Boolean(
+      search && !orderIdSearch && !isOperationTypeSearch,
+    );
+
+    const matchesActiveFilters = (item) => {
+      const fecha = item.Fecha ? String(item.Fecha).slice(0, 10) : "";
+      const isBilled = Boolean(item.Facturada || item.facturada);
+      const matchesArchive =
+        archiveFilter === "todas" ||
+        (archiveFilter === "archivadas" ? item.Archivada : !item.Archivada);
+      return (
+        (!statusFilter || item.Estado === statusFilter) &&
+        (!billedFilter ||
+          (billedFilter === "facturadas" ? isBilled : !isBilled)) &&
+        matchesArchive &&
+        (!dateFrom || fecha >= dateFrom) &&
+        (!dateTo || fecha <= dateTo) &&
+        (!isOperationTypeSearch || matchesWorkOrderOperationSearch(item, search)) &&
+        (!isPlateTextSearch || matchesWorkOrderTextSearch(item, search))
+      );
+    };
+
+    if (orderIdSearch) {
+      const res = await api.get(`/OrdenTrabajo/${orderIdSearch}`);
+      const item = normalizeOrder(
+        res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? res?.data,
+      );
+      return matchesActiveFilters(item) ? [item] : [];
+    }
+
+    const baseParams = {
+      matricula:
+        isOperationTypeSearch || isPlateTextSearch ? null : search || null,
+      estado: statusFilter || null,
+      archivo: archiveFilter,
+      fechaDesde: dateFrom || null,
+      fechaHasta: dateTo || null,
+    };
+    const pageSize = 100;
+    const allItems = [];
+    let apiPage = 1;
+    let apiTotal = 0;
+
+    do {
+      const res = await api.get("/OrdenTrabajo", {
+        params: { ...baseParams, page: apiPage, pageSize },
+      });
+      const pageItems = getItemsFromResponse(res).map(normalizeOrder);
+      const paging = getPagingFromResponse(res);
+      allItems.push(...pageItems);
+      apiTotal = paging.total;
+      if (!pageItems.length) break;
+      apiPage += 1;
+    } while (allItems.length < apiTotal);
+
+    return allItems.filter(matchesActiveFilters);
+  };
+
+  const exportOrdersExcel = async () => {
+    try {
+      setExportingOrders(true);
+      setError("");
+      const filteredItems = await getAllFilteredOrders();
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Órdenes", {
+        pageSetup: {
+          paperSize: 9,
+          orientation: "landscape",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+        },
+      });
+
+      worksheet.mergeCells("A1:M1");
+      worksheet.getCell("A1").value = "ÓRDENES DE TRABAJO";
+      worksheet.getCell("A1").font = { bold: true, size: 16 };
+      worksheet.getCell("A1").alignment = { horizontal: "center" };
+      worksheet.mergeCells("A2:M2");
+      worksheet.getCell("A2").value = `Filtros: ${[
+        plateSearch.trim() && `Búsqueda: ${plateSearch.trim()}`,
+        statusFilter && `Estado: ${statusFilter}`,
+        billedFilter &&
+          `Facturación: ${billedFilter === "facturadas" ? "Facturadas" : "Sin facturar"}`,
+        archiveFilter !== "activas" &&
+          `Archivo: ${archiveFilter === "archivadas" ? "Archivadas" : "Todas"}`,
+        dateFrom && `Desde: ${dateFrom}`,
+        dateTo && `Hasta: ${dateTo}`,
+      ].filter(Boolean).join(" · ") || "Sin filtros"}`;
+      worksheet.getCell("A2").alignment = { horizontal: "center" };
+      worksheet.addRow([]);
+
+      const headerRow = worksheet.addRow([
+        "N.º orden",
+        "Fecha",
+        "Cliente",
+        "Matrícula",
+        "Marca",
+        "Modelo",
+        "Estado",
+        "Tipo de operación",
+        "Trabajo",
+        "Repuestos",
+        "Mano de obra",
+        "Total estimado",
+        "Facturada",
+      ]);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF9A3412" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+
+      filteredItems.forEach((item) => {
+        worksheet.addRow([
+          item.Id,
+          item.Fecha ? String(item.Fecha).slice(0, 10) : "",
+          item.Cliente || "",
+          item.Matricula || "",
+          item.Marca || "",
+          item.Modelo || "",
+          item.Estado || "",
+          getWorkOrderOperationTypeLabel(item),
+          item.Trabajo || "",
+          Number(item.Repuestos || 0),
+          Number(item.ManoObra || 0),
+          Number(item.Total || 0),
+          item.Facturada ? "Sí" : "No",
+        ]);
+      });
+
+      worksheet.columns = [
+        { width: 12 }, { width: 13 }, { width: 28 }, { width: 14 },
+        { width: 16 }, { width: 18 }, { width: 20 }, { width: 20 },
+        { width: 45 }, { width: 14 }, { width: 14 }, { width: 16 },
+        { width: 12 },
+      ];
+      worksheet.autoFilter = { from: "A4", to: "M4" };
+      worksheet.views = [{ state: "frozen", ySplit: 4 }];
+      worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell, columnNumber) => {
+          cell.alignment = {
+            vertical: "middle",
+            wrapText: columnNumber === 9,
+            horizontal: columnNumber >= 10 && columnNumber <= 12 ? "right" : "left",
+          };
+          if (rowNumber > 4 && columnNumber >= 10 && columnNumber <= 12) {
+            cell.numFmt = "#,##0.00 [$€-es-ES]";
+          }
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `Ordenes_${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "No se pudieron exportar las órdenes.",
+      );
+    } finally {
+      setExportingOrders(false);
     }
   };
 
@@ -1441,7 +1638,15 @@ export default function RegisterWorkOrder() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [plateSearch, statusFilter, billedFilter, dateFrom, dateTo, showOrders]);
+  }, [
+    plateSearch,
+    statusFilter,
+    billedFilter,
+    archiveFilter,
+    dateFrom,
+    dateTo,
+    showOrders,
+  ]);
 
   useEffect(() => {
     if (window.location.hash) {
@@ -1524,7 +1729,7 @@ export default function RegisterWorkOrder() {
       setDeleteConfirmation((current) => ({ ...current, loading: true }));
       setError("");
       setNotice("");
-      const res = await api.delete(`/OrdenTrabajo/${targetOrder.Id}`);
+      const res = await api.put(`/OrdenTrabajo/${targetOrder.Id}/archivar`);
       ensureOk(res);
       setOrders((currentOrders) =>
         currentOrders.filter((item) => item.Id !== targetOrder.Id),
@@ -1535,7 +1740,7 @@ export default function RegisterWorkOrder() {
         setEditingId(null);
       }
       setDeleteConfirmation({ order: null, loading: false });
-      setNotice("Orden eliminada correctamente.");
+      setNotice("Orden archivada correctamente.");
       await loadOrders(orderPage);
     } catch (err) {
       console.error(err);
@@ -1544,7 +1749,7 @@ export default function RegisterWorkOrder() {
         err?.response?.data?.message ||
           err?.response?.data?.Message ||
           err?.message ||
-          "No se pudo eliminar la orden.",
+          "No se pudo archivar la orden.",
       );
     }
   };
@@ -1600,10 +1805,8 @@ export default function RegisterWorkOrder() {
   };
 
   const startEdit = (o) => {
-    if (isWorkOrderEditLocked(o.Estado)) {
-      setError(
-        "No se puede editar una orden en reparacion, lista o entregada.",
-      );
+    if (isWorkOrderEditLocked(o.Facturada || o.facturada)) {
+      setError("No se puede editar una orden que ya está facturada.");
       return;
     }
 
@@ -1766,9 +1969,9 @@ export default function RegisterWorkOrder() {
       />
       <ConfirmActionModal
         open={Boolean(deleteConfirmation.order)}
-        title="Eliminar orden"
-        message={`Se eliminará la orden #${deleteConfirmation.order?.Id ?? ""}. Esta acción no se puede deshacer desde el front.`}
-        confirmLabel="Eliminar"
+        title="Archivar orden"
+        message={`La orden #${deleteConfirmation.order?.Id ?? ""} pasará a Archivadas y conservará toda su información.`}
+        confirmLabel="Archivar"
         loading={deleteConfirmation.loading}
         onConfirm={confirmOrderDelete}
         onCancel={closeDeleteConfirmation}
@@ -2579,26 +2782,17 @@ export default function RegisterWorkOrder() {
     />
   </>
 )}
-                        <input
-                          type="number"
-                          step="0.01"
+                        <MoneyInput
                           value={item.precioUnitario}
-                          onChange={(e) =>
+                          onChange={(value) =>
                             setDetailItemField(
                               item.id,
                               "precioUnitario",
-                              e.target.value,
-                            )
-                          }
-                          onBlur={(e) =>
-                            setDetailItemField(
-                              item.id,
-                              "precioUnitario",
-                              Number(e.target.value || 0).toFixed(2),
+                              value,
                             )
                           }
                           className={cls}
-                          placeholder="Precio"
+                          placeholder="0,00"
                         />
                         {detailedRepairLinesEnabled && (
                           <>
@@ -2712,7 +2906,7 @@ export default function RegisterWorkOrder() {
           id="ordenes-recientes"
           className="mt-4 rounded-2xl bg-white/80 backdrop-blur shadow-sm ring-1 ring-slate-200 p-4 md:p-6"
         >
-          <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,280px)_auto_auto_auto_auto_auto] md:items-end">
+          <div className="grid grid-cols-1 gap-3 mb-6 md:grid-cols-[1fr_minmax(180px,280px)_auto_auto_auto_auto_auto_auto] md:items-end">
             <div className="flex-1">
               <h3 className="text-lg font-semibold text-slate-800">
                 Órdenes recientes
@@ -2753,6 +2947,16 @@ export default function RegisterWorkOrder() {
               <option value="pendientes">Sin facturar</option>
               <option value="facturadas">Facturadas</option>
             </select>
+            <select
+              value={archiveFilter}
+              onChange={(e) => setArchiveFilter(e.target.value)}
+              className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+              aria-label="Filtrar por archivo"
+            >
+              <option value="activas">Activas</option>
+              <option value="archivadas">Archivadas</option>
+              <option value="todas">Todas</option>
+            </select>
             <input
               type="date"
               value={dateFrom}
@@ -2766,13 +2970,28 @@ export default function RegisterWorkOrder() {
               onChange={(e) => setDateTo(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
             />
-            {(plateSearch || statusFilter || billedFilter || dateFrom || dateTo) && (
+            <button
+              type="button"
+              onClick={exportOrdersExcel}
+              disabled={exportingOrders || loadingOrders}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-800 disabled:opacity-60 md:w-auto"
+            >
+              <Download size={17} />
+              {exportingOrders ? "Exportando..." : "Exportar Excel"}
+            </button>
+            {(plateSearch ||
+              statusFilter ||
+              billedFilter ||
+              archiveFilter !== "activas" ||
+              dateFrom ||
+              dateTo) && (
               <button
                 type="button"
                 onClick={() => {
                   setPlateSearch("");
                   setStatusFilter("");
                   setBilledFilter("");
+                  setArchiveFilter("activas");
                   setDateFrom("");
                   setDateTo("");
                   setOrderPage(1);
@@ -2794,7 +3013,11 @@ export default function RegisterWorkOrder() {
             {filteredOrders.map((o) => (
               <article
                 key={o.Id}
-                className={`rounded-2xl border p-4 shadow-sm hover:shadow-md transition sm:p-5 ${getStateStyles(o.Estado)}`}
+                className={`rounded-2xl border p-4 shadow-sm hover:shadow-md transition sm:p-5 ${
+                  o.Archivada
+                    ? "border-slate-300 bg-slate-100 text-slate-600"
+                    : getStateStyles(o.Estado)
+                }`}
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
@@ -2805,6 +3028,11 @@ export default function RegisterWorkOrder() {
                       <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-bold text-slate-500 ring-1 ring-slate-200">
                         Orden #{o.Id}
                       </span>
+                      {o.Archivada && (
+                        <span className="rounded-full bg-slate-700 px-2.5 py-1 text-xs font-bold text-white">
+                          Archivada
+                        </span>
+                      )}
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-bold ring-1 ${getWorkOrderOperationTypeBadgeClass(o)}`}
                       >
@@ -2819,6 +3047,7 @@ export default function RegisterWorkOrder() {
 
                   <select
                     value={normalizeWorkOrderState(o.Estado)}
+                    disabled={o.Archivada}
                     onChange={(e) =>
                       requestOrderStateChange(o, e.target.value)
                     }
@@ -2886,6 +3115,14 @@ export default function RegisterWorkOrder() {
                       Imprimir
                     </a>
 
+                    <a
+                      href={`/print-valuation/${o.Id}`}
+                      rel="noopener noreferrer"
+                      className="inline-flex justify-center rounded-xl border border-violet-300 bg-violet-50 px-3 py-2 text-sm font-medium text-violet-700 transition hover:bg-violet-100"
+                    >
+                      Valoración
+                    </a>
+
                     {useZagaDocuments && (
                       <>
                         {preOrdersEnabled && (
@@ -2923,7 +3160,8 @@ export default function RegisterWorkOrder() {
                       </button>
                     )}
 
-                    {!isWorkOrderEditLocked(o.Estado) && (
+                    {!o.Archivada &&
+                      !isWorkOrderEditLocked(o.Facturada || o.facturada) && (
                       <button
                         type="button"
                         onClick={() => startEdit(o)}
@@ -2933,7 +3171,8 @@ export default function RegisterWorkOrder() {
                       </button>
                     )}
 
-                    {canInvoiceWorkOrder(o.Estado) &&
+                    {!o.Archivada &&
+                      canInvoiceWorkOrder(o.Estado) &&
                       !(o.Facturada || o.facturada) && (
                       <Link
                         to={`/workshop-invoice/${o.Id}`}
@@ -2944,14 +3183,14 @@ export default function RegisterWorkOrder() {
                       </Link>
                     )}
 
-                    {!(o.Facturada || o.facturada) && (
+                    {!o.Archivada && !(o.Facturada || o.facturada) && (
                       <button
                         type="button"
                         onClick={() => requestOrderDelete(o)}
                         className="inline-flex justify-center gap-2 rounded-xl px-3 py-2 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-sm font-medium text-rose-700 transition"
                       >
-                        <Trash2 size={16} />
-                        Eliminar
+                        <Archive size={16} />
+                        Archivar
                       </button>
                     )}
 
@@ -2976,13 +3215,23 @@ export default function RegisterWorkOrder() {
                 </div>
 
                 <h4 className="mt-4 text-lg font-semibold text-slate-800">
-                  {plateSearch || statusFilter || billedFilter || dateFrom || dateTo
+                  {plateSearch ||
+                  statusFilter ||
+                  billedFilter ||
+                  archiveFilter !== "activas" ||
+                  dateFrom ||
+                  dateTo
                     ? "No se encontraron órdenes"
                     : "No hay órdenes registradas"}
                 </h4>
 
                 <p className="mt-2 text-sm text-slate-500">
-                  {plateSearch || statusFilter || billedFilter || dateFrom || dateTo
+                  {plateSearch ||
+                  statusFilter ||
+                  billedFilter ||
+                  archiveFilter !== "activas" ||
+                  dateFrom ||
+                  dateTo
                     ? "Prueba buscando otra matrícula, cliente o empresa."
                     : "Las nuevas órdenes aparecerán aquí automáticamente."}
                 </p>

@@ -12,7 +12,7 @@ import PartPicker, {
   getPartSalePrice,
 } from "../Components/PartPicker";
 import ZagaInvoiceDocument, { usesZagaInvoiceTemplate } from "../Components/ZagaInvoiceDocument";
-import { amountInput } from "../utils/currency";
+import MoneyInput from "../Components/MoneyInput";
 import {
   currentFiscalYearStart,
   localDateInputValue,
@@ -916,12 +916,14 @@ export default function SpecialPartsInvoice() {
               </select>
             </label>
             {isInsuranceCustomer && (
-              <Input
-                label="Franquicia"
-                type="number"
-                value={invoice.franquiciaImporte}
-                onChange={(v) => setInvoiceField("franquiciaImporte", v)}
-              />
+              <label className="block text-sm font-medium text-slate-700">
+                Franquicia
+                <MoneyInput
+                  value={invoice.franquiciaImporte}
+                  onChange={(value) => setInvoiceField("franquiciaImporte", value)}
+                  className={`${inputCls} mt-1 w-full`}
+                />
+              </label>
             )}
           </div>
           {!hasSelectedClient && (
@@ -998,12 +1000,9 @@ export default function SpecialPartsInvoice() {
                     onChange={(event) => setItem(index, "cantidad", event.target.value)}
                     className={inputCls}
                   />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
+                  <MoneyInput
                     value={item.importe}
-                    onChange={(event) => setItem(index, "importe", event.target.value)}
+                    onChange={(value) => setItem(index, "importe", value)}
                     className={inputCls}
                   />
                   <button
@@ -1123,21 +1122,12 @@ export default function SpecialPartsInvoice() {
 
                     {checked && (
                       <div className="mt-2 space-y-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <MoneyInput
                           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
                           placeholder="Importe"
                           value={paymentMethods[method.key]?.amount || ""}
-                          onChange={(event) =>
-                            setPaymentMethodAmount(method.key, event.target.value)
-                          }
-                          onBlur={(event) =>
-                            setPaymentMethodAmount(
-                              method.key,
-                              amountInput(event.target.value),
-                            )
+                          onChange={(value) =>
+                            setPaymentMethodAmount(method.key, value)
                           }
                         />
 

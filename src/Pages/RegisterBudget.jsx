@@ -24,6 +24,7 @@ import PartPicker, {
   getPartSalePrice,
 } from "../Components/PartPicker";
 import { amountInput } from "../utils/currency";
+import MoneyInput from "../Components/MoneyInput";
 
 const EMPTY_BUDGET = {
   NumeroPresupuesto: "",
@@ -1876,22 +1877,13 @@ export default function RegisterBudget() {
                                 section === "ManoObra" ? "Horas" : "Cantidad"
                               }
                             />
-                            <input
-                              type="number"
-                              step="0.01"
+                            <MoneyInput
                               value={item.precioUnitario}
-                              onChange={(e) =>
+                              onChange={(value) =>
                                 setDetailItemField(
                                   item.id,
                                   "precioUnitario",
-                                  e.target.value,
-                                )
-                              }
-                              onBlur={(e) =>
-                                setDetailItemField(
-                                  item.id,
-                                  "precioUnitario",
-                                  Number(e.target.value || 0).toFixed(2),
+                                  value,
                                 )
                               }
                               className={cls}

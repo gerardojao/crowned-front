@@ -15,7 +15,7 @@ import PartPicker, {
   getPartPurchasePrice,
   getPartSalePrice,
 } from "../Components/PartPicker";
-import { amountInput } from "../utils/currency";
+import MoneyInput from "../Components/MoneyInput";
 import {
   currentFiscalYearStart,
   localDateInputValue,
@@ -519,9 +519,10 @@ export default function WorkshopInvoice() {
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
   const isCredit = invoice.tipoPago === "Credito";
   const accountsReceivableEnabled = Boolean(taller.enableAccountsReceivable);
+  const isZeroPayable = companyPayable <= 0.009;
   const paymentContract = buildInvoicePaymentContract({
     isCredit,
-    selectedPaymentMethods,
+    selectedPaymentMethods: isZeroPayable ? [] : selectedPaymentMethods,
     selectedBankId,
   });
   const { backendTipoPago, bankAccountId, pagos } = paymentContract;
@@ -882,7 +883,9 @@ const saveIssuedInvoice = async () => {
 const printInvoice = async () => {
   try {
     if (otros < 0 || otros > baseAntesOtros) {
-      throw new Error("Otros debe ser un descuento entre 0 y la base de la factura.");
+      throw new Error(
+        "Descuento / Otros debe ser un importe entre 0 y la base de la factura.",
+      );
     }
 
     if (isCredit && !accountsReceivableEnabled) {
@@ -893,13 +896,15 @@ const printInvoice = async () => {
       throw new Error("La fecha de vencimiento no puede ser anterior a la fecha de factura.");
     }
 
-    if (!isCredit && !hasPaymentMethods) {
+    if (!isCredit && !isZeroPayable && !hasPaymentMethods) {
       throw new Error("Selecciona al menos un metodo de pago.");
     }
 
-    const paymentWithoutAmount = selectedPaymentMethods.find(
-      (method) => Number(method.amount || 0) <= 0,
-    );
+    const paymentWithoutAmount = isZeroPayable
+      ? null
+      : selectedPaymentMethods.find(
+          (method) => Number(method.amount || 0) <= 0,
+        );
     if (paymentWithoutAmount) {
       throw new Error(`Indica un importe mayor que 0 para ${paymentWithoutAmount.label}.`);
     }
@@ -918,9 +923,11 @@ const printInvoice = async () => {
       throw new Error("El abono inicial no puede superar el importe a pagar por el cliente.");
     }
 
-    const bankPaymentWithoutBank = selectedPaymentMethods.find(
-      (method) => method.key !== "efectivo" && !method.bankAccountId,
-    );
+    const bankPaymentWithoutBank = isZeroPayable
+      ? null
+      : selectedPaymentMethods.find(
+          (method) => method.key !== "efectivo" && !method.bankAccountId,
+        );
     if (bankPaymentWithoutBank) {
       throw new Error(`Selecciona el banco para ${bankPaymentWithoutBank.label}.`);
     }
@@ -1238,15 +1245,17 @@ const printInvoice = async () => {
             </label>
 
             {isInsuranceCustomer && (
-              <input
-                type="number"
-                step="0.01"
-                className={inputCls}
-                placeholder="Franquicia"
-                value={invoice.franquiciaImporte}
-                onChange={(e) => setInvoiceField("franquiciaImporte", e.target.value)}
-                onBlur={(e) => setInvoiceField("franquiciaImporte", amountInput(e.target.value))}
-              />
+              <label className="block text-sm font-semibold text-slate-700">
+                Franquicia
+                <MoneyInput
+                  className={`mt-1 w-full ${inputCls}`}
+                  placeholder="0,00"
+                  value={invoice.franquiciaImporte}
+                  onChange={(value) =>
+                    setInvoiceField("franquiciaImporte", value)
+                  }
+                />
+              </label>
             )}
 
             <input
@@ -1267,23 +1276,29 @@ const printInvoice = async () => {
               onChange={(e) => setInvoiceField("km", e.target.value)}
             />
 
-            <input
-              type="number"
-              className={inputCls}
-              placeholder="IVA %"
-              value={invoice.ivaPct}
-              onChange={(e) => setInvoiceField("ivaPct", e.target.value)}
-            />
-            <input
-              type="number"
-              className={inputCls}
-              placeholder="Otros"
-              value={invoice.otros}
-              min="0"
-              max={baseAntesOtros}
-              onChange={(e) => setInvoiceField("otros", e.target.value)}
-              onBlur={(e) => setInvoiceField("otros", amountInput(e.target.value))}
-            />
+            <label className="block max-w-[140px] text-sm font-semibold text-slate-700">
+              IVA (%)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={`mt-1 w-full ${inputCls}`}
+                value={invoice.ivaPct}
+                onChange={(e) => setInvoiceField("ivaPct", e.target.value)}
+              />
+            </label>
+            <label className="block text-sm font-semibold text-slate-700">
+              Descuento / Otros
+              <MoneyInput
+                className={`mt-1 w-full ${inputCls}`}
+                placeholder="0,00"
+                value={invoice.otros}
+                onChange={(value) => setInvoiceField("otros", value)}
+              />
+              <span className="mt-1 block text-xs font-normal text-slate-500">
+                Introduce un importe positivo; se restará del total de la factura.
+              </span>
+            </label>
 
     {accountsReceivableEnabled && (
             <label className="block text-sm font-semibold text-slate-700">
@@ -1402,21 +1417,12 @@ const printInvoice = async () => {
 
                     {checked && (
                       <div className="mt-2 space-y-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
+                        <MoneyInput
                           className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
                           placeholder="Importe"
                           value={paymentMethods[method.key]?.amount || ""}
-                          onChange={(e) =>
-                            setPaymentMethodAmount(method.key, e.target.value)
-                          }
-                          onBlur={(e) =>
-                            setPaymentMethodAmount(
-                              method.key,
-                              amountInput(e.target.value),
-                            )
+                          onChange={(value) =>
+                            setPaymentMethodAmount(method.key, value)
                           }
                         />
 
@@ -1601,24 +1607,15 @@ const printInvoice = async () => {
                   }
                 />
 
-                <input
-                  type="number"
-                  step="0.01"
+                <MoneyInput
                   className="rounded-xl border border-slate-300 px-3 py-2 text-sm"
                   placeholder={useDetailedRepairLines ? "Precio" : "Precio unitario"}
                   value={useDetailedRepairLines ? item.precioUnitario ?? item.importe : item.importe}
-                  onChange={(e) =>
+                  onChange={(value) =>
                     setItemField(
                       index,
                       useDetailedRepairLines ? "precioUnitario" : "importe",
-                      e.target.value,
-                    )
-                  }
-                  onBlur={(e) =>
-                    setItemField(
-                      index,
-                      useDetailedRepairLines ? "precioUnitario" : "importe",
-                      amountInput(e.target.value),
+                      value,
                     )
                   }
                 />
@@ -1696,6 +1693,8 @@ const printInvoice = async () => {
           selectedPaymentMethods={selectedPaymentMethods}
           warrantyTitle={labels.warrantyTitle}
           warrantyText={labels.warrantyText}
+          otherSummaryLabel="Descuento / Otros"
+          showOtherAsDiscount
         />
       )}
 
@@ -1881,7 +1880,7 @@ const printInvoice = async () => {
               <Row label="BASE IMPONIBLE" value={formatMoney(subtotal)} />
               <Row label="TASA IVA" value={`${invoice.ivaPct || 0}%`} />
               <Row label="IVA" value={formatMoney(iva)} />
-              <Row label="OTROS" value={`- ${formatMoney(otros)}`} />
+              <Row label="DESCUENTO / OTROS" value={`- ${formatMoney(otros)}`} />
               {isInsuranceCustomer && (
                 <>
                   <Row label="FRANQUICIA" value={`- ${formatMoney(franchiseAmount)}`} />
