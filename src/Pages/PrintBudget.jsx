@@ -27,9 +27,12 @@ const eur = new Intl.NumberFormat("es-ES", {
 const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
-export default function PrintBudget() {
+export default function PrintBudget({ documentType = "budget" }) {
   const { id } = useParams();
   const labels = useBusinessTerminology();
+  const isValuation = documentType === "valuation";
+  const documentTitle = isValuation ? "Valoración" : "Presupuesto";
+  const backTo = isValuation ? "/register-work-order#ordenes-recientes" : "/presupuestos";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -42,7 +45,7 @@ export default function PrintBudget() {
   useEffect(() => {
     loadWorkshopSettings();
     loadBudget();
-  }, [id]);
+  }, [id, isValuation]);
 
   const loadWorkshopSettings = async () => {
     try {
@@ -74,17 +77,21 @@ export default function PrintBudget() {
       setLoading(true);
       setError("");
 
-      const res = await api.get(`/Presupuesto/${id}`);
+      const res = await api.get(
+        isValuation ? `/OrdenTrabajo/${id}` : `/Presupuesto/${id}`,
+      );
       const p = res?.data?.data?.[0];
 
       if (!p) {
-        setError("No se encontro el presupuesto.");
+        setError(`No se encontró la ${documentTitle.toLowerCase()}.`);
         return;
       }
 
       setBudget({
         id: p.id ?? p.Id,
-        numeroPresupuesto: p.numeroPresupuesto ?? p.NumeroPresupuesto ?? "",
+        numeroPresupuesto: isValuation
+          ? `Orden #${p.id ?? p.Id ?? id}`
+          : p.numeroPresupuesto ?? p.NumeroPresupuesto ?? "",
         cliente: p.cliente ?? p.Cliente ?? "",
         dni: p.dni ?? p.Dni ?? "",
         telefono: p.telefono ?? p.Telefono ?? "",
@@ -122,7 +129,7 @@ export default function PrintBudget() {
       setError(
         err?.response?.data?.message ||
           err?.message ||
-          "No se pudo cargar el presupuesto.",
+          `No se pudo cargar la ${documentTitle.toLowerCase()}.`,
       );
     } finally {
       setLoading(false);
@@ -169,7 +176,7 @@ export default function PrintBudget() {
   if (loading) {
     return (
       <section className="rounded-2xl bg-white/80 p-6 ring-1 ring-slate-200">
-        Cargando presupuesto...
+        Cargando {documentTitle.toLowerCase()}...
       </section>
     );
   }
@@ -177,7 +184,7 @@ export default function PrintBudget() {
   if (error || !budget) {
     return (
       <section className="rounded-2xl bg-rose-50 p-6 text-rose-700 ring-1 ring-rose-200">
-        {error || "No se encontro el presupuesto."}
+        {error || `No se encontró la ${documentTitle.toLowerCase()}.`}
       </section>
     );
   }
@@ -198,9 +205,9 @@ export default function PrintBudget() {
     return (
       <main className="print-page -mx-4 min-h-screen bg-sky-50/70 px-4 py-6 text-black sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <PrintActions
-          title="Presupuesto"
-          subtitle={`Presupuesto ${documentNumber}`}
-          backTo="/presupuestos"
+          title={documentTitle}
+          subtitle={`${documentTitle} ${documentNumber}`}
+          backTo={backTo}
           printLabel="Imprimir"
         />
 
@@ -514,7 +521,7 @@ export default function PrintBudget() {
 
           <section className="budget-mt-title-row">
             <div>
-              <h1 className="budget-mt-title">Presupuesto</h1>
+              <h1 className="budget-mt-title">{documentTitle}</h1>
               <table className="budget-mt-meta">
                 <tbody>
                   <tr>
@@ -581,8 +588,8 @@ export default function PrintBudget() {
             <thead>
               <tr>
                 <th>Bloque</th>
-                <th>F. presupuesto</th>
-                <th>Validez</th>
+                <th>{isValuation ? "F. valoración" : "F. presupuesto"}</th>
+                <th>{isValuation ? "Referencia" : "Validez"}</th>
                 <th>Kms</th>
                 <th>Cod color</th>
                 <th>Marca y modelo</th>
@@ -592,7 +599,7 @@ export default function PrintBudget() {
               <tr>
                 <td>-</td>
                 <td>{formatDateShort(budget.fecha)}</td>
-                <td>12 días</td>
+                <td>{isValuation ? `Orden #${budget.id}` : "12 días"}</td>
                 <td>{budget.kilometraje || "-"}</td>
                 <td>-</td>
                 <td>{[budget.marca, budget.modelo].filter(Boolean).join(" ") || "-"}</td>
@@ -642,10 +649,12 @@ export default function PrintBudget() {
             />
           </section>
 
-          <div className="budget-mt-validity">
-            Este presupuesto tiene una validez de 12 días hábiles a partir del
-            día siguiente en el que es entregado al cliente.
-          </div>
+          {!isValuation && (
+            <div className="budget-mt-validity">
+              Este presupuesto tiene una validez de 12 días hábiles a partir del
+              día siguiente en el que es entregado al cliente.
+            </div>
+          )}
           <div className="budget-mt-pending">
             {budget.observaciones || "Pendiente configurar"}
           </div>
@@ -656,7 +665,9 @@ export default function PrintBudget() {
               Fecha y firma del taller
             </div>
             <div className="budget-mt-sign">
-              Acepto presupuesto con fecha {formatDateShort(budget.fecha)}
+              {isValuation
+                ? `Valoración entregada con fecha ${formatDateShort(budget.fecha)}`
+                : `Acepto presupuesto con fecha ${formatDateShort(budget.fecha)}`}
               <br />
               {acceptanceSignatureSrc ? (
               <img
@@ -703,9 +714,9 @@ export default function PrintBudget() {
   return (
     <>
       <PrintActions
-        title={labels.budgetTitle}
-        subtitle={`Presupuesto ${budget.numeroPresupuesto}`}
-        backTo="/presupuestos"
+        title={isValuation ? "Valoración" : labels.budgetTitle}
+        subtitle={`${documentTitle} ${budget.numeroPresupuesto}`}
+        backTo={backTo}
         printLabel="Imprimir"
       />
 
@@ -737,7 +748,7 @@ export default function PrintBudget() {
             <div className="text-sm">
               <div className="text-right mb-4">
                 <h2 className="text-2xl font-extrabold uppercase">
-                  PRESUPUESTO
+                  {documentTitle.toUpperCase()}
                 </h2>
               </div>
 
@@ -745,7 +756,9 @@ export default function PrintBudget() {
                 <p className="font-bold">FECHA:</p>
                 <p>{formatDate(budget.fecha)}</p>
 
-                <p className="font-bold">N. PRESUPUESTO:</p>
+                <p className="font-bold">
+                  {isValuation ? "REFERENCIA:" : "N. PRESUPUESTO:"}
+                </p>
                 <p className="text-xl font-extrabold">
                   {budget.numeroPresupuesto}
                 </p>
@@ -827,13 +840,17 @@ export default function PrintBudget() {
 
           <div className="mt-2 grid grid-cols-[1fr_280px] gap-6 items-start">
             <div className="text-sm">
-              <p className="font-extrabold">CONDICIONES DEL PRESUPUESTO</p>
-
-              <p className="mt-2 italic font-semibold leading-5">
-                Este presupuesto tiene validez de 15 días desde su fecha de
-                emision. La aceptacion del presupuesto autoriza el inicio de los
-                trabajos indicados.
+              <p className="font-extrabold">
+                {isValuation ? "DATOS DE LA VALORACIÓN" : "CONDICIONES DEL PRESUPUESTO"}
               </p>
+
+              {!isValuation && (
+                <p className="mt-2 italic font-semibold leading-5">
+                  Este presupuesto tiene validez de 15 días desde su fecha de
+                  emision. La aceptacion del presupuesto autoriza el inicio de los
+                  trabajos indicados.
+                </p>
+              )}
 
               <div className="mt-4">
                 <p className="text-left text-lg font-extrabold underline">

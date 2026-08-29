@@ -108,6 +108,10 @@ function App() {
             <Route path="/ledger" element={protectedElement(<Ledger />)} />
             <Route path="/print-budget/:id" element={protectedElement(<PrintBudget />)} />
             <Route
+              path="/print-valuation/:id"
+              element={protectedElement(<PrintBudget documentType="valuation" />)}
+            />
+            <Route
               path="/admin/workshops"
               element={
                 <ProtectedRoute roles={["superadmin"]}>
