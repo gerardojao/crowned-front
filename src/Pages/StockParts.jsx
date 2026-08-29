@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   ArrowLeft,
   CheckCircle2,
+  Download,
   Edit3,
   PackagePlus,
   RefreshCcw,
@@ -12,6 +13,8 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../Components/api";
 import {
   buildQuickProviderPayload,
@@ -128,6 +131,7 @@ export default function StockParts() {
   const [inventoryPage, setInventoryPage] = useState(1);
   const [inventoryTotal, setInventoryTotal] = useState(0);
   const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventoryExporting, setInventoryExporting] = useState(false);
   const [showLowOnly, setShowLowOnly] = useState(false);
 
   const [form, setForm] = useState(emptyPartForm);
@@ -320,6 +324,111 @@ export default function StockParts() {
     }
   };
 
+  const exportInventoryExcel = async () => {
+    try {
+      setInventoryExporting(true);
+      let rows = [];
+
+      if (showLowOnly) {
+        const res = await api.get("/RepuestoStock/stock-bajo");
+        rows = res?.data?.data?.[0] || [];
+      } else {
+        const exportPageSize = 200;
+        let page = 1;
+        let total = 0;
+
+        do {
+          const res = await api.get("/RepuestoStock", {
+            params: {
+              search: inventorySearch || undefined,
+              esFacturado: false,
+              page,
+              pageSize: exportPageSize,
+            },
+          });
+          const pack = res?.data?.data?.[0];
+          const pageRows = pack?.items || [];
+          total = Number(pack?.total || pageRows.length);
+          rows.push(...pageRows);
+          page += 1;
+          if (pageRows.length < exportPageSize) break;
+        } while (rows.length < total);
+      }
+
+      if (!rows.length) {
+        setNotice({
+          type: "error",
+          text: "No hay stock para exportar con los filtros seleccionados.",
+        });
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "ZagaPro";
+      const worksheet = workbook.addWorksheet("Stock");
+      worksheet.columns = [
+        { header: "Fecha", key: "fecha", width: 14 },
+        { header: "Referencia", key: "referencia", width: 18 },
+        { header: "Factura / Albaran", key: "factura", width: 22 },
+        { header: "Repuesto", key: "repuesto", width: 32 },
+        { header: "Marca", key: "marca", width: 18 },
+        { header: "Proveedor", key: "proveedor", width: 28 },
+        { header: "Stock", key: "stock", width: 12 },
+        { header: "Minimo", key: "minimo", width: 12 },
+        { header: "Compra", key: "compra", width: 14 },
+        { header: "Venta", key: "venta", width: 14 },
+        { header: "Ubicacion", key: "ubicacion", width: 18 },
+      ];
+
+      rows.forEach((row) => {
+        worksheet.addRow({
+          fecha: getValue(row, "fechaCreacion")
+            ? new Date(getValue(row, "fechaCreacion"))
+            : null,
+          referencia: getValue(row, "codigoReferencia", "") || "",
+          factura: getValue(row, "numeroFactura", "") || "",
+          repuesto: getValue(row, "nombre", "") || "",
+          marca: getValue(row, "marca", "") || "",
+          proveedor: getValue(row, "nombreProveedor", "") || "",
+          stock: Number(getValue(row, "cantidad", 0)),
+          minimo: Number(getValue(row, "stockMinimo", 0)),
+          compra: Number(getValue(row, "precioCompra", 0)),
+          venta: Number(getValue(row, "precioVenta", 0)),
+          ubicacion: getValue(row, "ubicacion", "") || "",
+        });
+      });
+
+      worksheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      worksheet.getRow(1).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF334155" },
+      };
+      worksheet.getRow(1).alignment = { vertical: "middle", horizontal: "center" };
+      worksheet.getRow(1).height = 24;
+      worksheet.views = [{ state: "frozen", ySplit: 1 }];
+      worksheet.autoFilter = { from: "A1", to: "K1" };
+      worksheet.getColumn("fecha").numFmt = "dd/mm/yyyy";
+      worksheet.getColumn("stock").numFmt = "0.00";
+      worksheet.getColumn("minimo").numFmt = "0";
+      worksheet.getColumn("compra").numFmt = '#,##0.00 [$€-es-ES]';
+      worksheet.getColumn("venta").numFmt = '#,##0.00 [$€-es-ES]';
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `stock-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+    } catch (err) {
+      console.error(err);
+      setNotice({ type: "error", text: "No se pudo exportar el stock a Excel." });
+    } finally {
+      setInventoryExporting(false);
+    }
+  };
+
   const loadBilled = async () => {
     try {
       setBilledLoading(true);
@@ -469,6 +578,13 @@ export default function StockParts() {
       setNotice({
         type: "error",
         text: "El nombre del repuesto es requerido.",
+      });
+      return;
+    }
+    if (payload.cantidad < 0) {
+      setNotice({
+        type: "error",
+        text: "La cantidad del repuesto no puede ser negativa.",
       });
       return;
     }
@@ -903,6 +1019,7 @@ export default function StockParts() {
               />
               <Input
                 type="number"
+                min="0"
                 step="0.01"
                 label="Cantidad"
                 value={form.cantidad}
@@ -1166,7 +1283,7 @@ export default function StockParts() {
               <h3 className="text-lg font-semibold text-slate-800">
                 Inventario actual
               </h3>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(260px,1fr)_auto_auto]">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(260px,1fr)_auto_auto_auto]">
                 <div className="relative">
                   <Search
                     size={16}
@@ -1205,6 +1322,15 @@ export default function StockParts() {
                 >
                   <RefreshCcw size={16} />
                   Actualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={exportInventoryExcel}
+                  disabled={inventoryExporting || inventoryLoading}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Download size={16} />
+                  {inventoryExporting ? "Exportando..." : "Exportar Excel"}
                 </button>
               </div>
             </div>
