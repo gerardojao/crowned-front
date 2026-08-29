@@ -17,6 +17,8 @@ export default function ZagaInvoiceDocument({
   isDuplicate = false,
   warrantyTitle = "",
   warrantyText = "",
+  otherSummaryLabel = "Otros",
+  showOtherAsDiscount = false,
 }) {
   const logoSrc = resolveApiAssetUrl(taller.logoUrl) || logoZaga;
   const ivaPct = Number(invoice.ivaPct || 21);
@@ -163,6 +165,16 @@ export default function ZagaInvoiceDocument({
               operationType={invoice.tipoOperacion || invoice.TipoOperacion}
             />
 
+            {showOtherAsDiscount && Number(totals.otros || 0) > 0 && (
+              <div className="grid grid-cols-[90px_1fr_70px] px-1 py-1 text-[10px]">
+                <div>DTO.</div>
+                <div>{otherSummaryLabel}</div>
+                <div className="text-right">
+                  {formatPlain(-Math.abs(Number(totals.otros || 0)))}
+                </div>
+              </div>
+            )}
+
             <div className={detailsSpacerClass} />
 
             {(warrantyTitle || warrantyText) && (
@@ -224,7 +236,10 @@ export default function ZagaInvoiceDocument({
               />
               <SummaryCell label="Piezas" value={partsTotal} />
               <SummaryCell label="Pintura" value={0} />
-              <SummaryCell label="Otros" value={totals.otros} />
+              <SummaryCell
+                label={otherSummaryLabel}
+                value={showOtherAsDiscount ? -Math.abs(Number(totals.otros || 0)) : totals.otros}
+              />
               <SummaryCell label="Base Imponible" value={totals.subtotal} />
               <SummaryCell label="Impuestos" value={totals.iva} />
               <SummaryCell label="TOTAL IMPORTE" value={totals.total} strong />

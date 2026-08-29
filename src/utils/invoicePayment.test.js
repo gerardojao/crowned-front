@@ -74,3 +74,13 @@ test("credit invoice without initial payment can still send selected bank accoun
   assert.equal(contract.bankAccountId, 7);
   assert.deepEqual(contract.pagos, []);
 });
+
+test("zero-total invoice needs no payment movement", () => {
+  const contract = buildInvoicePaymentContract({
+    selectedPaymentMethods: [],
+  });
+
+  assert.equal(contract.backendTipoPago, "Efectivo");
+  assert.equal(contract.bankAccountId, null);
+  assert.deepEqual(contract.pagos, []);
+});
