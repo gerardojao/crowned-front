@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, ArrowRightLeft, Landmark, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Download, Landmark, RefreshCw, Trash2, X } from "lucide-react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../Components/api";
 import MoneyInput from "../Components/MoneyInput";
 import { amountInput, currency, parseSpanishMoney } from "../utils/currency";
@@ -71,6 +73,7 @@ export default function Ledger() {
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -339,6 +342,119 @@ export default function Ledger() {
     }
   };
 
+  const exportExcel = async () => {
+    try {
+      setExporting(true);
+      setError("");
+      setNotice("");
+
+      const exportPageSize = 200;
+      const bankParam =
+        accountFilter === "Banco" && bankFilter ? Number(bankFilter) : null;
+      const allItems = [];
+      let exportPage = 1;
+      let expectedTotal = 0;
+
+      do {
+        const response = await api.get("/Mayor", {
+          params: {
+            cuenta: accountFilter || null,
+            tipoMovimiento: typeFilter || null,
+            bankAccountId: bankParam,
+            fechaInicio: from || null,
+            fechaFin: to || null,
+            busqueda: searchFilter || null,
+            page: exportPage,
+            pageSize: exportPageSize,
+          },
+        });
+        const pack = pickPack(response);
+        const pageItems = Array.isArray(pack.items) ? pack.items : [];
+        expectedTotal = Number(pack.totalItems || pageItems.length);
+        allItems.push(...pageItems);
+        exportPage += 1;
+
+        if (pageItems.length === 0 || pageItems.length < exportPageSize) break;
+      } while (allItems.length < expectedTotal);
+
+      const rows = filterDuplicateInitialBalanceRows(allItems);
+      if (rows.length === 0) {
+        setNotice("No hay movimientos para exportar con los filtros seleccionados.");
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "ZagaPro";
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet("Mayor");
+      worksheet.columns = [
+        { header: "Fecha", key: "fecha", width: 14 },
+        { header: "Cuenta", key: "cuenta", width: 20 },
+        { header: "Tipo", key: "tipo", width: 13 },
+        { header: "Origen", key: "origen", width: 16 },
+        { header: "Banco", key: "banco", width: 24 },
+        { header: "Referencia", key: "referencia", width: 24 },
+        { header: "Descripción", key: "descripcion", width: 45 },
+        { header: "Entrada", key: "entrada", width: 16 },
+        { header: "Salida", key: "salida", width: 16 },
+      ];
+
+      rows.forEach((item) => {
+        const type = item.tipoMovimiento ?? item.TipoMovimiento;
+        const account = item.cuenta ?? item.Cuenta;
+        const amount = Math.abs(Number(item.importe ?? item.Importe ?? 0));
+        const rawDate = item.fecha ?? item.Fecha;
+        worksheet.addRow({
+          fecha: rawDate ? new Date(rawDate) : null,
+          cuenta: accountLabel(account),
+          tipo: type || "",
+          origen: item.source ?? item.Source ?? "Mayor",
+          banco:
+            account === "Banco"
+              ? item.bankAccountName ?? item.BankAccountName ?? "Sin banco asignado"
+              : "",
+          referencia: item.referencia ?? item.Referencia ?? "",
+          descripcion: item.descripcion ?? item.Descripcion ?? "",
+          entrada: type === "Ingreso" ? amount : null,
+          salida: type === "Egreso" ? amount : null,
+        });
+      });
+
+      const header = worksheet.getRow(1);
+      header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      header.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF334155" },
+      };
+      header.alignment = { vertical: "middle", horizontal: "center" };
+      header.height = 24;
+      worksheet.views = [{ state: "frozen", ySplit: 1 }];
+      worksheet.autoFilter = { from: "A1", to: "I1" };
+      worksheet.getColumn("fecha").numFmt = "dd/mm/yyyy";
+      worksheet.getColumn("entrada").numFmt = '#,##0.00 [$€-es-ES]';
+      worksheet.getColumn("salida").numFmt = '#,##0.00 [$€-es-ES]';
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `Mayor_${today()}.xlsx`,
+      );
+      setNotice(`${rows.length} movimientos exportados correctamente.`);
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          "No se pudo exportar el Mayor a Excel.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const clearFilters = () => {
     setAccountFilter("");
     setTypeFilter("");
@@ -374,6 +490,17 @@ export default function Ledger() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
+            {moduleEnabled && (
+              <button
+                type="button"
+                onClick={exportExcel}
+                disabled={exporting || loading}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Download size={17} />
+                {exporting ? "Exportando..." : "Exportar Excel"}
+              </button>
+            )}
             {moduleEnabled && (
               <button
                 type="button"
