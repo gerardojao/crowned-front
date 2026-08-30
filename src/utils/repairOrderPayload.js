@@ -207,6 +207,11 @@ export function buildWorkOrderPayload(order, detailedRepairLinesEnabled) {
   const legacyTrabajo = legacyTotals?.descriptions.length
     ? legacyTotals.descriptions.join("\n")
     : null;
+  const detailedTrabajo = normalizedItems
+    .map((item) => String(item.descripcion || "").trim())
+    .filter(Boolean)
+    .join("\n");
+  const trabajo = String(order?.Trabajo || "").trim();
 
   return {
     cliente: order.Cliente,
@@ -234,7 +239,7 @@ export function buildWorkOrderPayload(order, detailedRepairLinesEnabled) {
       ? Number(order.TiempoEstimadoHoras)
       : null,
     tipoOperacion: order.TipoOperacion || "Mecanica",
-    trabajo: order.Trabajo || legacyTrabajo,
+    trabajo: trabajo || detailedTrabajo || legacyTrabajo,
     itemsJson: normalizedItems.length ? JSON.stringify(normalizedItems) : null,
     repuestos: normalizedItems.length
       ? partsTotal

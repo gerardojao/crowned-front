@@ -65,7 +65,7 @@ test("buildWorkOrderPayload serializes technical lines when detailed lines are e
   const payload = buildWorkOrderPayload(baseOrder, true);
   const items = JSON.parse(payload.itemsJson);
 
-  assert.equal(payload.trabajo, null);
+  assert.equal(payload.trabajo, "Servicio cambio aceite");
   assert.equal(payload.cantidad, 1);
   assert.equal(payload.manoObra, 100);
   assert.equal(payload.repuestos, 0);
@@ -75,6 +75,38 @@ test("buildWorkOrderPayload serializes technical lines when detailed lines are e
   assert.equal(items[0].tiempo, 2);
   assert.equal(items[0].kind, "labor");
   assert.equal("sectionLocked" in items[0], false);
+});
+
+test("buildWorkOrderPayload preserves the explicit work summary with detailed lines", () => {
+  const payload = buildWorkOrderPayload(
+    { ...baseOrder, Trabajo: "Revisión general solicitada" },
+    true,
+  );
+
+  assert.equal(payload.trabajo, "Revisión general solicitada");
+});
+
+test("buildWorkOrderPayload joins detailed line descriptions when work is empty", () => {
+  const payload = buildWorkOrderPayload(
+    {
+      ...baseOrder,
+      Items: [
+        ...baseOrder.Items,
+        {
+          descripcion: "Montaje neumáticos",
+          section: "ManoObra",
+          cantidad: 1,
+          precioUnitario: 25,
+        },
+      ],
+    },
+    true,
+  );
+
+  assert.equal(
+    payload.trabajo,
+    "Servicio cambio aceite\nMontaje neumáticos",
+  );
 });
 
 test("buildPreOrderPayload maps pre-order form to backend DTO contract", () => {

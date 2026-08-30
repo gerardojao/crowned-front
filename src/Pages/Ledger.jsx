@@ -1,18 +1,27 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Landmark, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRightLeft, Landmark, RefreshCw, Trash2, X } from "lucide-react";
 import api from "../Components/api";
-import { amountInput, currency } from "../utils/currency";
+import MoneyInput from "../Components/MoneyInput";
+import { amountInput, currency, parseSpanishMoney } from "../utils/currency";
 import { signedLedgerAmount } from "../utils/ledgerAmounts";
-import {
-  buildSummaryFromItems,
-  filterDuplicateInitialBalanceRows,
-} from "../utils/ledgerInitialBalances";
+import { filterDuplicateInitialBalanceRows } from "../utils/ledgerInitialBalances";
 
 const ACCOUNTS = ["Cliente", "Proveedor", "IvaSoportado", "IvaRepercutido", "Banco", "Efectivo"];
 const MOVEMENT_TYPES = ["Ingreso", "Egreso"];
 
 const today = () => new Date().toISOString().slice(0, 10);
+
+const parseTransferAccount = (value) => {
+  if (value === "cash") return { tipo: "Efectivo", bankAccountId: null };
+  if (String(value).startsWith("bank:")) {
+    return {
+      tipo: "Banco",
+      bankAccountId: Number(String(value).slice(5)),
+    };
+  }
+  return null;
+};
 
 // const pickPack = (res) => {
 //   const pack = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? {};
@@ -81,6 +90,17 @@ export default function Ledger() {
   });
 
   const [searchFilter, setSearchFilter] = useState("");
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [transferSaving, setTransferSaving] = useState(false);
+  const [transferForm, setTransferForm] = useState({
+    requestId: crypto.randomUUID(),
+    origen: "cash",
+    destino: "",
+    importe: "",
+    fecha: today(),
+    concepto: "Ingreso de efectivo en banco",
+    referencia: "",
+  });
 
   const load = async (filters = {}) => {
     try {
@@ -133,7 +153,7 @@ export default function Ledger() {
         nextAccountFilter === "Banco" && nextBankFilter
           ? Number(nextBankFilter)
           : null;
-      const [itemsRes, summaryRes, banksRes] = await Promise.all([
+      const [itemsRes, banksRes] = await Promise.all([
         api.get("/Mayor", {
           params: {
             cuenta: nextAccountFilter || null,
@@ -146,25 +166,12 @@ export default function Ledger() {
             pageSize,
           },
         }),
-        api.get("/Mayor", {
-          params: {
-            bankAccountId: bankParam,
-            tipoMovimiento: nextTypeFilter || null,
-            fechaInicio: nextFrom || null,
-            fechaFin: nextTo || null,
-            busqueda: nextSearchFilter || null,
-            page: 1,
-            pageSize: 100000,
-          },
-        }),
         api.get("/WorkshopBankAccounts"),
       ]);
       const itemsPack = pickPack(itemsRes);
-      const summaryPack = pickPack(summaryRes);
       const visibleItems = filterDuplicateInitialBalanceRows(itemsPack.items);
-      const summaryItems = filterDuplicateInitialBalanceRows(summaryPack.items);
       setItems(visibleItems);
-      setSummary(buildSummaryFromItems(summaryItems));
+      setSummary(itemsPack.resumen);
       setPage(itemsPack.page);
       setTotalItems(itemsPack.totalItems);
       setTotalPages(itemsPack.totalPages);
@@ -236,12 +243,21 @@ export default function Ledger() {
     }
   };
 
-  const remove = async (id) => {
+  const remove = async (id, reference = "") => {
+    const isTransfer = String(reference).startsWith("TRASPASO-");
+    if (
+      isTransfer &&
+      !window.confirm(
+        "Se anularán simultáneamente la salida y la entrada del traspaso. ¿Deseas continuar?",
+      )
+    ) {
+      return;
+    }
     try {
       setError("");
       setNotice("");
       await api.delete(`/Mayor/${id}`);
-      setNotice("Movimiento eliminado.");
+      setNotice(isTransfer ? "Traspaso interno anulado." : "Movimiento eliminado.");
       await load();
     } catch (err) {
       console.error(err);
@@ -251,6 +267,75 @@ export default function Ledger() {
           err?.message ||
           "No se pudo eliminar el movimiento.",
       );
+    }
+  };
+
+  const openTransferModal = () => {
+    const firstBank = bankAccounts[0];
+    const firstBankId = firstBank?.id ?? firstBank?.Id;
+    setTransferForm({
+      requestId: crypto.randomUUID(),
+      origen: "cash",
+      destino: firstBankId ? `bank:${firstBankId}` : "",
+      importe: "",
+      fecha: today(),
+      concepto: "Ingreso de efectivo en banco",
+      referencia: "",
+    });
+    setShowTransferModal(true);
+  };
+
+  const saveTransfer = async (event) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    const origin = parseTransferAccount(transferForm.origen);
+    const destination = parseTransferAccount(transferForm.destino);
+    const amount = parseSpanishMoney(transferForm.importe);
+
+    if (!origin || !destination) {
+      setError("Selecciona una cuenta de origen y una cuenta de destino.");
+      return;
+    }
+    if (transferForm.origen === transferForm.destino) {
+      setError("La cuenta de origen y destino deben ser diferentes.");
+      return;
+    }
+    if (amount <= 0) {
+      setError("El importe del traspaso debe ser mayor que 0.");
+      return;
+    }
+
+    try {
+      setTransferSaving(true);
+      const res = await api.post("/Mayor/traspasos", {
+        requestId: transferForm.requestId,
+        tipoOrigen: origin.tipo,
+        bankAccountOrigenId: origin.bankAccountId,
+        tipoDestino: destination.tipo,
+        bankAccountDestinoId: destination.bankAccountId,
+        importe: amount,
+        fecha: transferForm.fecha,
+        concepto: transferForm.concepto.trim() || null,
+        referencia: transferForm.referencia.trim() || null,
+      });
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(res?.data?.message || res?.data?.Message);
+      }
+      setShowTransferModal(false);
+      setNotice("Traspaso interno registrado sin afectar ingresos ni gastos.");
+      await load({ page: 1 });
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo registrar el traspaso.",
+      );
+    } finally {
+      setTransferSaving(false);
     }
   };
 
@@ -289,6 +374,16 @@ export default function Ledger() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
+            {moduleEnabled && (
+              <button
+                type="button"
+                onClick={openTransferModal}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-800"
+              >
+                <ArrowRightLeft size={17} />
+                Nuevo traspaso
+              </button>
+            )}
             <Link
               to="/"
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -657,6 +752,135 @@ export default function Ledger() {
           </section>
         </>
       )}
+
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <form
+            onSubmit={saveTransfer}
+            className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Nuevo traspaso interno</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Mueve dinero entre caja y bancos sin generar ingresos ni gastos.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTransferModal(false)}
+                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Cerrar"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {["origen", "destino"].map((field) => (
+                <label key={field} className="grid gap-1 text-sm font-semibold text-slate-700">
+                  {field === "origen" ? "Cuenta de origen" : "Cuenta de destino"}
+                  <select
+                    value={transferForm[field]}
+                    onChange={(event) =>
+                      setTransferForm((current) => ({
+                        ...current,
+                        [field]: event.target.value,
+                      }))
+                    }
+                    required
+                    className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  >
+                    <option value="">Seleccionar</option>
+                    <option value="cash">Efectivo / Caja</option>
+                    {bankAccounts.map((bank) => {
+                      const id = bank.id ?? bank.Id;
+                      const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                      const iban = bank.iban ?? bank.Iban ?? "";
+                      return (
+                        <option key={id} value={`bank:${id}`}>
+                          {iban ? `${name} · ${iban}` : name}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              ))}
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Importe
+                <MoneyInput
+                  value={transferForm.importe}
+                  onChange={(value) =>
+                    setTransferForm((current) => ({ ...current, importe: value }))
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  required
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+                Fecha
+                <input
+                  type="date"
+                  max={today()}
+                  value={transferForm.fecha}
+                  onChange={(event) =>
+                    setTransferForm((current) => ({ ...current, fecha: event.target.value }))
+                  }
+                  required
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+                Concepto
+                <input
+                  value={transferForm.concepto}
+                  onChange={(event) =>
+                    setTransferForm((current) => ({ ...current, concepto: event.target.value }))
+                  }
+                  maxLength={200}
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                />
+              </label>
+
+              <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+                Referencia o justificante (opcional)
+                <input
+                  value={transferForm.referencia}
+                  onChange={(event) =>
+                    setTransferForm((current) => ({ ...current, referencia: event.target.value }))
+                  }
+                  maxLength={100}
+                  placeholder="Número del ingreso bancario"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 rounded-xl bg-indigo-50 p-3 text-sm text-indigo-800 ring-1 ring-indigo-200">
+              Se registrará una salida en la cuenta de origen y una entrada por el mismo importe en la cuenta de destino. El resultado económico será 0,00 €.
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowTransferModal(false)}
+                className="rounded-xl bg-white px-4 py-2.5 font-semibold text-slate-700 ring-1 ring-slate-200"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={transferSaving}
+                className="rounded-xl bg-indigo-700 px-4 py-2.5 font-semibold text-white hover:bg-indigo-800 disabled:opacity-60"
+              >
+                {transferSaving ? "Registrando..." : "Registrar traspaso"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </section>
   );
 }
@@ -683,7 +907,8 @@ function LedgerRow({ item, onRemove }) {
   const source = item.source ?? item.Source ?? "Mayor";
   const account = item.cuenta ?? item.Cuenta;
   const bankName = item.bankAccountName ?? item.BankAccountName;
-  const canDelete = source === "Mayor";
+  const reference = item.referencia ?? item.Referencia ?? "";
+  const canDelete = source === "Mayor" || source === "Traspaso";
   return (
     <tr className="hover:bg-slate-50">
       <td className="px-3 py-3 text-slate-600">
@@ -716,7 +941,7 @@ function LedgerRow({ item, onRemove }) {
         {canDelete ? (
           <button
             type="button"
-            onClick={() => onRemove(sourceId)}
+            onClick={() => onRemove(sourceId, reference)}
             className="rounded-lg p-2 text-rose-700 hover:bg-rose-50"
             aria-label="Eliminar movimiento"
           >
@@ -737,7 +962,8 @@ function MobileMovement({ item, onRemove }) {
   const source = item.source ?? item.Source ?? "Mayor";
   const account = item.cuenta ?? item.Cuenta;
   const bankName = item.bankAccountName ?? item.BankAccountName;
-  const canDelete = source === "Mayor";
+  const reference = item.referencia ?? item.Referencia ?? "";
+  const canDelete = source === "Mayor" || source === "Traspaso";
   return (
     <article className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
@@ -773,7 +999,7 @@ function MobileMovement({ item, onRemove }) {
       {canDelete && (
         <button
           type="button"
-          onClick={() => onRemove(sourceId)}
+          onClick={() => onRemove(sourceId, reference)}
           className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700"
         >
           <Trash2 size={16} />
@@ -790,6 +1016,8 @@ function SourceBadge({ source }) {
       ? "bg-sky-50 text-sky-700 ring-sky-200"
       : source === "Egreso"
         ? "bg-amber-50 text-amber-700 ring-amber-200"
+        : source === "Traspaso"
+          ? "bg-indigo-50 text-indigo-700 ring-indigo-200"
         : "bg-slate-100 text-slate-700 ring-slate-200";
   return (
     <span
