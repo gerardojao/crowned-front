@@ -754,14 +754,17 @@ export default function Ledger() {
       )}
 
       {showTransferModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]">
           <form
             onSubmit={saveTransfer}
-            className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200"
+            className="max-h-[calc(100vh-2rem)] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-xl font-bold text-slate-900">Nuevo traspaso interno</h3>
+                <div className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                  <ArrowRightLeft size={21} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-950">Nuevo traspaso interno</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   Mueve dinero entre caja y bancos sin generar ingresos ni gastos.
                 </p>
@@ -769,16 +772,16 @@ export default function Ledger() {
               <button
                 type="button"
                 onClick={() => setShowTransferModal(false)}
-                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"
+                className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
                 aria-label="Cerrar"
               >
                 <X size={19} />
               </button>
             </div>
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-6 grid gap-5 sm:grid-cols-2">
               {["origen", "destino"].map((field) => (
-                <label key={field} className="grid gap-1 text-sm font-semibold text-slate-700">
+                <label key={field} className="grid min-w-0 gap-1.5 text-left text-sm font-semibold text-slate-700">
                   {field === "origen" ? "Cuenta de origen" : "Cuenta de destino"}
                   <select
                     value={transferForm[field]}
@@ -789,7 +792,7 @@ export default function Ledger() {
                       }))
                     }
                     required
-                    className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                    className="h-11 w-full min-w-0 truncate rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   >
                     <option value="">Seleccionar</option>
                     <option value="cash">Efectivo / Caja</option>
@@ -807,19 +810,19 @@ export default function Ledger() {
                 </label>
               ))}
 
-              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              <label className="grid gap-1.5 text-left text-sm font-semibold text-slate-700">
                 Importe
                 <MoneyInput
                   value={transferForm.importe}
                   onChange={(value) =>
                     setTransferForm((current) => ({ ...current, importe: value }))
                   }
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-base font-semibold outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   required
                 />
               </label>
 
-              <label className="grid gap-1 text-sm font-semibold text-slate-700">
+              <label className="grid gap-1.5 text-left text-sm font-semibold text-slate-700">
                 Fecha
                 <input
                   type="date"
@@ -829,11 +832,11 @@ export default function Ledger() {
                     setTransferForm((current) => ({ ...current, fecha: event.target.value }))
                   }
                   required
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 />
               </label>
 
-              <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+              <label className="grid gap-1.5 text-left text-sm font-semibold text-slate-700 sm:col-span-2">
                 Concepto
                 <input
                   value={transferForm.concepto}
@@ -841,11 +844,12 @@ export default function Ledger() {
                     setTransferForm((current) => ({ ...current, concepto: event.target.value }))
                   }
                   maxLength={200}
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  placeholder="Ej. Ingreso de efectivo en banco"
+                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 />
               </label>
 
-              <label className="grid gap-1 text-sm font-semibold text-slate-700 sm:col-span-2">
+              <label className="grid gap-1.5 text-left text-sm font-semibold text-slate-700 sm:col-span-2">
                 Referencia o justificante (opcional)
                 <input
                   value={transferForm.referencia}
@@ -854,26 +858,29 @@ export default function Ledger() {
                   }
                   maxLength={100}
                   placeholder="Número del ingreso bancario"
-                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                  className="h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 />
               </label>
             </div>
 
-            <div className="mt-5 rounded-xl bg-indigo-50 p-3 text-sm text-indigo-800 ring-1 ring-indigo-200">
+            <div className="mt-6 flex gap-3 rounded-2xl bg-indigo-50 p-4 text-left text-sm leading-5 text-indigo-900 ring-1 ring-indigo-200">
+              <Landmark className="mt-0.5 shrink-0 text-indigo-600" size={18} />
+              <span>
               Se registrará una salida en la cuenta de origen y una entrada por el mismo importe en la cuenta de destino. El resultado económico será 0,00 €.
+              </span>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-6 flex flex-col-reverse gap-2 border-t border-slate-200 pt-5 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setShowTransferModal(false)}
-                className="rounded-xl bg-white px-4 py-2.5 font-semibold text-slate-700 ring-1 ring-slate-200"
+                className="rounded-xl bg-white px-5 py-2.5 font-semibold text-slate-700 ring-1 ring-slate-300 transition hover:bg-slate-100"
               >
                 Cancelar
               </button>
               <button
                 disabled={transferSaving}
-                className="rounded-xl bg-indigo-700 px-4 py-2.5 font-semibold text-white hover:bg-indigo-800 disabled:opacity-60"
+                className="rounded-xl bg-indigo-600 px-5 py-2.5 font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {transferSaving ? "Registrando..." : "Registrar traspaso"}
               </button>
