@@ -27,6 +27,7 @@ import {
   getInvoiceLineSection,
   getInvoiceLineTotal,
   getInvoiceSubtotal,
+  isInvoiceLineEligible,
   normalizeInvoiceLineForTotals,
   parseOrderItems,
   round2,
@@ -836,15 +837,10 @@ export default function WorkshopInvoice() {
   };
 
 const saveIssuedInvoice = async () => {
-  const billableItems = invoiceItems
-    .filter(
-      (item) =>
-        String(item.descripcion || item.codigo || "").trim() &&
-        getInvoiceLineTotal(item) > 0,
-    );
+  const billableItems = invoiceItems.filter(isInvoiceLineEligible);
 
   if (billableItems.length === 0) {
-    throw new Error("La factura debe tener al menos una línea con importe mayor que 0.");
+    throw new Error("La factura debe tener al menos una línea con descripción y un importe válido.");
   }
 
   const payload = {

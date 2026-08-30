@@ -43,6 +43,12 @@ export function getInvoiceLineTotal(item) {
   return round2(Number(item?.cantidad || 0) * Number(item?.importe || 0));
 }
 
+export function isInvoiceLineEligible(item) {
+  const description = String(item?.descripcion || item?.codigo || "").trim();
+  const total = getInvoiceLineTotal(item);
+  return Boolean(description) && Number.isFinite(total) && total >= 0;
+}
+
 function getStoredInvoiceLineTotal(item) {
   return (
     item?.lineTotal ??

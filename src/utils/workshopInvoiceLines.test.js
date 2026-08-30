@@ -5,9 +5,22 @@ import {
   buildInvoicePayloadItems,
   getInvoiceLineTotal,
   getInvoiceSubtotal,
+  isInvoiceLineEligible,
   normalizeInvoiceLineForTotals,
   round2,
 } from "./workshopInvoiceLines.js";
+
+test("invoice lines with a description and zero price remain eligible", () => {
+  assert.equal(
+    isInvoiceLineEligible({ descripcion: "Trabajo en garantía", cantidad: 1, importe: 0 }),
+    true,
+  );
+  assert.equal(isInvoiceLineEligible({ descripcion: "", cantidad: 1, importe: 0 }), false);
+  assert.equal(
+    isInvoiceLineEligible({ descripcion: "Importe inválido", cantidad: 1, importe: -1 }),
+    false,
+  );
+});
 
 test("keeps original line net total when rounded unit net would inflate it", () => {
   const line = normalizeInvoiceLineForTotals(

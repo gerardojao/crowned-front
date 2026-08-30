@@ -618,7 +618,8 @@ export default function SpecialPartsInvoice() {
         (item) =>
           String(item.descripcion || "").trim() &&
           Number(item.cantidad || 0) > 0 &&
-          Number(item.importe || 0) > 0,
+          Number.isFinite(Number(item.importe)) &&
+          Number(item.importe) >= 0,
       )
       .map((item) => ({
         ...item,
@@ -630,7 +631,7 @@ export default function SpecialPartsInvoice() {
 
     if (!invoice.cliente.trim()) throw new Error("El cliente es requerido.");
     if (!billableItems.length) {
-      throw new Error(`Agrega al menos una línea de ${invoiceMode.titleLower} con importe mayor que 0.`);
+      throw new Error(`Agrega al menos una línea de ${invoiceMode.titleLower} con descripción y un importe válido.`);
     }
     if (isCredit && !accountsReceivableEnabled) {
       throw new Error("El módulo de cuentas por cobrar no está habilitado para este taller.");
