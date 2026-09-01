@@ -190,6 +190,14 @@ function splitLegacyRepairTotals(items) {
   );
 }
 
+const WORK_SUMMARY_MAX_LENGTH = 500;
+
+function limitWorkSummary(value) {
+  const text = String(value || "").trim();
+  if (text.length <= WORK_SUMMARY_MAX_LENGTH) return text;
+  return `${text.slice(0, WORK_SUMMARY_MAX_LENGTH - 3).trimEnd()}...`;
+}
+
 export function buildWorkOrderPayload(order, detailedRepairLinesEnabled) {
   const normalizedItems = buildNormalizedRepairItems(
     order?.Items,
@@ -211,7 +219,9 @@ export function buildWorkOrderPayload(order, detailedRepairLinesEnabled) {
     .map((item) => String(item.descripcion || "").trim())
     .filter(Boolean)
     .join("\n");
-  const trabajo = String(order?.Trabajo || "").trim();
+  const trabajo = limitWorkSummary(
+    String(order?.Trabajo || "").trim() || detailedTrabajo || legacyTrabajo,
+  );
 
   return {
     cliente: order.Cliente,
@@ -239,7 +249,7 @@ export function buildWorkOrderPayload(order, detailedRepairLinesEnabled) {
       ? Number(order.TiempoEstimadoHoras)
       : null,
     tipoOperacion: order.TipoOperacion || "Mecanica",
-    trabajo: trabajo || detailedTrabajo || legacyTrabajo,
+    trabajo,
     itemsJson: normalizedItems.length ? JSON.stringify(normalizedItems) : null,
     repuestos: normalizedItems.length
       ? partsTotal

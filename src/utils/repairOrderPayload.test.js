@@ -109,6 +109,27 @@ test("buildWorkOrderPayload joins detailed line descriptions when work is empty"
   );
 });
 
+test("buildWorkOrderPayload limits the work summary without losing detailed lines", () => {
+  const items = Array.from({ length: 12 }, (_, index) => ({
+    descripcion: `${index + 1} - ${"Recambio con descripcion extensa ".repeat(3)}`,
+    section: "Piezas",
+    cantidad: 1,
+    precioUnitario: 25,
+  }));
+  const payload = buildWorkOrderPayload(
+    { ...baseOrder, Trabajo: "", Items: items },
+    true,
+  );
+
+  assert.equal(payload.trabajo.length, 500);
+  assert.equal(payload.trabajo.endsWith("..."), true);
+  assert.equal(JSON.parse(payload.itemsJson).length, items.length);
+  assert.equal(
+    JSON.parse(payload.itemsJson)[11].descripcion,
+    items[11].descripcion.trim(),
+  );
+});
+
 test("buildPreOrderPayload maps pre-order form to backend DTO contract", () => {
   const payload = buildPreOrderPayload({
     Cliente: "Cliente Test",
