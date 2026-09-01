@@ -7,8 +7,22 @@ import {
   getInvoiceSubtotal,
   isInvoiceLineEligible,
   normalizeInvoiceLineForTotals,
+  normalizeProviderId,
   round2,
 } from "./workshopInvoiceLines.js";
+
+test("invoice provider ids normalize zero and invalid values to null", () => {
+  assert.equal(normalizeProviderId(0), null);
+  assert.equal(normalizeProviderId("0"), null);
+  assert.equal(normalizeProviderId(undefined), null);
+  assert.equal(normalizeProviderId("invalid"), null);
+  assert.equal(normalizeProviderId("17"), 17);
+
+  const [payloadItem] = buildInvoicePayloadItems([
+    { descripcion: "Recambio sin proveedor", cantidad: 1, importe: 25, idProveedor: 0 },
+  ]);
+  assert.equal(payloadItem.idProveedor, null);
+});
 
 test("invoice lines with a description and zero price remain eligible", () => {
   assert.equal(

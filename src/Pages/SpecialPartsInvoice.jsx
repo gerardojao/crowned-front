@@ -19,6 +19,7 @@ import {
 } from "../utils/date";
 import { buildInvoicePaymentContract } from "../utils/invoicePayment";
 import { getBusinessTerminology } from "../utils/businessTerminology";
+import { normalizeProviderId } from "../utils/workshopInvoiceLines";
 
 const DEFAULT_TALLER = {
   nombre: "Multiservicios Crower",
@@ -695,7 +696,12 @@ export default function SpecialPartsInvoice() {
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
       bankAccountId,
       pagos,
-      items: billableItems,
+      items: billableItems.map((item) => ({
+        ...item,
+        idProveedor: normalizeProviderId(
+          item?.idProveedor ?? item?.IdProveedor,
+        ),
+      })),
     });
 
     if (res?.data?.ok === 0 || res?.data?.Ok === 0) {

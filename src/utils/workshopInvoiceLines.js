@@ -1,6 +1,11 @@
 export const round2 = (value) =>
   Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
+export function normalizeProviderId(value) {
+  const providerId = Number(value);
+  return Number.isInteger(providerId) && providerId > 0 ? providerId : null;
+}
+
 export function getInvoiceLineSection(item) {
   const raw = String(
     item?.section ??
@@ -160,7 +165,9 @@ export function parseOrderItems(itemsJson) {
               item?.idRepuesto ??
               item?.IdRepuesto ??
               null,
-            idProveedor: item?.idProveedor ?? item?.IdProveedor ?? null,
+            idProveedor: normalizeProviderId(
+              item?.idProveedor ?? item?.IdProveedor,
+            ),
             nombreProveedor: item?.nombreProveedor ?? item?.NombreProveedor ?? null,
             precioCompra: item?.precioCompra ?? item?.PrecioCompra ?? null,
           },
@@ -202,6 +209,9 @@ export function buildInvoicePayloadItems(items) {
     return [{
       ...item,
       importe: normalizedUnit,
+      idProveedor: normalizeProviderId(
+        item?.idProveedor ?? item?.IdProveedor,
+      ),
     }];
   });
 }
@@ -218,6 +228,9 @@ function splitLineForBackendTwoDecimalUnit(item, quantity, lineTotal) {
       ...item,
       cantidad: higherUnitCount,
       importe: round2((baseUnitCents + 1) / 100),
+      idProveedor: normalizeProviderId(
+        item?.idProveedor ?? item?.IdProveedor,
+      ),
     });
   }
 
@@ -226,6 +239,9 @@ function splitLineForBackendTwoDecimalUnit(item, quantity, lineTotal) {
       ...item,
       cantidad: lowerUnitCount,
       importe: round2(baseUnitCents / 100),
+      idProveedor: normalizeProviderId(
+        item?.idProveedor ?? item?.IdProveedor,
+      ),
     });
   }
 
