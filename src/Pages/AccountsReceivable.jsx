@@ -86,6 +86,7 @@ export default function AccountsReceivable() {
   const [to, setTo] = useState("");
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
+  const [onlyOverdue, setOnlyOverdue] = useState(false);
   const [clienteFilter, setClienteFilter] = useState("");
   const [matriculaFilter, setMatriculaFilter] = useState("");
   const [facturaFilter, setFacturaFilter] = useState("");
@@ -148,6 +149,15 @@ export default function AccountsReceivable() {
         if (to && (!fecha || fecha > to)) return false;
         if (dueFrom && (!fechaVencimiento || fechaVencimiento < dueFrom)) return false;
         if (dueTo && (!fechaVencimiento || fechaVencimiento > dueTo)) return false;
+        if (
+          onlyOverdue &&
+          daysOverdue(
+            item.fechaVencimiento ?? item.FechaVencimiento,
+            item.estadoCxC ?? item.EstadoCxC,
+          ) === 0
+        ) {
+          return false;
+        }
         if (!includesText(item.cliente ?? item.Cliente, clienteFilter)) return false;
         if (!includesText(item.matricula ?? item.Matricula, matriculaFilter)) return false;
         if (!includesText(item.numeroFactura ?? item.NumeroFactura, facturaFilter)) return false;
@@ -159,7 +169,17 @@ export default function AccountsReceivable() {
         if (fechaA !== fechaB) return fechaB - fechaA;
         return Number(b.id ?? b.Id ?? 0) - Number(a.id ?? a.Id ?? 0);
       });
-  }, [items, from, to, dueFrom, dueTo, clienteFilter, matriculaFilter, facturaFilter]);
+  }, [
+    items,
+    from,
+    to,
+    dueFrom,
+    dueTo,
+    onlyOverdue,
+    clienteFilter,
+    matriculaFilter,
+    facturaFilter,
+  ]);
 
   const summary = useMemo(() => {
     return filteredItems.reduce(
@@ -202,7 +222,9 @@ export default function AccountsReceivable() {
     worksheet.getCell("A1").alignment = { horizontal: "center" };
 
     worksheet.mergeCells("A2:J2");
-    worksheet.getCell("A2").value = `Estado: ${estado}`;
+    worksheet.getCell("A2").value = `Estado: ${estado} | Vencimiento: ${
+      onlyOverdue ? "Solo vencidas" : "Todas"
+    }`;
     worksheet.getCell("A2").alignment = { horizontal: "center" };
 
     worksheet.mergeCells("A3:J3");
@@ -525,6 +547,18 @@ export default function AccountsReceivable() {
                 {item}
               </button>
             ))}
+              <button
+                type="button"
+                aria-pressed={onlyOverdue}
+                onClick={() => setOnlyOverdue((current) => !current)}
+                className={`rounded-xl px-3 py-2 text-sm font-bold ring-1 ${
+                  onlyOverdue
+                    ? "bg-amber-500 text-white ring-amber-500"
+                    : "bg-white text-amber-700 ring-amber-300 hover:bg-amber-50"
+                }`}
+              >
+                Solo vencidas
+              </button>
             </div>
           </div>
 

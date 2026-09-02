@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Landmark, X } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import api from "../../../Components/api";
@@ -13,6 +13,10 @@ import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 import PaymentModal from "./PaymentModal";
 
 const CASH_PAYMENT_VALUE = "cash";
+
+const isRefundableSupplierCredit = (invoice) =>
+  invoice?.isSupplierCredit === true &&
+  Number(invoice?.saldoAFavor || 0) > 0;
 
 function normalizePendingInvoice(item) {
   const total = Number(item?.total ?? item?.Total ?? 0);
@@ -75,6 +79,16 @@ export default function AccountsPayablePanel({
     amount: "",
     mode: "full",
     loading: false,
+  });
+  const [refundModal, setRefundModal] = useState({
+    open: false,
+    credit: null,
+    bankAccountId: "",
+    amount: "",
+    fecha: new Date().toISOString().slice(0, 10),
+    referencia: "",
+    saving: false,
+    error: "",
   });
 
   const setFilterField = (name, value) => {
@@ -212,6 +226,75 @@ export default function AccountsPayablePanel({
           "No se pudo marcar la factura como pagada.",
       );
       setPaymentModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const openRefundModal = (credit) => {
+    if (!isRefundableSupplierCredit(credit)) return;
+
+    const mainBank =
+      bankAccounts.find((bank) => bank.esPrincipal ?? bank.EsPrincipal) ||
+      bankAccounts[0];
+    setRefundModal({
+      open: true,
+      credit,
+      bankAccountId: String(mainBank?.id ?? mainBank?.Id ?? ""),
+      amount: String(Number(credit.saldoAFavor || 0)),
+      fecha: new Date().toISOString().slice(0, 10),
+      referencia: "",
+      saving: false,
+      error: "",
+    });
+  };
+
+  const closeRefundModal = () => {
+    if (refundModal.saving) return;
+    setRefundModal((prev) => ({ ...prev, open: false }));
+  };
+
+  const confirmRefund = async () => {
+    const credit = refundModal.credit;
+    const amount = Number(refundModal.amount);
+    const available = Number(credit?.saldoAFavor || 0);
+    if (!credit || refundModal.saving) return;
+    if (!refundModal.bankAccountId) {
+      setRefundModal((prev) => ({ ...prev, error: "Selecciona una cuenta bancaria." }));
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0 || amount > available) {
+      setRefundModal((prev) => ({
+        ...prev,
+        error: "El importe debe ser mayor que cero y no superar el saldo disponible.",
+      }));
+      return;
+    }
+
+    try {
+      setRefundModal((prev) => ({ ...prev, saving: true, error: "" }));
+      const res = await api.post(`/FacturaRecibida/${credit.id}/devoluciones`, {
+        importe: amount,
+        bankAccountId: Number(refundModal.bankAccountId),
+        fecha: refundModal.fecha || null,
+        referencia: refundModal.referencia.trim() || null,
+      });
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) {
+        throw new Error(res?.data?.message || res?.data?.Message);
+      }
+
+      setRefundModal((prev) => ({ ...prev, open: false, saving: false }));
+      await loadPendingInvoices();
+      await onInvoicesChanged?.();
+    } catch (err) {
+      setRefundModal((prev) => ({
+        ...prev,
+        saving: false,
+        error:
+          err?.response?.data?.detail ||
+          err?.response?.data?.message ||
+          err?.response?.data?.Message ||
+          err?.message ||
+          "No se pudo registrar la devolución bancaria.",
+      }));
     }
   };
 
@@ -564,7 +647,16 @@ export default function AccountsPayablePanel({
                       ) : null}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      {item.canRegisterPayment ? (
+                      {isRefundableSupplierCredit(item) ? (
+                        <button
+                          type="button"
+                          onClick={() => openRefundModal(item)}
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 ring-1 ring-indigo-200 hover:bg-indigo-100"
+                        >
+                          <Landmark size={14} />
+                          Registrar devolución
+                        </button>
+                      ) : item.canRegisterPayment ? (
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -660,6 +752,158 @@ export default function AccountsPayablePanel({
         onCancel={closePaymentModal}
         onConfirm={confirmPayment}
       />
+
+      {refundModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-white">
+                  <Landmark size={21} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-950">
+                  Registrar devolución bancaria
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Registra el dinero devuelto por el proveedor directamente en el banco.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeRefundModal}
+                className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"
+                aria-label="Cerrar"
+              >
+                <X size={19} />
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-200">
+              <p className="text-sm font-bold text-sky-900">
+                {refundModal.credit?.proveedor}
+              </p>
+              <div className="mt-2 flex items-center justify-between gap-4 text-sm">
+                <span className="text-sky-700">
+                  {refundModal.credit?.tipoDocumento}{" "}
+                  {refundModal.credit?.numeroFactura || "-"}
+                </span>
+                <span className="font-extrabold text-sky-900">
+                  Disponible: {formatCurrency(refundModal.credit?.saldoAFavor)}
+                </span>
+              </div>
+            </div>
+
+            {refundModal.error && (
+              <div className="mt-4 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-700 ring-1 ring-rose-200">
+                {refundModal.error}
+              </div>
+            )}
+
+            <div className="mt-5 space-y-4">
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                Cuenta bancaria de destino
+                <select
+                  value={refundModal.bankAccountId}
+                  onChange={(event) =>
+                    setRefundModal((prev) => ({
+                      ...prev,
+                      bankAccountId: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                >
+                  <option value="">Selecciona un banco</option>
+                  {bankAccounts.map((bank) => (
+                    <option key={bank.id ?? bank.Id} value={bank.id ?? bank.Id}>
+                      {bank.nombre ?? bank.Nombre}
+                      {(bank.iban ?? bank.Iban) ? ` · ${bank.iban ?? bank.Iban}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                Importe devuelto
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  max={refundModal.credit?.saldoAFavor}
+                  value={refundModal.amount}
+                  onChange={(event) =>
+                    setRefundModal((prev) => ({
+                      ...prev,
+                      amount: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                />
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                Fecha de devolución
+                <input
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={refundModal.fecha}
+                  onChange={(event) =>
+                    setRefundModal((prev) => ({ ...prev, fecha: event.target.value }))
+                  }
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                />
+              </label>
+
+              <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                Referencia o justificante (opcional)
+                <input
+                  type="text"
+                  maxLength={120}
+                  value={refundModal.referencia}
+                  onChange={(event) =>
+                    setRefundModal((prev) => ({ ...prev, referencia: event.target.value }))
+                  }
+                  placeholder="Referencia del ingreso bancario"
+                  className="rounded-xl border border-slate-300 bg-white px-3 py-2.5"
+                />
+              </label>
+
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm ring-1 ring-slate-200">
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-600">Entrada en banco</span>
+                  <strong className="text-slate-950">
+                    {formatCurrency(Number(refundModal.amount || 0))}
+                  </strong>
+                </div>
+                <div className="mt-2 flex justify-between gap-4">
+                  <span className="text-slate-600">Saldo a favor restante</span>
+                  <strong>
+                    {formatCurrency(Math.max(0, Number(refundModal.credit?.saldoAFavor || 0) - Number(refundModal.amount || 0)))}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeRefundModal}
+                disabled={refundModal.saving}
+                className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmRefund}
+                disabled={!refundModal.bankAccountId || refundModal.saving}
+                className="rounded-xl bg-indigo-700 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {refundModal.saving ? "Registrando..." : "Registrar devolución"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
