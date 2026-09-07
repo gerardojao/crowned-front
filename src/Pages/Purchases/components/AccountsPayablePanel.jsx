@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Download, Landmark, X } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
@@ -753,9 +754,9 @@ export default function AccountsPayablePanel({
         onConfirm={confirmPayment}
       />
 
-      {refundModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-xl rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
+      {refundModal.open && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-[2px]">
+          <div className="max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl ring-1 ring-slate-200">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="mb-3 grid h-11 w-11 place-items-center rounded-2xl bg-indigo-600 text-white">
@@ -902,7 +903,8 @@ export default function AccountsPayablePanel({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
