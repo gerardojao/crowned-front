@@ -682,13 +682,6 @@ export default function SupplierDeliveryNotesPanel({
       return;
     }
 
-    const adjustmentVatField =
-      VAT_FIELD_BY_RATE[Number(invoiceForm.ajusteIvaPct)] ?? "base21";
-    if (Number(adjustedInvoiceVatBreakdown[adjustmentVatField]) < 0) {
-      alert("El ajuste no puede dejar una base de IVA negativa.");
-      return;
-    }
-
     // if (roundMoney(selectedTotals.base) <= 0) {
     //   alert("La base imponible de los albaranes debe ser mayor que 0.");
     //   return;

@@ -880,7 +880,7 @@ const printInvoice = async () => {
   try {
     if (otros < 0 || otros > baseAntesOtros) {
       throw new Error(
-        "Descuento / Otros debe ser un importe entre 0 y la base de la factura.",
+        `El descuento no puede superar la base imponible de la factura (${formatMoney(baseAntesOtros)}). Para aplicar un descuento del 100 %, introduce ${formatMoney(baseAntesOtros)}; el IVA también quedará en 0,00 €.`,
       );
     }
 
@@ -1292,7 +1292,7 @@ const printInvoice = async () => {
                 onChange={(value) => setInvoiceField("otros", value)}
               />
               <span className="mt-1 block text-xs font-normal text-slate-500">
-                Introduce un importe positivo; se restará del total de la factura.
+                Máximo aplicable: {formatMoney(baseAntesOtros)} (base sin IVA).
               </span>
             </label>
 
