@@ -384,7 +384,7 @@ if (checkingPurchasesModule) {
   );
 }
 
-if (purchasesEnabled) {
+if (purchasesEnabled && !isEdit) {
   return <PurchaseModuleScreen />;
 }
 
