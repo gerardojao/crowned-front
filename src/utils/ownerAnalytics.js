@@ -1,5 +1,14 @@
 export const numberOf = (value) => Number(value ?? 0) || 0;
 
+export function filterByDateRange(rows, from, to, dateField) {
+  return rows.filter((row) => {
+    const rawDate = row[dateField] ?? row[dateField[0].toUpperCase() + dateField.slice(1)];
+    if (!rawDate) return false;
+    const date = String(rawDate).slice(0, 10);
+    return (!from || date >= from) && (!to || date <= to);
+  });
+}
+
 export function monthKeys(from, to) {
   const start = new Date(`${from}T00:00:00`);
   const end = new Date(`${to}T00:00:00`);

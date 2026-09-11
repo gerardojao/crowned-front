@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupMonthly, monthKeys, topCustomers } from "./ownerAnalytics.js";
+import { filterByDateRange, groupMonthly, monthKeys, topCustomers } from "./ownerAnalytics.js";
+
+test("owner analytics filters exact dates, including range boundaries", () => {
+  const rows = [
+    { fecha: "2026-09-01T10:00:00" },
+    { fecha: "2026-09-10T10:00:00" },
+    { fecha: "2026-09-20T10:00:00" },
+  ];
+  assert.deepEqual(filterByDateRange(rows, "2026-09-10", "2026-09-20", "fecha"), rows.slice(1));
+});
 
 test("owner analytics creates inclusive monthly keys", () => {
   assert.deepEqual(monthKeys("2026-01-01", "2026-03-31"), ["2026-01", "2026-02", "2026-03"]);
