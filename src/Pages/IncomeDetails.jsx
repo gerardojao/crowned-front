@@ -4,13 +4,14 @@ import Loader from "../Components/Loader";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { soloFecha } from "../utils/date";
 import {
-  Search, RotateCcw, ArrowLeft, CalendarDays, XCircle,
+  Search, RotateCcw, ArrowLeft, CalendarDays, Download, XCircle,
 } from "lucide-react";
 import {
   incomeIvaAmount,
   incomeTotalAmount,
 } from "../utils/accountsReceivableIncome";
 import { incomeDisplayLabel } from "../utils/financialStatementSummaries";
+import { exportDetailExcel } from "../utils/exportDetailExcel";
 
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const IVA_RATE = 0.21;
@@ -111,6 +112,7 @@ export default function IncomeDetails() {
   const [searchFilter, setSearchFilter] = useState("");
   const [tipos, setTipos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   // Banner global
   const [notice, setNotice] = useState(null); // { type, text, actionLabel?, onAction?, onClose?, autocloseMs? }
@@ -140,6 +142,37 @@ export default function IncomeDetails() {
     const names = new Set(allRows.map((row) => paymentMethod(row)).filter(Boolean));
     return Array.from(names).sort((a, b) => a.localeCompare(b, "es"));
   }, [allRows, paymentMethod]);
+
+  const exportExcel = async () => {
+    if (!rows.length) return;
+    try {
+      setExporting(true);
+      await exportDetailExcel({
+        sheetName: "Detalle de ingresos",
+        title: "DETALLE DE INGRESOS",
+        filename: `detalle-ingresos-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        columns: [
+          { header: "Fecha", width: 14, value: (row) => row.fecha ? soloFecha(row.fecha) : "" },
+          { header: "Tipo", width: 24, value: (row) => incomeDisplayLabel(row) ?? "" },
+          { header: "Método de pago", width: 22, value: paymentMethod },
+          { header: "Descripción", width: 48, value: (row) => row.descripcion ?? "" },
+          { header: "Importe", width: 16, money: true, value: (row) => amountOf(row.importe) },
+          { header: "IVA", width: 16, money: true, value: (row) => incomeIvaOf(row, row.importe) },
+          { header: "Total", width: 16, money: true, value: (row) => incomeTotalWithIva(row, row.importe) },
+        ],
+        rows,
+        totals: [
+          { column: 4, value: total },
+          { column: 5, value: ivaTotal },
+          { column: 6, value: totalConIva },
+        ],
+      });
+    } catch {
+      setNotice({ type: "error", text: "No se pudo exportar el detalle de ingresos." });
+    } finally {
+      setExporting(false);
+    }
+  };
   const applyFilters = useCallback(
     (list, method, search) => {
       const cleanSearch = textOf(search);
@@ -340,12 +373,22 @@ export default function IncomeDetails() {
       {/* Header + volver */}
       <div className="flex items-center justify-between gap-3 mt-2 mb-3 md:mb-4">
         <h2 className="text-2xl font-semibold text-slate-900">Detalle de ingresos</h2>
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-700 text-white hover:bg-slate-800 transition"
-        >
-          <ArrowLeft size={18} /> Volver
-        </Link>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={loading || exporting || rows.length === 0}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={18} /> {exporting ? "Exportando..." : "Exportar Excel"}
+          </button>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 bg-slate-700 text-white hover:bg-slate-800 transition"
+          >
+            <ArrowLeft size={18} /> Volver
+          </Link>
+        </div>
       </div>
 
       {/* Banner global */}

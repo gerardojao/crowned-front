@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   CalendarDays,
+  Download,
   Edit3,
   Filter,
   RotateCcw,
@@ -13,6 +14,7 @@ import {
 import api from "../Components/api";
 import Loader from "../Components/Loader";
 import { soloFecha } from "../utils/date";
+import { exportDetailExcel } from "../utils/exportDetailExcel";
 
 const eur = new Intl.NumberFormat("es-ES", {
   style: "currency",
@@ -175,6 +177,7 @@ export default function ExpenseDetails() {
   const [paymentFilter, setPaymentFilter] = useState("");
   const [searchFilter, setSearchFilter] = useState("");
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteRow, setDeleteRow] = useState(null);
@@ -188,6 +191,33 @@ export default function ExpenseDetails() {
     const names = new Set(allRows.map((row) => paymentMethod(row)).filter(Boolean));
     return Array.from(names).sort((a, b) => a.localeCompare(b, "es"));
   }, [allRows]);
+
+  const exportExcel = async () => {
+    if (!rows.length) return;
+    try {
+      setExporting(true);
+      await exportDetailExcel({
+        sheetName: "Detalle de gastos",
+        title: "DETALLE DE GASTOS",
+        filename: `detalle-gastos-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        columns: [
+          { header: "Fecha", width: 14, value: (row) => row.fecha ? soloFecha(row.fecha) : "" },
+          { header: "Tipo", width: 24, value: typeName },
+          { header: "Comprobante", width: 18, value: invoiceNumber },
+          { header: "Proveedor", width: 28, value: providerName },
+          { header: "Método de pago", width: 22, value: paymentMethod },
+          { header: "Descripción", width: 48, value: description },
+          { header: "Importe", width: 16, money: true, value: amount },
+        ],
+        rows,
+        totals: [{ column: 6, value: total }],
+      });
+    } catch {
+      setNotice({ type: "error", text: "No se pudo exportar el detalle de gastos." });
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const applyFilters = useCallback((list, method, search) => {
     const cleanSearch = textOf(search);
@@ -337,12 +367,22 @@ export default function ExpenseDetails() {
             Detalle de gastos
           </h2>
         </div>
-        <Link
-          to="/"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-900"
-        >
-          <ArrowLeft size={18} /> Volver
-        </Link>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={loading || exporting || rows.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={18} /> {exporting ? "Exportando..." : "Exportar Excel"}
+          </button>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-900"
+          >
+            <ArrowLeft size={18} /> Volver
+          </Link>
+        </div>
       </div>
 
       <Banner notice={notice} onClose={() => setNotice(null)} />
