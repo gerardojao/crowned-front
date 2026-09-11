@@ -184,6 +184,9 @@ export default function Layout({ children }) {
     activeWorkshop?.EnablePreOrders ??
     false;
   const isSuperAdmin = (user?.role || "").toLowerCase() === "superadmin";
+  const isWorkshopManager = String(
+    activeWorkshop?.workshopRole ?? activeWorkshop?.WorkshopRole ?? "",
+  ).toLowerCase() === "manager";
   const accountsReceivableEnabled =
     activeWorkshop?.enableAccountsReceivable ??
     activeWorkshop?.EnableAccountsReceivable ??
@@ -327,6 +330,14 @@ export default function Layout({ children }) {
                         className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
                       >
                         Talleres
+                      </NavLink>
+                    )}
+                    {isWorkshopManager && (
+                      <NavLink
+                        to="/manager/settings"
+                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                      >
+                        Configuración
                       </NavLink>
                     )}
                   </>
@@ -561,6 +572,16 @@ export default function Layout({ children }) {
                         >
                           <Users size={18} className="text-slate-700" />
                           Administrar negocios
+                        </NavLink>
+                      )}
+                      {isWorkshopManager && (
+                        <NavLink
+                          to="/manager/settings"
+                          className={mobileLink}
+                          onClick={() => setOpen(false)}
+                        >
+                          <Users size={18} className="text-sky-700" />
+                          Usuarios y bancos
                         </NavLink>
                       )}
                     </div>

@@ -25,6 +25,7 @@ import api, { getCurrentWorkshopId } from "../Components/api";
 import KPIs from "../Components/Kpi";
 import { useAuth } from "../Components/AuthContext";
 import { useBusinessTerminology } from "../utils/businessTerminology";
+import { isLegacyOwnerAccount } from "../utils/ownerAccess";
 import {
   getWorkOrderOperationTypeBadgeClass,
   getWorkOrderOperationTypeLabel,
@@ -138,7 +139,7 @@ export default function Home() {
   const [showUrlMigrationNotice, setShowUrlMigrationNotice] = useState(false);
   const [urlMigrationModalOpen, setUrlMigrationModalOpen] = useState(false);
   const [isWorkshopOwner, setIsWorkshopOwner] = useState(
-    String(user?.role ?? "").toLowerCase() === "owner",
+    String(user?.role ?? "").toLowerCase() === "owner" || isLegacyOwnerAccount(user),
   );
 
   const ts = (d) => (d ? new Date(d).getTime() : 0);
@@ -151,7 +152,9 @@ export default function Home() {
       return;
     }
 
-    const systemOwner = String(user?.role ?? "").toLowerCase() === "owner";
+    const systemOwner =
+      String(user?.role ?? "").toLowerCase() === "owner" ||
+      isLegacyOwnerAccount(user);
     setIsWorkshopOwner(systemOwner);
     api.get("/WorkshopSettings/mine")
       .then((response) => {

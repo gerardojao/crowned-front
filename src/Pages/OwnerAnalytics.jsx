@@ -18,6 +18,7 @@ import api, { getCurrentWorkshopId } from "../Components/api";
 import Loader from "../Components/Loader";
 import { useAuth } from "../Components/AuthContext";
 import { groupMonthly, monthKeys, numberOf, topCustomers } from "../utils/ownerAnalytics";
+import { isLegacyOwnerAccount } from "../utils/ownerAccess";
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, Filler, Legend, LinearScale, LineElement, PointElement, Tooltip);
 
@@ -62,7 +63,7 @@ export default function OwnerAnalytics() {
       const active = (Array.isArray(mine.data) ? mine.data : []).find((item) => String(item.id ?? item.Id) === activeId);
       const workshopRole = String(active?.workshopRole ?? active?.WorkshopRole ?? "").toLowerCase();
       const systemRole = String(user?.role ?? user?.Role ?? "").toLowerCase();
-      if (workshopRole !== "owner" && systemRole !== "owner") {
+      if (workshopRole !== "owner" && systemRole !== "owner" && !isLegacyOwnerAccount(user)) {
         navigate("/", { replace: true });
         return;
       }
