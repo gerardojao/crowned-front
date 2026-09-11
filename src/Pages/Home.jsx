@@ -337,7 +337,7 @@ export default function Home() {
 
   return (
     <>
-      {showUrlMigrationNotice && (
+      {/* {showUrlMigrationNotice && (
         <section className="rounded-2xl border border-orange-200 bg-white p-4 shadow-sm ring-1 ring-orange-100 md:p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-3">
@@ -404,7 +404,7 @@ export default function Home() {
             </div>
           </section>
         </div>
-      )}
+      )} */}
 
       <KPIs totalsOverride={dashboardTotals} />
 
