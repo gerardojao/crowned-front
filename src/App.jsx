@@ -1,6 +1,7 @@
 ﻿// src/App.jsx
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
+
 import Layout from "./Components/Layout";
 import Home from "./Pages/Home";
 import RegisterCustomer from "./Pages/RegisterCustomer";
@@ -43,6 +44,8 @@ import Ledger from "./Pages/Ledger.jsx";
 import InvoiceHistory from "./Pages/InvoiceHistory.jsx";
 import PurchaseModuleScreen from "./Pages/PurchaseModuleScreen.jsx";
 
+const OwnerAnalytics = lazy(() => import("./Pages/OwnerAnalytics.jsx"));
+
 function App() {
   const protectedElement = (element) => (
     <ProtectedRoute>{element}</ProtectedRoute>
@@ -58,6 +61,7 @@ function App() {
     IngresoId: "",
     Descripcion: "",
   });
+
   const [expense, setExpense] = useState({
     Foto: "",
     Fecha: "",
@@ -72,7 +76,7 @@ function App() {
       <AuthProvider>
         <Layout>
           <Routes>
-            {/* publicas */}
+            {/* Públicas */}
             <Route path="/trial" element={<TrialGate />} />
             <Route path="/register" element={<NewUser />} />
             <Route path="/login" element={<Login />} />
@@ -82,16 +86,39 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
-            <Route path="/print-order/:id" element={protectedElement(<PrintWorkOrder />)} />
-            <Route path="/print-pre-order/:id" element={protectedElement(<PrintPreOrder />)} />
-            <Route path="/workshop-invoice/:id" element={protectedElement(<WorkshopInvoice />)} />
-            <Route path="/invoices-history" element={protectedElement(<InvoiceHistory />)} />
 
-            <Route path="/workshop-invoice" element={protectedElement(<WorkshopInvoice />)} />
-            <Route path="/special-invoices/parts" element={protectedElement(<SpecialPartsInvoice />)} />
-            <Route path="/special-invoices/:type" element={protectedElement(<SpecialPartsInvoice />)} />
-
-            <Route path="/stock-parts" element={protectedElement(<StockParts />)} />
+            <Route
+              path="/print-order/:id"
+              element={protectedElement(<PrintWorkOrder />)}
+            />
+            <Route
+              path="/print-pre-order/:id"
+              element={protectedElement(<PrintPreOrder />)}
+            />
+            <Route
+              path="/workshop-invoice/:id"
+              element={protectedElement(<WorkshopInvoice />)}
+            />
+            <Route
+              path="/invoices-history"
+              element={protectedElement(<InvoiceHistory />)}
+            />
+            <Route
+              path="/workshop-invoice"
+              element={protectedElement(<WorkshopInvoice />)}
+            />
+            <Route
+              path="/special-invoices/parts"
+              element={protectedElement(<SpecialPartsInvoice />)}
+            />
+            <Route
+              path="/special-invoices/:type"
+              element={protectedElement(<SpecialPartsInvoice />)}
+            />
+            <Route
+              path="/stock-parts"
+              element={protectedElement(<StockParts />)}
+            />
             <Route
               path="/reprint-invoice/order/:idOrden"
               element={protectedElement(<ReprintInvoice />)}
@@ -100,17 +127,51 @@ function App() {
               path="/reprint-invoice/number/:numeroFactura"
               element={protectedElement(<ReprintInvoice />)}
             />
-            <Route path="/register-expense-type" element={protectedElement(<RegisterExpenseType />)} />
-            <Route path="/register-income-type" element={protectedElement(<RegisterIncomeType />)} />
-            <Route path="/presupuestos" element={protectedElement(<RegisterBudget />)} />
-            <Route path="/accounts-receivable" element={protectedElement(<AccountsReceivable />)} />
-            <Route path="/purchases" element={protectedElement(<PurchaseModuleScreen />)} />
-            <Route path="/ledger" element={protectedElement(<Ledger />)} />
-            <Route path="/print-budget/:id" element={protectedElement(<PrintBudget />)} />
+            <Route
+              path="/register-expense-type"
+              element={protectedElement(<RegisterExpenseType />)}
+            />
+            <Route
+              path="/register-income-type"
+              element={protectedElement(<RegisterIncomeType />)}
+            />
+            <Route
+              path="/presupuestos"
+              element={protectedElement(<RegisterBudget />)}
+            />
+            <Route
+              path="/accounts-receivable"
+              element={protectedElement(<AccountsReceivable />)}
+            />
+            <Route
+              path="/purchases"
+              element={protectedElement(<PurchaseModuleScreen />)}
+            />
+            <Route
+              path="/ledger"
+              element={protectedElement(<Ledger />)}
+            />
+
+            <Route
+              path="/owner/analytics"
+              element={protectedElement(
+                <Suspense fallback={null}>
+                  <OwnerAnalytics />
+                </Suspense>,
+              )}
+            />
+
+            <Route
+              path="/print-budget/:id"
+              element={protectedElement(<PrintBudget />)}
+            />
             <Route
               path="/print-valuation/:id"
-              element={protectedElement(<PrintBudget documentType="valuation" />)}
+              element={protectedElement(
+                <PrintBudget documentType="valuation" />,
+              )}
             />
+
             <Route
               path="/admin/workshops"
               element={
@@ -120,8 +181,7 @@ function App() {
               }
             />
 
-            {/* protegidas */}
-
+            {/* Protegidas */}
             <Route
               path="/register-work-order"
               element={
@@ -232,5 +292,5 @@ function App() {
     </BrowserRouter>
   );
 }
-export default App;
 
+export default App;

@@ -408,6 +408,13 @@ export default function Home() {
 
       <KPIs totalsOverride={dashboardTotals} />
 
+      {String(user?.role ?? "").toLowerCase() === "owner" && (
+        <Link to="/owner/analytics" className="flex items-center justify-between rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-950 to-slate-900 p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
+          <div className="flex items-center gap-4"><span className="rounded-2xl bg-white/10 p-3"><BarChart3 size={28} className="text-cyan-300" /></span><span><span className="block text-xl font-black">Analytics</span><span className="text-sm text-slate-300">Facturación, flujo, clientes y rendimiento del negocio.</span></span></div>
+          <ArrowRight className="shrink-0" />
+        </Link>
+      )}
+
       {showDashboardModules && (
         <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {dashboardFeatures.enableDashboardRepairVehicles && (
