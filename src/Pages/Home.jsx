@@ -21,7 +21,7 @@ import {
   fetchAccountsReceivableIncome,
   incomeTotalAmount,
 } from "../utils/accountsReceivableIncome";
-import api from "../Components/api";
+import api, { getCurrentWorkshopId } from "../Components/api";
 import KPIs from "../Components/Kpi";
 import { useAuth } from "../Components/AuthContext";
 import { useBusinessTerminology } from "../utils/businessTerminology";
@@ -137,21 +137,42 @@ export default function Home() {
   const [lastStatement, setLastStatement] = useState(null);
   const [showUrlMigrationNotice, setShowUrlMigrationNotice] = useState(false);
   const [urlMigrationModalOpen, setUrlMigrationModalOpen] = useState(false);
+  const [isWorkshopOwner, setIsWorkshopOwner] = useState(
+    String(user?.role ?? "").toLowerCase() === "owner",
+  );
 
   const ts = (d) => (d ? new Date(d).getTime() : 0);
 
   useEffect(() => {
     if (!isAuthed) {
+      setIsWorkshopOwner(false);
       setShowUrlMigrationNotice(false);
       setUrlMigrationModalOpen(false);
       return;
     }
 
+    const systemOwner = String(user?.role ?? "").toLowerCase() === "owner";
+    setIsWorkshopOwner(systemOwner);
+    api.get("/WorkshopSettings/mine")
+      .then((response) => {
+        const workshops = Array.isArray(response?.data) ? response.data : [];
+        const currentWorkshopId = getCurrentWorkshopId();
+        const activeWorkshop = workshops.find(
+          (workshop) =>
+            String(workshop?.id ?? workshop?.Id) === String(currentWorkshopId),
+        ) ?? workshops[0];
+        const workshopRole = String(
+          activeWorkshop?.workshopRole ?? activeWorkshop?.WorkshopRole ?? "",
+        ).toLowerCase();
+        setIsWorkshopOwner(systemOwner || workshopRole === "owner");
+      })
+      .catch(() => setIsWorkshopOwner(systemOwner));
+
     setShowUrlMigrationNotice(
       getUrlMigrationNoticeViewCount(user) < URL_MIGRATION_NOTICE_REQUIRED_VIEWS,
     );
     setUrlMigrationModalOpen(false);
-  }, [isAuthed, user?.id, user?.Id, user?.email]);
+  }, [isAuthed, user?.id, user?.Id, user?.email, user?.role]);
 
   const openUrlMigrationModal = () => {
     setUrlMigrationModalOpen(true);
@@ -408,7 +429,7 @@ export default function Home() {
 
       <KPIs totalsOverride={dashboardTotals} />
 
-      {String(user?.role ?? "").toLowerCase() === "owner" && (
+      {isWorkshopOwner && (
         <Link to="/owner/analytics" className="flex items-center justify-between rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-950 to-slate-900 p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">
           <div className="flex items-center gap-4"><span className="rounded-2xl bg-white/10 p-3"><BarChart3 size={28} className="text-cyan-300" /></span><span><span className="block text-xl font-black">Analytics</span><span className="text-sm text-slate-300">Facturación, flujo, clientes y rendimiento del negocio.</span></span></div>
           <ArrowRight className="shrink-0" />
