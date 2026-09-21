@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import api from "../../../Components/api";
+import { normalizeLinkedDeliveryNotes } from "../utils/supplierInvoiceDeliveryNotes";
 
 function toNumber(...values) {
   const value = values.find((item) => item !== undefined && item !== null);
@@ -72,6 +73,7 @@ function normalizeSupplierInvoice(item) {
     fechaPago: item?.fechaPago ?? item?.FechaPago ?? null,
     bankAccountId: item?.bankAccountId ?? item?.BankAccountId ?? null,
     fichaEgresoId: item?.fichaEgresoId ?? item?.FichaEgresoId ?? null,
+    albaranes: normalizeLinkedDeliveryNotes(item),
     source: "facturaRecibida",
     ivaDetalles,
     lineasIva: ivaDetalles,

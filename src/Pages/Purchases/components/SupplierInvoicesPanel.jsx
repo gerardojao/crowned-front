@@ -849,6 +849,7 @@ export default function SupplierInvoicesPanel({
                 <th className="px-4 py-3 text-left">Proveedor</th>
                 <th className="px-4 py-3 text-left">Nº Factura</th>
                 <th className="px-4 py-3 text-left">Referencia</th>
+                <th className="px-4 py-3 text-left">Albaranes</th>
                 <th className="px-4 py-3 text-right">Base</th>
                 <th className="px-4 py-3 text-right">IVA</th>
                 <th className="px-4 py-3 text-right">Total</th>
@@ -860,13 +861,13 @@ export default function SupplierInvoicesPanel({
             <tbody>
               {loadingInvoices ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center">
+                  <td colSpan={10} className="px-4 py-10 text-center">
                     <Loader />
                   </td>
                 </tr>
               ) : supplierInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center">
+                  <td colSpan={10} className="px-4 py-10 text-center">
                     <p className="text-sm font-semibold text-slate-700">
                       Todavía no hay facturas recibidas registradas.
                     </p>
@@ -888,6 +889,29 @@ export default function SupplierInvoicesPanel({
                     </td>
                     <td className="px-4 py-3">{item.numeroFactura}</td>
                     <td className="px-4 py-3">{item.referencia || "-"}</td>
+                    <td className="min-w-48 px-4 py-3 align-top">
+                      {item.albaranes?.length ? (
+                        <details className="group">
+                          <summary className="cursor-pointer text-xs font-bold text-sky-700 hover:text-sky-800">
+                            {item.albaranes.length === 1
+                              ? "1 albarán"
+                              : `${item.albaranes.length} albaranes`}
+                          </summary>
+                          <div className="mt-2 flex max-w-80 flex-wrap gap-1.5">
+                            {item.albaranes.map((note) => (
+                              <span
+                                key={note.id}
+                                className="rounded-md bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200"
+                              >
+                                {note.numeroAlbaran}
+                              </span>
+                            ))}
+                          </div>
+                        </details>
+                      ) : (
+                        <span className="text-xs text-slate-400">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       {formatCurrency(item.base)}
                     </td>
@@ -932,7 +956,7 @@ export default function SupplierInvoicesPanel({
             <tfoot className="bg-slate-50">
               <tr>
                 <th
-                  colSpan={3}
+                  colSpan={5}
                   className="px-4 py-3 text-right font-bold text-slate-700"
                 >
                   Totales

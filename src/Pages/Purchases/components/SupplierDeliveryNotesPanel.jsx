@@ -12,6 +12,7 @@ import {
   sumDeliveryLines,
 } from "../utils/purchaseCalculations";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
+import { buildGroupedDeliveryNoteDescription } from "../utils/supplierInvoiceDeliveryNotes";
 
 const createEmptyLine = () => ({
   id: crypto.randomUUID(),
@@ -552,10 +553,7 @@ export default function SupplierDeliveryNotesPanel({
       },
       descripcion:
         prev.descripcion ||
-        `Factura de albaranes ${selectedNotes
-          .map((note) => note.numeroAlbaran)
-          .filter(Boolean)
-          .join(", ")}`,
+        buildGroupedDeliveryNoteDescription(selectedNotes),
       bankAccountId: String(mainBank?.id ?? mainBank?.Id ?? ""),
     }));
   };
