@@ -50,7 +50,7 @@ export function getAccountsPayableDisplay(invoice) {
     isSupplierCredit,
     canRegisterPayment: !isSupplierCredit,
     estadoVisual: isSupplierCredit
-      ? "Abono pendiente"
+      ? "Saldo a favor pendiente"
       : invoice?.estado ?? invoice?.Estado ?? "Pendiente de pago",
     saldoPendiente: isSupplierCredit ? -saldoAFavor : normalSaldo,
     saldoVisual: isSupplierCredit ? saldoAFavor : normalSaldo,

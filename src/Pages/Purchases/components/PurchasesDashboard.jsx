@@ -35,7 +35,7 @@ export default function PurchasesDashboard({
               Facturas pendientes
             </h3>
             <p className="text-xs text-slate-500">
-              Proximos pagos a proveedores.
+              Pagos y saldos a favor pendientes.
             </p>
           </div>
           <button

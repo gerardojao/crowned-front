@@ -29,7 +29,7 @@ test("negative supplier invoice is shown as pending supplier credit", () => {
   assert.equal(display.saldoPendiente, -1277.45);
   assert.equal(display.saldoVisual, 1277.45);
   assert.equal(display.saldoLabel, "Saldo a favor");
-  assert.equal(display.estadoVisual, "Abono pendiente");
+  assert.equal(display.estadoVisual, "Saldo a favor pendiente");
   assert.equal(display.canRegisterPayment, false);
 });
 
@@ -54,6 +54,6 @@ test("supplier credit can be detected by document type", () => {
   });
 
   assert.equal(display.isSupplierCredit, true);
-  assert.equal(display.estadoVisual, "Abono pendiente");
+  assert.equal(display.estadoVisual, "Saldo a favor pendiente");
   assert.equal(display.canRegisterPayment, false);
 });

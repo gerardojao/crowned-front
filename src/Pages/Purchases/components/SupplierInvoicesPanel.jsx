@@ -16,6 +16,7 @@ import {
   getCreatedProviderId,
   validateQuickProviderForm,
 } from "../utils/supplierQuickCreate";
+import { validateSupplierInvoiceTotal } from "../utils/supplierInvoiceRules";
 
 const createEmptyLine = () => ({
   id: crypto.randomUUID(),
@@ -189,19 +190,17 @@ export default function SupplierInvoicesPanel({
       return;
     }
 
-    const isCredit = form.tipoDocumento === "Rappel" || form.tipoDocumento === "Abono";
     const requiresOriginalInvoice = form.tipoDocumento === "Abono";
     if (requiresOriginalInvoice && !form.facturaOriginalId) {
       alert("Selecciona la factura original del abono.");
       return;
     }
-    if (!isCredit && (invoiceTotals.base <= 0 || invoiceTotals.total <= 0)) {
-      alert("Base y total deben ser mayores que 0.");
-      return;
-    }
-
-    if (isCredit && (invoiceTotals.base >= 0 || invoiceTotals.total >= 0)) {
-      alert("Base y total deben ser negativos para rappels o abonos.");
+    const totalValidationError = validateSupplierInvoiceTotal(
+      form.tipoDocumento,
+      invoiceTotals.total,
+    );
+    if (totalValidationError) {
+      alert(totalValidationError);
       return;
     }
 
@@ -811,6 +810,13 @@ export default function SupplierInvoicesPanel({
               {formatCurrency(invoiceTotals.total)}
             </span>
           </div>
+
+          {form.tipoDocumento === "Factura" && invoiceTotals.total < 0 ? (
+            <div className="rounded-xl bg-sky-50 p-3 text-sm font-semibold text-sky-800 ring-1 ring-sky-200">
+              Esta factura generarÃ¡ un saldo a favor del taller por{" "}
+              {formatCurrency(Math.abs(invoiceTotals.total))}.
+            </div>
+          ) : null}
 
           <div className="flex flex-wrap gap-3">
             <button

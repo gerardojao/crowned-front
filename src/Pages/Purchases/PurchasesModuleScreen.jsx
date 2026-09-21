@@ -56,8 +56,11 @@ export default function PurchasesModuleScreen() {
     const pendingInvoices = activeInvoices.filter((invoice) =>
       isPendingState(invoice.estado),
     );
+    const pendingDebts = pendingInvoices.filter(
+      (invoice) => !getAccountsPayableDisplay(invoice).isSupplierCredit,
+    );
 
-    const overdueCount = pendingInvoices.filter((invoice) => {
+    const overdueCount = pendingDebts.filter((invoice) => {
       if (!invoice.fecha) return false;
       const date = new Date(invoice.fecha);
       if (Number.isNaN(date.getTime())) return false;
@@ -69,7 +72,7 @@ export default function PurchasesModuleScreen() {
       isSameMonth(invoice.fecha),
     );
 
-    const pendingTotal = pendingInvoices.reduce(
+    const pendingTotal = pendingDebts.reduce(
       (sum, invoice) => sum + getAccountsPayableDisplay(invoice).saldoPendiente,
       0,
     );
