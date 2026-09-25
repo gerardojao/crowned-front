@@ -13,6 +13,23 @@ import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 
 const CASH_PAYMENT_VALUE = "cash";
 
+const initialFilters = {
+  search: "",
+  estado: "",
+  fechaInicio: "",
+  fechaFin: "",
+  pageSize: 10,
+  page: 1,
+};
+
+function normalizeSearch(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
 const initialForm = {
   numeroComprobante: "",
   fecha: new Date().toISOString().slice(0, 10),
@@ -32,11 +49,55 @@ export default function MiscExpensesPanel() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
+  const [filters, setFilters] = useState(initialFilters);
 
-  const totals = useMemo(
-    () => items.reduce((sum, item) => sum + Number(item.importe || 0), 0),
-    [items],
+  const filteredItems = useMemo(() => {
+    const search = normalizeSearch(filters.search);
+
+    return items.filter((item) => {
+      const itemDate = String(item.fecha || item.Fecha || "").slice(0, 10);
+      const searchable = normalizeSearch(
+        [
+          item.numeroComprobante,
+          item.proveedorNombre,
+          item.descripcion,
+          item.tipoGastoNombre,
+          item.bankAccountName,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+
+      return (
+        (!search || searchable.includes(search)) &&
+        (!filters.estado || filters.estado === "Registrado") &&
+        (!filters.fechaInicio || itemDate >= filters.fechaInicio) &&
+        (!filters.fechaFin || itemDate <= filters.fechaFin)
+      );
+    });
+  }, [filters, items]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredItems.length / filters.pageSize),
   );
+  const currentPage = Math.min(filters.page, totalPages);
+  const visibleItems = filteredItems.slice(
+    (currentPage - 1) * filters.pageSize,
+    currentPage * filters.pageSize,
+  );
+  const totals = useMemo(
+    () =>
+      filteredItems.reduce(
+        (sum, item) => sum + Number(item.importe || 0),
+        0,
+      ),
+    [filteredItems],
+  );
+
+  const setFilter = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value, page: 1 }));
+  };
 
   useEffect(() => {
     loadItems();
@@ -347,6 +408,91 @@ export default function MiscExpensesPanel() {
         </form>
       )}
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Buscar
+            </label>
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => setFilter("search", event.target.value)}
+              placeholder="Comprobante, proveedor, descripcion o tipo"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Estado
+            </label>
+            <select
+              value={filters.estado}
+              onChange={(event) => setFilter("estado", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="Registrado">Registrado</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Desde
+            </label>
+            <input
+              type="date"
+              value={filters.fechaInicio}
+              onChange={(event) => setFilter("fechaInicio", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Hasta
+            </label>
+            <input
+              type="date"
+              value={filters.fechaFin}
+              onChange={(event) => setFilter("fechaFin", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Por pagina
+            </label>
+            <select
+              value={filters.pageSize}
+              onChange={(event) =>
+                setFilter("pageSize", Number(event.target.value))
+              }
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-slate-500">
+            {filteredItems.length} gasto(s) encontrado(s)
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilters(initialFilters)}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -370,7 +516,7 @@ export default function MiscExpensesPanel() {
                     <Loader />
                   </td>
                 </tr>
-              ) : items.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-4 py-10 text-center">
                     <p className="text-sm font-semibold text-slate-700">
@@ -379,7 +525,7 @@ export default function MiscExpensesPanel() {
                   </td>
                 </tr>
               ) : (
-                items.map((item) => (
+                visibleItems.map((item) => (
                   <tr
                     key={item.id ?? item.Id}
                     className="border-t border-slate-100 hover:bg-slate-50"
@@ -440,6 +586,34 @@ export default function MiscExpensesPanel() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <span>
+          Pagina {currentPage} de {totalPages}
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={currentPage <= 1 || loading}
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, page: currentPage - 1 }))
+            }
+            className="rounded-lg bg-white px-3 py-1.5 font-semibold ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            disabled={currentPage >= totalPages || loading}
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, page: currentPage + 1 }))
+            }
+            className="rounded-lg bg-white px-3 py-1.5 font-semibold ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
     </div>

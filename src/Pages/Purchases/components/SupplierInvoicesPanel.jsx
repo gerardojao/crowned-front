@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
@@ -41,6 +41,15 @@ const initialForm = {
 
 const CASH_PAYMENT_VALUE = "cash";
 
+const initialFilters = {
+  search: "",
+  estado: "",
+  fechaInicio: "",
+  fechaFin: "",
+  pageSize: 10,
+  page: 1,
+};
+
 function normalizeState(value) {
   return String(value || "")
     .trim()
@@ -63,6 +72,7 @@ export default function SupplierInvoicesPanel({
   const [quickProvider, setQuickProvider] = useState(emptyQuickProviderForm);
   const [quickProviderErrors, setQuickProviderErrors] = useState({});
   const [savingQuickProvider, setSavingQuickProvider] = useState(false);
+  const [filters, setFilters] = useState(initialFilters);
   const { providers, reloadProviders } = useProviders();
   const { expenseTypes } = useExpenseTypes();
 
@@ -278,7 +288,47 @@ export default function SupplierInvoicesPanel({
     }
   };
 
-  const totals = supplierInvoices.reduce(
+  const filteredInvoices = useMemo(() => {
+    const search = normalizeState(filters.search);
+
+    return supplierInvoices.filter((item) => {
+      const itemDate = String(item.fecha || "").slice(0, 10);
+      const searchable = normalizeState(
+        [
+          item.numeroFactura,
+          item.proveedor,
+          item.referencia,
+          item.descripcion,
+          item.tipoDocumento,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+
+      return (
+        (!search || searchable.includes(search)) &&
+        (!filters.estado || item.estado === filters.estado) &&
+        (!filters.fechaInicio || itemDate >= filters.fechaInicio) &&
+        (!filters.fechaFin || itemDate <= filters.fechaFin)
+      );
+    });
+  }, [filters, supplierInvoices]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredInvoices.length / filters.pageSize),
+  );
+  const currentPage = Math.min(filters.page, totalPages);
+  const visibleInvoices = filteredInvoices.slice(
+    (currentPage - 1) * filters.pageSize,
+    currentPage * filters.pageSize,
+  );
+
+  const setFilter = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value, page: 1 }));
+  };
+
+  const totals = filteredInvoices.reduce(
     (acc, item) => {
       acc.base += Number(item.base) || 0;
       acc.iva += Number(item.iva) || 0;
@@ -840,6 +890,94 @@ export default function SupplierInvoicesPanel({
         </form>
       )}
 
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+          <div className="md:col-span-2">
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Buscar
+            </label>
+            <input
+              type="search"
+              value={filters.search}
+              onChange={(event) => setFilter("search", event.target.value)}
+              placeholder="Numero, proveedor, referencia o descripcion"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Estado
+            </label>
+            <select
+              value={filters.estado}
+              onChange={(event) => setFilter("estado", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">Todos</option>
+              <option value="Pendiente de pago">Pendiente de pago</option>
+              <option value="Pagada parcialmente">Pagada parcialmente</option>
+              <option value="Pagada">Pagada</option>
+              <option value="Anulada">Anulada</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Desde
+            </label>
+            <input
+              type="date"
+              value={filters.fechaInicio}
+              onChange={(event) => setFilter("fechaInicio", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Hasta
+            </label>
+            <input
+              type="date"
+              value={filters.fechaFin}
+              onChange={(event) => setFilter("fechaFin", event.target.value)}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-bold uppercase text-slate-500">
+              Por pagina
+            </label>
+            <select
+              value={filters.pageSize}
+              onChange={(event) =>
+                setFilter("pageSize", Number(event.target.value))
+              }
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-xs font-semibold text-slate-500">
+            {filteredInvoices.length} factura(s) encontrada(s)
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilters(initialFilters)}
+            className="rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            Limpiar filtros
+          </button>
+        </div>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
@@ -865,7 +1003,7 @@ export default function SupplierInvoicesPanel({
                     <Loader />
                   </td>
                 </tr>
-              ) : supplierInvoices.length === 0 ? (
+              ) : filteredInvoices.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="px-4 py-10 text-center">
                     <p className="text-sm font-semibold text-slate-700">
@@ -878,7 +1016,7 @@ export default function SupplierInvoicesPanel({
                   </td>
                 </tr>
               ) : (
-                supplierInvoices.map((item) => (
+                visibleInvoices.map((item) => (
                   <tr
                     key={item.id}
                     className="border-t border-slate-100 hover:bg-slate-50"
@@ -975,6 +1113,34 @@ export default function SupplierInvoicesPanel({
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <span>
+          Pagina {currentPage} de {totalPages}
+        </span>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            disabled={currentPage <= 1 || loadingInvoices}
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, page: currentPage - 1 }))
+            }
+            className="rounded-lg bg-white px-3 py-1.5 font-semibold ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Anterior
+          </button>
+          <button
+            type="button"
+            disabled={currentPage >= totalPages || loadingInvoices}
+            onClick={() =>
+              setFilters((prev) => ({ ...prev, page: currentPage + 1 }))
+            }
+            className="rounded-lg bg-white px-3 py-1.5 font-semibold ring-1 ring-slate-200 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Siguiente
+          </button>
         </div>
       </div>
     </div>
