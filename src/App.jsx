@@ -43,6 +43,7 @@ import AccountsReceivable from "./Pages/AccountsReceivable.jsx";
 import Ledger from "./Pages/Ledger.jsx";
 import InvoiceHistory from "./Pages/InvoiceHistory.jsx";
 import PurchaseModuleScreen from "./Pages/PurchaseModuleScreen.jsx";
+import ManagerSettings from "./Pages/ManagerSettings.jsx";
 
 const OwnerAnalytics = lazy(() => import("./Pages/OwnerAnalytics.jsx"));
 
@@ -179,6 +180,11 @@ function App() {
                   <AdminWorkshops />
                 </ProtectedRoute>
               }
+            />
+
+            <Route
+              path="/manager/settings"
+              element={protectedElement(<ManagerSettings />)}
             />
 
             {/* Protegidas */}

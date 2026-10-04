@@ -21,6 +21,7 @@ import {
   Bell,
   WalletCards,
   ShoppingCart,
+  Settings,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import api, {
@@ -335,9 +336,11 @@ export default function Layout({ children }) {
                     {isWorkshopManager && (
                       <NavLink
                         to="/manager/settings"
-                        className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-slate-100"
+                        aria-label="Configuración"
+                        title="Configuración"
+                        className="inline-flex items-center justify-center rounded-lg p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                       >
-                        Configuración
+                        <Settings size={20} aria-hidden="true" />
                       </NavLink>
                     )}
                   </>
@@ -580,7 +583,7 @@ export default function Layout({ children }) {
                           className={mobileLink}
                           onClick={() => setOpen(false)}
                         >
-                          <Users size={18} className="text-sky-700" />
+                          <Settings size={18} className="text-sky-700" />
                           Usuarios y bancos
                         </NavLink>
                       )}
