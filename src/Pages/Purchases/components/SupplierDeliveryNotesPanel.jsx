@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Eye, Plus, X } from "lucide-react";
+import { Download, Eye, Plus, X } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
+import { exportDetailExcel } from "../../../utils/exportDetailExcel";
 import ProviderSearchInput from "./ProviderSearchInput";
 import { useBankAccounts } from "../hooks/useBankAccounts";
 import { useDeliveryNotes } from "../hooks/useDeliveryNotes";
@@ -13,6 +14,7 @@ import {
 } from "../utils/purchaseCalculations";
 import { formatCurrency, formatDate } from "../utils/purchaseFormatters";
 import { buildGroupedDeliveryNoteDescription } from "../utils/supplierInvoiceDeliveryNotes";
+import { normalizeDeliveryNote } from "../utils/deliveryNotes";
 
 const createEmptyLine = () => ({
   id: crypto.randomUUID(),
@@ -418,6 +420,7 @@ export default function SupplierDeliveryNotesPanel({
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [loadingEditId, setLoadingEditId] = useState(null);
   const [cancellingNoteId, setCancellingNoteId] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const [invoiceSubmitting, setInvoiceSubmitting] = useState(false);
   const [header, setHeader] = useState(initialHeader);
   const [lines, setLines] = useState([createEmptyLine()]);
@@ -496,6 +499,70 @@ export default function SupplierDeliveryNotesPanel({
 
   const setNoteFilter = (field, value) => {
     updateFilters({ [field]: value, page: 1 });
+  };
+
+  const exportExcel = async () => {
+    if (exporting || pagination.total === 0) return;
+
+    try {
+      setExporting(true);
+      const pageSize = 100;
+      const exportedNotes = [];
+      let page = 1;
+
+      while (exportedNotes.length < pagination.total) {
+        const res = await api.get("/Albaran", {
+          params: {
+            search: filters.search || undefined,
+            estado: filters.estado || undefined,
+            fechaInicio: filters.fechaInicio || undefined,
+            fechaFin: filters.fechaFin || undefined,
+            page,
+            pageSize,
+          },
+        });
+        const pack = res?.data?.data?.[0] || {};
+        const pageItems = Array.isArray(pack.items) ? pack.items : [];
+        exportedNotes.push(...pageItems.map(normalizeDeliveryNote));
+        if (pageItems.length === 0) break;
+        page += 1;
+      }
+
+      const totals = exportedNotes.reduce(
+        (acc, note) => ({
+          base: acc.base + Number(note.base || 0),
+          iva: acc.iva + Number(note.iva || 0),
+          total: acc.total + Number(note.total || 0),
+        }),
+        { base: 0, iva: 0, total: 0 },
+      );
+
+      await exportDetailExcel({
+        sheetName: "Albaranes",
+        title: "ALBARANES DE PROVEEDOR",
+        filename: `albaranes-proveedor-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        columns: [
+          { header: "Fecha", width: 14, value: (note) => formatDate(note.fecha) },
+          { header: "Proveedor", width: 30, value: (note) => note.proveedor || "-" },
+          { header: "Numero albaran", width: 22, value: (note) => note.numeroAlbaran || "-" },
+          { header: "Observaciones", width: 36, value: (note) => note.observaciones || "-" },
+          { header: "Base", width: 16, money: true, value: (note) => Number(note.base || 0) },
+          { header: "IVA", width: 16, money: true, value: (note) => Number(note.iva || 0) },
+          { header: "Total", width: 16, money: true, value: (note) => Number(note.total || 0) },
+          { header: "Estado", width: 22, value: (note) => note.estado || "-" },
+        ],
+        rows: exportedNotes,
+        totals: [
+          { column: 4, value: totals.base },
+          { column: 5, value: totals.iva },
+          { column: 6, value: totals.total },
+        ],
+      });
+    } catch {
+      alert("No se pudo exportar los albaranes a Excel.");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const setLineField = (id, field, value) => {
@@ -1011,21 +1078,33 @@ export default function SupplierDeliveryNotesPanel({
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (showForm) {
-                resetForm();
-                setShowForm(false);
-                return;
-              }
-              setShowForm(true);
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
-          >
-            <Plus size={17} />
-            {showForm ? "Ocultar formulario" : "Nuevo albarán"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportExcel}
+              disabled={exporting || pagination.total === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <Download size={17} />
+              {exporting ? "Exportando..." : "Exportar Excel"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (showForm) {
+                  resetForm();
+                  setShowForm(false);
+                  return;
+                }
+                setShowForm(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+            >
+              <Plus size={17} />
+              {showForm ? "Ocultar formulario" : "Nuevo albarán"}
+            </button>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import api from "../Components/api";
 import { Link } from "react-router-dom";
 import Loader from "../Components/Loader";
@@ -52,6 +54,7 @@ export default function Statement() {
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportingInvoices, setExportingInvoices] = useState(false);
   const [err, setErr] = useState("");
   const [features, setFeatures] = useState({
     enableInvoiceExport: true,
@@ -285,10 +288,10 @@ export default function Statement() {
     }
   };
 
-  const downloadInvoices = async () => {
+  const exportInvoicesForAccounting = async () => {
     if (!from || !to) {
       setErr(
-        "Selecciona fecha desde y fecha hasta para descargar las facturas.",
+        "Selecciona fecha desde y fecha hasta para exportar las facturas.",
       );
       return;
     }
@@ -300,17 +303,191 @@ export default function Statement() {
 
     try {
       setErr("");
-      const res = await api.get("/FacturaEmitida/exportar", {
-        params: { fechaInicio: from, fechaFin: to },
-        responseType: "blob",
+      setExportingInvoices(true);
+
+      const firstRes = await api.get("/FacturaEmitida", {
+        params: {
+          fechaInicio: from,
+          fechaFin: to,
+          page: 1,
+          pageSize: 100,
+        },
+      });
+      const firstRows = Array.isArray(firstRes.data?.data)
+        ? firstRes.data.data
+        : [];
+      const totalPages = Math.max(1, Number(firstRes.data?.totalPages ?? 1));
+      const remainingResponses = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          api.get("/FacturaEmitida", {
+            params: {
+              fechaInicio: from,
+              fechaFin: to,
+              page: index + 2,
+              pageSize: 100,
+            },
+          }),
+        ),
+      );
+      const invoices = remainingResponses.reduce(
+        (all, response) =>
+          all.concat(
+            Array.isArray(response.data?.data) ? response.data.data : [],
+          ),
+        firstRows,
+      );
+
+      if (invoices.length === 0) {
+        setErr("No hay facturas en el periodo seleccionado.");
+        return;
+      }
+
+      const metadata = firstRes.data?.reportMetadata ?? {};
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "ZagaPro";
+      workbook.created = new Date();
+      const worksheet = workbook.addWorksheet("Facturas", {
+        views: [{ state: "frozen", ySplit: 5 }],
+        pageSetup: {
+          paperSize: 9,
+          orientation: "landscape",
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+        },
       });
 
-      downloadBlob(res.data, `facturas-${from}-a-${to}.zip`);
+      worksheet.mergeCells("A1:O1");
+      worksheet.getCell("A1").value = "EXPORTACION DE FACTURAS PARA CONTABILIDAD";
+      worksheet.getCell("A1").font = { bold: true, size: 16, color: { argb: "FFFFFFFF" } };
+      worksheet.getCell("A1").fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF334155" },
+      };
+      worksheet.getCell("A1").alignment = { horizontal: "center" };
+
+      worksheet.mergeCells("A2:O2");
+      worksheet.getCell("A2").value = [
+        metadata.issuerName,
+        metadata.issuerNif ? `NIF: ${metadata.issuerNif}` : "",
+      ].filter(Boolean).join(" - ");
+      worksheet.getCell("A2").alignment = { horizontal: "center" };
+
+      worksheet.mergeCells("A3:O3");
+      worksheet.getCell("A3").value = `Periodo: ${from} a ${to}`;
+      worksheet.getCell("A3").alignment = { horizontal: "center" };
+      worksheet.addRow([]);
+
+      const headers = [
+        "Fecha",
+        "Nº factura",
+        "Cliente",
+        "NIF",
+        "Origen",
+        "Tipo",
+        "Factura rectificada",
+        "Matrícula",
+        "Base imponible",
+        "IVA",
+        "Total",
+        "Forma de pago",
+        "Estado de cobro",
+        "Saldo pendiente",
+        "Orden de trabajo",
+      ];
+      const headerRow = worksheet.addRow(headers);
+      headerRow.height = 24;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF475569" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+
+      invoices.forEach((invoice) => {
+        worksheet.addRow([
+          invoice.date ? new Date(invoice.date) : null,
+          invoice.invoiceNumber || "",
+          invoice.customerName || "",
+          invoice.nif || "",
+          invoiceOriginLabel(invoice.origin),
+          invoiceTypeLabel(invoice),
+          invoice.originalInvoiceNumber || "",
+          invoice.matricula || "",
+          Number(invoice.baseAmount || 0),
+          Number(invoice.ivaAmount || 0),
+          Number(invoice.totalAmount || 0),
+          invoice.tipoPago || "",
+          invoice.estadoCxC || "",
+          Number(invoice.saldoPendiente || 0),
+          invoice.idOrdenTrabajo || "",
+        ]);
+      });
+
+      const totalRow = worksheet.addRow([
+        "", "", "", "", "", "", "", "TOTALES",
+        invoices.reduce((sum, item) => sum + Number(item.baseAmount || 0), 0),
+        invoices.reduce((sum, item) => sum + Number(item.ivaAmount || 0), 0),
+        invoices.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0),
+        "", "",
+        invoices.reduce((sum, item) => sum + Number(item.saldoPendiente || 0), 0),
+        "",
+      ]);
+      totalRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE2E8F0" },
+        };
+      });
+
+      worksheet.columns = [
+        { width: 13 }, { width: 20 }, { width: 32 }, { width: 17 },
+        { width: 14 }, { width: 17 }, { width: 21 }, { width: 15 },
+        { width: 17 }, { width: 14 }, { width: 16 }, { width: 18 },
+        { width: 18 }, { width: 18 }, { width: 18 },
+      ];
+      worksheet.autoFilter = { from: "A5", to: "O5" };
+      worksheet.getColumn(1).numFmt = "dd/mm/yyyy";
+      [9, 10, 11, 14].forEach((columnNumber) => {
+        worksheet.getColumn(columnNumber).numFmt = '#,##0.00 [$€-es-ES]';
+      });
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber < 5) return;
+        row.eachCell({ includeEmpty: true }, (cell) => {
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+          cell.alignment = { vertical: "middle" };
+        });
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(
+        new Blob([buffer], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+        `facturas-contabilidad-${from}-a-${to}.xlsx`,
+      );
+
       setAppliedFrom(from);
       setAppliedTo(to);
     } catch (e) {
-      const message = await readBlobError(e);
-      setErr(message || "No se pudieron descargar las facturas del periodo.");
+      setErr(
+        e?.response?.data?.message ||
+          e?.message ||
+          "No se pudo exportar la información contable de las facturas.",
+      );
+    } finally {
+      setExportingInvoices(false);
     }
   };
 
@@ -410,10 +587,13 @@ export default function Statement() {
             {features.enableInvoiceExport && (
               <button
                 type="button"
-                onClick={downloadInvoices}
-                className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition"
+                onClick={exportInvoicesForAccounting}
+                disabled={exportingInvoices}
+                className="inline-flex items-center justify-center rounded-xl px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 transition disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Descargar facturas
+                {exportingInvoices
+                  ? "Exportando..."
+                  : "Exportar facturas para contabilidad"}
               </button>
             )}
           </div>
@@ -943,30 +1123,28 @@ function formatMoneyCell(value) {
   );
 }
 
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+function invoiceOriginLabel(origin) {
+  const labels = {
+    workshop: "Taller",
+    sparePart: "Recambio",
+    rapel: "Rápel",
+    noVat: "Sin IVA",
+  };
+
+  return labels[origin] || origin || "";
 }
 
-async function readBlobError(error) {
-  const blob = error?.response?.data;
-  if (!blob || typeof blob.text !== "function") {
-    return error?.response?.data?.message || error?.message || "";
-  }
+function invoiceTypeLabel(invoice) {
+  if (invoice.isRectification) return "Rectificativa";
 
-  try {
-    const text = await blob.text();
-    const parsed = JSON.parse(text);
-    return parsed?.message || parsed?.Message || text;
-  } catch {
-    return error?.message || "";
-  }
+  const labels = {
+    Recambio: "Recambio",
+    Rapel: "Rápel",
+    SinIva: "Sin IVA",
+    Normal: "Normal",
+  };
+
+  return labels[invoice.tipoFactura] || "Normal";
 }
 
 function escapeHtmlCell(value) {

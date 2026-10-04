@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Edit3, Plus, Trash2 } from "lucide-react";
+import { Download, Edit3, Plus, Trash2 } from "lucide-react";
 import api from "../../../Components/api";
 import Loader from "../../../Components/Loader";
+import { exportDetailExcel } from "../../../utils/exportDetailExcel";
 import { useBankAccounts } from "../hooks/useBankAccounts";
 import { useExpenseTypes } from "../hooks/useExpenseTypes";
 import {
@@ -50,6 +51,7 @@ export default function MiscExpensesPanel() {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
+  const [exporting, setExporting] = useState(false);
 
   const filteredItems = useMemo(() => {
     const search = normalizeSearch(filters.search);
@@ -244,6 +246,34 @@ export default function MiscExpensesPanel() {
     }
   };
 
+  const exportExcel = async () => {
+    if (exporting || filteredItems.length === 0) return;
+
+    try {
+      setExporting(true);
+      await exportDetailExcel({
+        sheetName: "Gastos varios",
+        title: "GASTOS VARIOS",
+        filename: `gastos-varios-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        columns: [
+          { header: "Fecha", width: 14, value: (item) => formatDate(item.fecha ?? item.Fecha) },
+          { header: "Comprobante", width: 20, value: (item) => item.numeroComprobante ?? item.NumeroComprobante ?? "-" },
+          { header: "Proveedor", width: 28, value: (item) => item.proveedorNombre ?? item.ProveedorNombre ?? "-" },
+          { header: "Descripcion", width: 36, value: (item) => item.descripcion ?? item.Descripcion ?? "-" },
+          { header: "Tipo", width: 22, value: (item) => item.tipoGastoNombre ?? item.TipoGastoNombre ?? "-" },
+          { header: "Metodo de pago", width: 24, value: (item) => item.bankAccountName ?? item.BankAccountName ?? "Efectivo" },
+          { header: "Importe", width: 16, money: true, value: (item) => Number(item.importe ?? item.Importe ?? 0) },
+        ],
+        rows: filteredItems,
+        totals: [{ column: 6, value: totals }],
+      });
+    } catch {
+      alert("No se pudo exportar los gastos varios a Excel.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -257,22 +287,34 @@ export default function MiscExpensesPanel() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (showForm) {
-                resetForm();
-                setEditingId(null);
-                setShowForm(false);
-              } else {
-                setShowForm(true);
-              }
-            }}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
-          >
-            <Plus size={17} />
-            {showForm ? "Ocultar formulario" : "Registrar gasto"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportExcel}
+              disabled={exporting || filteredItems.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <Download size={17} />
+              {exporting ? "Exportando..." : "Exportar Excel"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (showForm) {
+                  resetForm();
+                  setEditingId(null);
+                  setShowForm(false);
+                } else {
+                  setShowForm(true);
+                }
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+            >
+              <Plus size={17} />
+              {showForm ? "Ocultar formulario" : "Registrar gasto"}
+            </button>
+          </div>
         </div>
       </div>
 
