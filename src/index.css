@@ -154,6 +154,57 @@
   font-size: 7pt !important;
 }
 
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm;
+  }
+
+  .help-print-page {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .help-print-page > div:first-child {
+    display: none !important;
+  }
+
+  .help-print-page > div:last-child {
+    padding: 0 !important;
+  }
+
+  .help-print-page article {
+    max-width: none !important;
+    color: #0f172a !important;
+    font-size: 10.5pt !important;
+  }
+
+  .help-print-page h2,
+  .help-print-page h3,
+  .help-print-page h4,
+  .help-print-page h5 {
+    break-after: avoid-page !important;
+    page-break-after: avoid !important;
+  }
+
+  .help-print-page p,
+  .help-print-page li {
+    orphans: 3;
+    widows: 3;
+  }
+
+  .help-print-page table,
+  .help-print-page blockquote {
+    break-inside: avoid-page !important;
+    page-break-inside: avoid !important;
+  }
+}
+
 .purchase-book-print th,
 .purchase-book-print td {
   padding: 3px 4px !important;

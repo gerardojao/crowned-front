@@ -97,7 +97,7 @@ export default function HelpCenter() {
           </div>
         </aside>
 
-        <main className="min-w-0 overflow-hidden rounded-3xl bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-200">
+        <main className="help-print-page print-page min-w-0 overflow-hidden rounded-3xl bg-white shadow-lg shadow-slate-900/5 ring-1 ring-slate-200">
           {selected && (
             <div className="border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white px-5 py-4 sm:px-8 lg:px-10">
               <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
