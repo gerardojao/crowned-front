@@ -44,6 +44,7 @@ import Ledger from "./Pages/Ledger.jsx";
 import InvoiceHistory from "./Pages/InvoiceHistory.jsx";
 import PurchaseModuleScreen from "./Pages/PurchaseModuleScreen.jsx";
 import ManagerSettings from "./Pages/ManagerSettings.jsx";
+import HelpCenter from "./Pages/HelpCenter.jsx";
 
 const OwnerAnalytics = lazy(() => import("./Pages/OwnerAnalytics.jsx"));
 
@@ -87,6 +88,7 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/support" element={<Support />} />
+            <Route path="/help" element={protectedElement(<HelpCenter />)} />
 
             <Route
               path="/print-order/:id"

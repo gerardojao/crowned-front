@@ -22,6 +22,7 @@ import {
   WalletCards,
   ShoppingCart,
   Settings,
+  CircleHelp,
 } from "lucide-react";
 import { useAuth } from "./AuthContext";
 import api, {
@@ -34,6 +35,7 @@ import zagaProLogo from "../assets/logozagapro.png";
 import ClientAlertModal from "./ClienteAlertModal";
 import { getBusinessTerminology } from "../utils/businessTerminology";
 import { sendSupportRequest } from "./supportRequest";
+import { manualForPath } from "../content/manualCatalog";
 
 const ProductTour = lazy(() => import("./ProductTour"));
 
@@ -94,7 +96,8 @@ export default function Layout({ children }) {
     "/accounts-receivable",
     "/ledger",
     "/invoices-history",
-    "/register-expense"
+    "/register-expense",
+    "/help",
   ];
 
   const isCompactRoute = compactRoutes.some((pattern) =>
@@ -217,6 +220,10 @@ export default function Layout({ children }) {
   const stockAccessLabel = stockModuleEnabled
     ? labels.stockTitle
     : "Repuestos facturados";
+  const contextualManual = manualForPath(location.pathname);
+  const helpHref = contextualManual
+    ? `/help?manual=${encodeURIComponent(contextualManual)}`
+    : "/help";
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
   };
@@ -325,6 +332,14 @@ export default function Layout({ children }) {
                       <LogOut size={16} />
                       Salir
                     </button>
+                    <NavLink
+                      to={helpHref}
+                      aria-label="Ayuda y manuales"
+                      title="Ayuda y manuales"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    >
+                      <CircleHelp size={20} aria-hidden="true" />
+                    </NavLink>
                     {isSuperAdmin && (
                       <NavLink
                         to="/admin/workshops"
@@ -406,6 +421,17 @@ export default function Layout({ children }) {
                       )}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      <NavLink
+                        to={helpHref}
+                        className={`${mobileLink} bg-orange-50 ring-orange-100`}
+                        onClick={() => setOpen(false)}
+                      >
+                        <CircleHelp size={18} className="text-orange-600" />
+                        <span className={mobileLinkText}>
+                          <span className={mobileLinkTitle}>Ayuda y manuales</span>
+                          <span className={mobileLinkHint}>Guías de uso del sistema</span>
+                        </span>
+                      </NavLink>
                       {/* <NavLink probando
                         to="/register-work-order"
                         className={mobileLink}
