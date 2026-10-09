@@ -47,6 +47,9 @@ const EMPTY_ITEM = {
   kind: "Recambio",
 };
 
+const normalizeTaxId = (value) =>
+  String(value ?? "").replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+
 const PAYMENT_METHODS = [
   { key: "efectivo", label: "Efectivo" },
   { key: "transferencia", label: "Transferencia" },
@@ -157,6 +160,8 @@ export default function SpecialPartsInvoice() {
   const [clientResults, setClientResults] = useState([]);
   const [showClientForm, setShowClientForm] = useState(false);
   const [includeVehicle, setIncludeVehicle] = useState(false);
+  const [rapelCandidates, setRapelCandidates] = useState([]);
+  const [rapelApplications, setRapelApplications] = useState({});
   const [invoice, setInvoice] = useState({
     numero: "",
     idCliente: "",
@@ -188,6 +193,34 @@ export default function SpecialPartsInvoice() {
     fechaVencimiento: "",
   });
   const [items, setItems] = useState([{ ...EMPTY_ITEM }]);
+
+  useEffect(() => {
+    if (!invoiceMode.isRapel || invoice.tipoPago === "Credito" || !normalizeTaxId(invoice.dni)) {
+      setRapelCandidates([]);
+      setRapelApplications({});
+      return;
+    }
+
+    let active = true;
+    api.get("/FacturaEmitida/cxc")
+      .then((res) => {
+        if (!active) return;
+        const rows = res?.data?.data?.[0] ?? res?.data?.Data?.[0] ?? [];
+        const dni = normalizeTaxId(invoice.dni);
+        setRapelCandidates((Array.isArray(rows) ? rows : []).filter((item) => {
+          const tipo = String(item.tipoFactura ?? item.TipoFactura ?? "").toLowerCase();
+          const estado = String(item.estadoCxC ?? item.EstadoCxC ?? "").toLowerCase();
+          const saldo = Number(item.saldoPendiente ?? item.SaldoPendiente ?? 0);
+          return tipo !== "rapel" && tipo !== "rectificativa" &&
+            !estado.includes("rectificada") && normalizeTaxId(item.dni ?? item.Dni) === dni && saldo >= 0.01;
+        }));
+      })
+      .catch(() => {
+        if (active) setRapelCandidates([]);
+      });
+
+    return () => { active = false; };
+  }, [invoiceMode.isRapel, invoice.tipoPago, invoice.dni]);
 
   const isCredit = invoice.tipoPago === "Credito";
   const accountsReceivableEnabled = Boolean(
@@ -253,6 +286,19 @@ export default function SpecialPartsInvoice() {
     [companyPayable, paymentTotal],
   );
   const hasPaymentMethods = selectedPaymentMethods.length > 0;
+  const displayedPaymentDifference = invoiceMode.isRapel
+    ? round2(Math.abs(total) - paymentTotal)
+    : paymentDifference;
+  const displayedPaymentMatches =
+    hasPaymentMethods && Math.abs(displayedPaymentDifference) < 0.01;
+  const hasRapelAmount = !invoiceMode.isRapel || Math.abs(total) >= 0.01;
+  const rapelAssigned = round2(
+    Object.values(rapelApplications).reduce(
+      (sum, value) => sum + Number(value || 0),
+      0,
+    ),
+  );
+  const displayedPaymentExcess = Math.max(0, -displayedPaymentDifference);
   const requiresPaymentMethods = !invoiceMode.isRapel && companyPayable > 0;
   const paymentContract = buildInvoicePaymentContract({
     isCredit,
@@ -640,6 +686,17 @@ export default function SpecialPartsInvoice() {
     if (!invoiceMode.isRapel && franchiseAmount > total) {
       throw new Error("La franquicia no puede superar el total de la factura.");
     }
+    if (invoiceMode.isRapel && !isCredit) {
+      if (!normalizeTaxId(invoice.dni)) {
+        throw new Error("El cliente debe tener DNI/NIF para aplicar el Rapel al emitirlo.");
+      }
+      if (rapelAssigned < 0.01) {
+        throw new Error("Indica al menos una factura pendiente a la que aplicar el Rapel.");
+      }
+      if (rapelAssigned - Math.abs(total) >= 0.01) {
+        throw new Error(`La aplicación no puede superar el importe del Rapel (${eur.format(Math.abs(total))}).`);
+      }
+    }
     if (requiresPaymentMethods && !isCredit && !hasPaymentMethods) {
       throw new Error("Selecciona al menos un metodo de pago.");
     }
@@ -696,6 +753,14 @@ export default function SpecialPartsInvoice() {
       fechaVencimiento: isCredit ? invoice.fechaVencimiento || null : null,
       bankAccountId,
       pagos,
+      aplicacionesRapel: invoiceMode.isRapel && !isCredit
+        ? Object.entries(rapelApplications)
+            .map(([facturaId, importe]) => ({
+              facturaId: Number(facturaId),
+              importe: Number(importe || 0),
+            }))
+            .filter((item) => item.importe > 0)
+        : [],
       items: billableItems.map((item) => ({
         ...item,
         idProveedor: normalizeProviderId(
@@ -990,6 +1055,12 @@ export default function SpecialPartsInvoice() {
                 allowCreate
               />
             )}
+            <div className="mt-4 hidden grid-cols-[1fr_90px_120px_44px] gap-2 px-3 text-xs font-bold uppercase tracking-wide text-slate-500 md:grid">
+              <span>Descripción</span>
+              <span className="text-center">Cantidad</span>
+              <span className="text-center">Precio unitario</span>
+              <span />
+            </div>
             <div className="mt-4 space-y-3">
               {items.map((item, index) => (
                 <div key={index} className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 p-3 md:grid-cols-[1fr_90px_120px_44px]">
@@ -1003,11 +1074,15 @@ export default function SpecialPartsInvoice() {
                     type="number"
                     min="0"
                     step="0.01"
+                    aria-label="Cantidad"
+                    title="Cantidad"
                     value={item.cantidad}
                     onChange={(event) => setItem(index, "cantidad", event.target.value)}
                     className={inputCls}
                   />
                   <MoneyInput
+                    placeholder="Precio unitario"
+                    aria-label="Precio unitario"
                     value={item.importe}
                     onChange={(value) => setItem(index, "importe", value)}
                     className={inputCls}
@@ -1058,6 +1133,67 @@ export default function SpecialPartsInvoice() {
               </select>
             </label>
           )}
+          {invoiceMode.isRapel && (
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                Estado informativo
+              </p>
+              <p
+                className={`mt-1 text-sm font-bold ${
+                  displayedPaymentMatches && hasRapelAmount
+                    ? "text-emerald-700"
+                    : "text-amber-700"
+                }`}
+              >
+                {!hasRapelAmount
+                  ? "Indica el precio del Rapel"
+                  : isCredit
+                    ? "Pendiente de aplicar"
+                    : "Aplicar a deuda al emitir"}
+              </p>
+              {hasRapelAmount && (
+                <p className="mt-2 text-xs text-slate-600">
+                  Saldo a favor del cliente: <strong>{eur.format(Math.abs(total))}</strong>. Se aplicará a sus facturas pendientes sin movimientos bancarios.
+                </p>
+              )}
+            </div>
+          )}
+          {invoiceMode.isRapel && !isCredit && (
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4">
+              <h4 className="text-sm font-bold text-violet-900">Aplicar a facturas pendientes</h4>
+              <p className="mt-1 text-xs text-violet-700">
+                Aplica ahora el importe posible. El resto quedará como saldo a favor para futuras facturas.
+              </p>
+              <div className="mt-3 space-y-2">
+                {rapelCandidates.length === 0 && (
+                  <p className="rounded-xl bg-white p-3 text-xs text-slate-600 ring-1 ring-violet-100">
+                    El cliente no tiene facturas pendientes con el mismo DNI/NIF.
+                  </p>
+                )}
+                {rapelCandidates.map((candidate) => {
+                  const id = candidate.id ?? candidate.Id;
+                  const saldo = Number(candidate.saldoPendiente ?? candidate.SaldoPendiente ?? 0);
+                  return (
+                    <label key={id} className="grid gap-2 rounded-xl bg-white p-3 ring-1 ring-violet-100">
+                      <span className="flex justify-between gap-2 text-xs">
+                        <strong>{candidate.numeroFactura ?? candidate.NumeroFactura}</strong>
+                        <span>Debe: {eur.format(saldo)}</span>
+                      </span>
+                      <MoneyInput
+                        placeholder="Importe a aplicar"
+                        value={rapelApplications[id] ?? ""}
+                        onChange={(value) => setRapelApplications((prev) => ({ ...prev, [id]: value }))}
+                        className={inputCls}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+              <div className={`mt-3 rounded-xl px-3 py-2 text-xs font-bold ${rapelAssigned > 0 && rapelAssigned <= Math.abs(total) ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                Aplicado ahora: {eur.format(rapelAssigned)} · Saldo a favor restante: {eur.format(Math.max(0, Math.abs(total) - rapelAssigned))}
+              </div>
+            </div>
+          )}
           {isCredit && (
             <div className="grid grid-cols-1 gap-3">
               <Input
@@ -1072,33 +1208,37 @@ export default function SpecialPartsInvoice() {
                 value={invoice.fechaVencimiento}
                 onChange={(v) => setInvoiceField("fechaVencimiento", v)}
               />
-              <label className="block text-sm font-medium text-slate-700">
-                Cuenta bancaria
-                <select
-                  value={selectedBankId}
-                  onChange={(event) => setSelectedBankId(event.target.value)}
-                  className={`${inputCls} mt-1 w-full`}
-                >
-                  <option value="">Banco</option>
-                  {bankAccounts.map((bank) => {
-                    const id = bank.id ?? bank.Id;
-                    const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
-                    const iban = bank.iban ?? bank.Iban ?? "";
-                    return (
-                      <option key={id} value={id}>
-                        {name} - {iban}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
+              {!invoiceMode.isRapel && (
+                <label className="block text-sm font-medium text-slate-700">
+                  Cuenta bancaria
+                  <select
+                    value={selectedBankId}
+                    onChange={(event) => setSelectedBankId(event.target.value)}
+                    className={`${inputCls} mt-1 w-full`}
+                  >
+                    <option value="">Banco</option>
+                    {bankAccounts.map((bank) => {
+                      const id = bank.id ?? bank.Id;
+                      const name = bank.nombre ?? bank.Nombre ?? "Cuenta bancaria";
+                      const iban = bank.iban ?? bank.Iban ?? "";
+                      return (
+                        <option key={id} value={id}>
+                          {name} - {iban}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              )}
             </div>
           )}
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          {!invoiceMode.isRapel && <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-3">
               <h4 className="text-sm font-bold text-slate-800">Metodos de pago</h4>
               <p className="text-xs text-slate-500">
-                {isCredit
+                {invoiceMode.isRapel
+                  ? "Referencia informativa: reparte el valor absoluto del Rapel entre los métodos utilizados."
+                  : isCredit
                   ? "Registra el abono inicial si el cliente paga una parte."
                   : "La suma debe coincidir con el total antes de imprimir."}
               </p>
@@ -1168,25 +1308,39 @@ export default function SpecialPartsInvoice() {
 
             <div
               className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ring-1 ${
-                isCredit || !requiresPaymentMethods || (hasPaymentMethods && Math.abs(paymentDifference) < 0.01)
+                invoiceMode.isRapel
+                  ? displayedPaymentMatches && hasRapelAmount
+                    ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                    : "bg-amber-50 text-amber-800 ring-amber-200"
+                  : isCredit || !requiresPaymentMethods || (hasPaymentMethods && Math.abs(paymentDifference) < 0.01)
                   ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
                   : "bg-amber-50 text-amber-800 ring-amber-200"
               }`}
             >
               {isCredit ? "Abono inicial" : "Asignado"}: {eur.format(paymentTotal)} -{" "}
-              {isCredit ? "Saldo pendiente" : "Diferencia"}:{" "}
-              {eur.format(Math.max(0, paymentDifference))}
+              {isCredit
+                ? `Saldo pendiente: ${eur.format(displayedPaymentDifference)}`
+                : displayedPaymentExcess > 0
+                  ? `Exceso asignado: ${eur.format(displayedPaymentExcess)}`
+                  : `Diferencia: ${eur.format(displayedPaymentDifference)}`}
+              {invoiceMode.isRapel && (
+                <span className="mt-1 block font-medium">
+                  Solo informativo; no cambia el estado contable ni registra un cobro.
+                </span>
+              )}
             </div>
-          </div>
-          <label className="block text-sm font-medium text-slate-700">
-            Observaciones
-            <textarea
-              value={invoice.observaciones}
-              onChange={(event) => setInvoiceField("observaciones", event.target.value)}
-              rows={4}
-              className={`${inputCls} mt-1 w-full`}
-            />
-          </label>
+          </div>}
+          {!invoiceMode.isRapel && (
+            <label className="block text-sm font-medium text-slate-700">
+              Observaciones
+              <textarea
+                value={invoice.observaciones}
+                onChange={(event) => setInvoiceField("observaciones", event.target.value)}
+                rows={4}
+                className={`${inputCls} mt-1 w-full`}
+              />
+            </label>
+          )}
           <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700 ring-1 ring-slate-200">
             <div className="flex justify-between">
               <span>Base imponible</span>

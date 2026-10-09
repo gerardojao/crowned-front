@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Download, HandCoins, RefreshCw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Download, HandCoins, RefreshCw, Scale } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import api from "../Components/api";
@@ -10,6 +10,9 @@ import { soloFecha } from "../utils/date";
 
 const ESTADOS = ["Todas", "Pendiente", "Parcial", "Rectificada", "Parcial rectificada", "Pagada"];
 const CASH_PAYMENT_VALUE = "cash";
+const isRapel = (item) =>
+  Boolean(item?.esSaldoFavor ?? item?.EsSaldoFavor) ||
+  normalizeText(item?.tipoFactura ?? item?.TipoFactura) === "rapel";
 
 const todayInput = () => new Date().toISOString().slice(0, 10);
 
@@ -90,6 +93,8 @@ export default function AccountsReceivable() {
   const [clienteFilter, setClienteFilter] = useState("");
   const [matriculaFilter, setMatriculaFilter] = useState("");
   const [facturaFilter, setFacturaFilter] = useState("");
+  const [rapelModal, setRapelModal] = useState({ open: false, rapel: null, fecha: todayInput(), aplicaciones: {}, loading: false });
+  const [showRapels, setShowRapels] = useState(false);
 
   const load = async () => {
     try {
@@ -181,8 +186,19 @@ export default function AccountsReceivable() {
     facturaFilter,
   ]);
 
+  const facturasPendientes = useMemo(() => filteredItems.filter((item) => !isRapel(item)), [filteredItems]);
+  const rappelsPendientes = useMemo(
+    () =>
+      filteredItems.filter(
+        (item) =>
+          isRapel(item) &&
+          Math.abs(Number(item.saldoPendiente ?? item.SaldoPendiente ?? 0)) >= 0.01,
+      ),
+    [filteredItems],
+  );
+
   const summary = useMemo(() => {
-    return filteredItems.reduce(
+    return facturasPendientes.reduce(
       (acc, item) => {
         const total = Number(item.totalFactura ?? item.TotalFactura ?? 0);
         const abonado = Number(item.totalAbonado ?? item.TotalAbonado ?? 0);
@@ -202,7 +218,44 @@ export default function AccountsReceivable() {
       },
       { total: 0, abonado: 0, saldo: 0, vencidas: 0, saldoVencido: 0 },
     );
-  }, [filteredItems]);
+  }, [facturasPendientes]);
+
+  const rapelSummary = useMemo(
+    () => rappelsPendientes.reduce((sum, item) => sum + Math.abs(Number(item.saldoPendiente ?? item.SaldoPendiente ?? 0)), 0),
+    [rappelsPendientes],
+  );
+
+  const sameCustomer = (rapel, factura) => {
+    const rapelDni = normalizeText(rapel.dni ?? rapel.Dni);
+    const facturaDni = normalizeText(factura.dni ?? factura.Dni);
+    return Boolean(rapelDni && facturaDni && rapelDni === facturaDni);
+  };
+
+  const closeRapelModal = () => {
+    if (rapelModal.loading) return;
+    setRapelModal({ open: false, rapel: null, fecha: todayInput(), aplicaciones: {}, loading: false });
+  };
+
+  const aplicarRapel = async () => {
+    const rapel = rapelModal.rapel;
+    if (!rapel) return;
+    const aplicaciones = Object.entries(rapelModal.aplicaciones)
+      .map(([facturaId, importe]) => ({ facturaId: Number(facturaId), importe: Number(importe || 0) }))
+      .filter((item) => item.importe > 0);
+    if (!aplicaciones.length) return setError("Distribuye un importe del Rapel en al menos una factura.");
+    try {
+      setError(""); setNotice("");
+      setRapelModal((prev) => ({ ...prev, loading: true }));
+      const res = await api.post(`/FacturaEmitida/${rapel.id ?? rapel.Id}/aplicar-rapel`, { fecha: rapelModal.fecha, aplicaciones });
+      if (res?.data?.ok === 0 || res?.data?.Ok === 0) throw new Error(res?.data?.message || res?.data?.Message);
+      setNotice("Rapel aplicado correctamente a la deuda del cliente.");
+      setRapelModal({ open: false, rapel: null, fecha: todayInput(), aplicaciones: {}, loading: false });
+      await load();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.response?.data?.Message || err?.message || "No se pudo aplicar el Rapel.");
+      setRapelModal((prev) => ({ ...prev, loading: false }));
+    }
+  };
 
   const exportExcel = async () => {
     const workbook = new ExcelJS.Workbook();
@@ -528,6 +581,34 @@ export default function AccountsReceivable() {
         />
       </div>
 
+      {rappelsPendientes.length > 0 && (
+        <section className="rounded-2xl border border-orange-200 bg-orange-50/50 p-4 shadow-sm">
+          <div className={`${showRapels ? "mb-3" : ""} flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between`}>
+            <div className="flex items-center gap-3"><span className="rounded-xl bg-orange-500 p-2.5 text-white"><Scale size={19} /></span><div>
+              <h3 className="text-base font-bold text-slate-900">Rappels pendientes de aplicar</h3>
+              <p className="text-sm text-slate-600">{rappelsPendientes.length} pendiente{rappelsPendientes.length === 1 ? "" : "s"} · Sin movimientos bancarios.</p>
+            </div></div>
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl bg-white px-3 py-2 text-right ring-1 ring-orange-200"><p className="text-[11px] font-bold uppercase text-orange-600">Saldo disponible</p><p className="text-lg font-extrabold text-orange-700">{currency(rapelSummary)}</p></div>
+              <button type="button" onClick={() => setShowRapels((value) => !value)} className="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-sm font-bold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100" aria-expanded={showRapels}>
+                {showRapels ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                {showRapels ? "Ocultar" : "Ver"}
+              </button>
+            </div>
+          </div>
+          {showRapels && <div className="grid max-h-80 gap-3 overflow-y-auto pr-1 lg:grid-cols-2">
+            {rappelsPendientes.map((rapel) => {
+              const hasDni = Boolean(String(rapel.dni ?? rapel.Dni ?? "").trim());
+              return <article key={rapel.id ?? rapel.Id} className="rounded-xl bg-white p-3 ring-1 ring-orange-200">
+                <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold text-slate-900">{rapel.numeroFactura ?? rapel.NumeroFactura}</p><p className="text-xs text-slate-600">{rapel.cliente ?? rapel.Cliente}</p><p className="mt-1 text-xs text-slate-500">{dateOnly(rapel.fecha ?? rapel.Fecha)}</p></div><div className="text-right"><p className="text-[11px] font-bold uppercase text-orange-600">Por aplicar</p><p className="text-base font-extrabold text-orange-700">{currency(Math.abs(Number(rapel.saldoPendiente ?? rapel.SaldoPendiente ?? 0)))}</p></div></div>
+                {!hasDni && <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs font-semibold text-amber-800">El cliente necesita DNI/NIF para aplicar este Rapel.</p>}
+                <button type="button" disabled={!hasDni} onClick={() => setRapelModal({ open: true, rapel, fecha: todayInput(), aplicaciones: {}, loading: false })} className="mt-2 w-full rounded-lg bg-orange-50 px-3 py-2 text-sm font-bold text-orange-700 ring-1 ring-orange-200 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50">Aplicar a facturas</button>
+              </article>;
+            })}
+          </div>}
+        </section>
+      )}
+
       <section className="rounded-3xl bg-white/85 p-5 shadow-sm ring-1 ring-slate-200">
         <div className="mb-4 flex flex-col gap-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -655,7 +736,7 @@ export default function AccountsReceivable() {
           </div>
         )}
 
-        {!loading && filteredItems.length === 0 && (
+        {!loading && facturasPendientes.length === 0 && (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
             No hay facturas para mostrar.
           </div>
@@ -679,7 +760,7 @@ export default function AccountsReceivable() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredItems.map((factura) => (
+              {facturasPendientes.map((factura) => (
                 <FacturaRow
                   key={factura.id ?? factura.Id}
                   factura={factura}
@@ -691,7 +772,7 @@ export default function AccountsReceivable() {
         </div>
 
         <div className="space-y-3 md:hidden">
-          {filteredItems.map((factura) => {
+          {facturasPendientes.map((factura) => {
             const id = factura.id ?? factura.Id;
             const estadoCxC = factura.estadoCxC ?? factura.EstadoCxC;
             const atraso = daysOverdue(
@@ -774,10 +855,36 @@ export default function AccountsReceivable() {
         onCancel={closeAbonoModal}
         onConfirm={registrarAbono}
       />
+      <RapelApplicationModal state={rapelModal} candidates={items.filter((item) => !isRapel(item) && sameCustomer(rapelModal.rapel || {}, item) && Number(item.saldoPendiente ?? item.SaldoPendiente ?? 0) > 0)} onChange={(next) => setRapelModal((prev) => ({ ...prev, ...next }))} onCancel={closeRapelModal} onConfirm={aplicarRapel} />
       </>
       )}
     </section>
   );
+}
+
+function RapelApplicationModal({ state, candidates, onChange, onCancel, onConfirm }) {
+  if (!state.open || !state.rapel) return null;
+  const available = Math.abs(Number(state.rapel.saldoPendiente ?? state.rapel.SaldoPendiente ?? 0));
+  const assigned = Object.values(state.aplicaciones).reduce((sum, value) => sum + Number(value || 0), 0);
+  const invalid = assigned <= 0 || assigned > available + 0.009 || candidates.some((factura) => Number(state.aplicaciones[factura.id ?? factura.Id] || 0) > Number(factura.saldoPendiente ?? factura.SaldoPendiente ?? 0) + 0.009);
+  const modal = <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto px-4 py-8" role="dialog" aria-modal="true">
+    <div className="absolute inset-0 bg-slate-900/50" onClick={state.loading ? undefined : onCancel} />
+    <div className="relative z-10 w-full max-w-2xl rounded-3xl bg-white p-5 shadow-2xl">
+      <div className="flex items-start justify-between gap-4"><div><h3 className="text-xl font-extrabold text-slate-900">Aplicar Rapel a facturas</h3><p className="mt-1 text-sm text-slate-600">{state.rapel.numeroFactura ?? state.rapel.NumeroFactura} · {state.rapel.cliente ?? state.rapel.Cliente}</p></div><div className="rounded-xl bg-violet-50 px-3 py-2 text-right"><p className="text-xs font-bold text-violet-600">Disponible</p><p className="font-extrabold text-violet-800">{currency(available)}</p></div></div>
+      <label className="mt-4 grid gap-1 text-sm font-semibold text-slate-700">Fecha de aplicación<input type="date" value={state.fecha} onChange={(event) => onChange({ fecha: event.target.value })} className="w-48 rounded-xl border border-slate-300 px-3 py-2" /></label>
+      <div className="mt-4 space-y-2">
+        {candidates.length === 0 && <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">Este cliente no tiene facturas pendientes con el mismo DNI/NIF.</div>}
+        {candidates.map((factura) => {
+          const id = factura.id ?? factura.Id; const saldo = Number(factura.saldoPendiente ?? factura.SaldoPendiente ?? 0);
+          return <div key={id} className="grid gap-3 rounded-xl border border-slate-200 p-3 sm:grid-cols-[1fr_140px] sm:items-center"><div><p className="font-bold text-slate-900">{factura.numeroFactura ?? factura.NumeroFactura}</p><p className="text-xs text-slate-500">Saldo pendiente: {currency(saldo)}</p></div><label className="grid gap-1 text-xs font-bold text-slate-600">Aplicar<input type="number" min="0" max={Math.min(saldo, available)} step="0.01" value={state.aplicaciones[id] ?? ""} onChange={(event) => onChange({ aplicaciones: { ...state.aplicaciones, [id]: event.target.value } })} className="rounded-xl border border-slate-300 px-3 py-2 text-sm" /></label></div>;
+        })}
+      </div>
+      <div className={`mt-4 rounded-xl p-3 text-sm font-bold ${invalid && assigned > 0 ? "bg-rose-50 text-rose-700" : "bg-violet-50 text-violet-800"}`}>Aplicado: {currency(assigned)} · Pendiente del Rapel: {currency(Math.max(0, available - assigned))}{assigned > available && <span className="block text-xs">La aplicación supera el saldo disponible.</span>}</div>
+      <p className="mt-2 text-xs text-slate-500">Esta compensación reduce la deuda del cliente y no registra entradas ni salidas de banco.</p>
+      <div className="mt-5 flex justify-end gap-2"><button type="button" disabled={state.loading} onClick={onCancel} className="rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-slate-700 ring-1 ring-slate-200">Cancelar</button><button type="button" disabled={state.loading || invalid || candidates.length === 0} onClick={onConfirm} className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{state.loading ? "Aplicando..." : "Confirmar aplicación"}</button></div>
+    </div>
+  </div>;
+  return createPortal(modal, document.body);
 }
 
 function SummaryCard({ label, value, detail = "", tone = "slate" }) {
