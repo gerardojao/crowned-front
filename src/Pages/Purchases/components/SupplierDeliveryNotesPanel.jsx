@@ -1729,7 +1729,7 @@ export default function SupplierDeliveryNotesPanel({
                           <tr>
                             <th className="px-4 py-3 text-left">Referencia</th>
                             <th className="px-4 py-3 text-left">Concepto</th>
-                            <th className="px-4 py-3 text-left">Marca</th>
+                            <th className="px-4 py-3 text-left">Matricula</th>
                             <th className="px-4 py-3 text-right">Cant.</th>
                             <th className="px-4 py-3 text-right">PVP</th>
                             <th className="px-4 py-3 text-right">Precio compra</th>
