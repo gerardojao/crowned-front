@@ -1201,7 +1201,7 @@ export default function SupplierDeliveryNotesPanel({
                   <tr>
                     <th className="px-3 py-2 text-left">Referencia</th>
                     <th className="px-3 py-2 text-left">Nombre</th>
-                    <th className="px-3 py-2 text-left">Marca</th>
+                    <th className="px-3 py-2 text-left">Matricula</th>
                     <th className="px-3 py-2 text-right">Cantidad</th>
                     <th className="px-3 py-2 text-right">PVP</th>
                     <th className="px-3 py-2 text-right">Dcto %</th>
