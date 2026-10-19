@@ -13,6 +13,8 @@ import {
   FileText,
   LogIn,
   Sparkles,
+  BookOpen,
+  X,
 } from "lucide-react";
 import { currency } from "../utils/currency";
 import { loadStatementSummary } from "../utils/statementStore";
@@ -30,6 +32,10 @@ import {
   getWorkOrderOperationTypeBadgeClass,
   getWorkOrderOperationTypeLabel,
 } from "../utils/repairOrderPayload";
+import {
+  dismissRapelHelpNotice,
+  isRapelHelpNoticeDismissed,
+} from "../utils/rapelHelpNotice";
 
 function soloFecha(value) {
   if (!value) return "";
@@ -127,6 +133,7 @@ export default function Home() {
     enableDashboardBilling: false,
     enablePreOrders: false,
     enableAccountsReceivable: false,
+    enableRapelInvoices: false,
     enableAccountsPayable: false,
     enableStockPayments: false,
     enableLedger: false,
@@ -138,6 +145,9 @@ export default function Home() {
   const [lastStatement, setLastStatement] = useState(null);
   const [showUrlMigrationNotice, setShowUrlMigrationNotice] = useState(false);
   const [urlMigrationModalOpen, setUrlMigrationModalOpen] = useState(false);
+  const [showRapelHelpNotice, setShowRapelHelpNotice] = useState(
+    () => !isRapelHelpNoticeDismissed(),
+  );
   const [isWorkshopOwner, setIsWorkshopOwner] = useState(
     String(user?.role ?? "").toLowerCase() === "owner" || isLegacyOwnerAccount(user),
   );
@@ -191,6 +201,11 @@ export default function Home() {
     setShowUrlMigrationNotice(
       nextViewCount < URL_MIGRATION_NOTICE_REQUIRED_VIEWS,
     );
+  };
+
+  const handleDismissRapelHelpNotice = () => {
+    dismissRapelHelpNotice();
+    setShowRapelHelpNotice(false);
   };
 
   const ordenesSorted = useMemo(
@@ -317,6 +332,10 @@ export default function Home() {
             settings.EnablePreOrders ??
             false,
           enableAccountsReceivable,
+          enableRapelInvoices:
+            settings.enableRapelInvoices ??
+            settings.EnableRapelInvoices ??
+            false,
           enableAccountsPayable:
             settings.enableAccountsPayable ??
             settings.EnableAccountsPayable ??
@@ -431,6 +450,47 @@ export default function Home() {
       )} */}
 
       <KPIs totalsOverride={dashboardTotals} />
+
+      {dashboardFeatures.enableAccountsReceivable &&
+        dashboardFeatures.enableRapelInvoices &&
+        showRapelHelpNotice && (
+        <section className="relative overflow-hidden rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-50 to-amber-50 p-4 shadow-sm md:p-5">
+          <button
+            type="button"
+            onClick={handleDismissRapelHelpNotice}
+            aria-label="Cerrar novedad sobre facturas Rapel"
+            className="absolute right-3 top-3 rounded-lg p-1.5 text-orange-500 hover:bg-white/80 hover:text-orange-800"
+          >
+            <X size={17} />
+          </button>
+          <div className="flex flex-col gap-4 pr-8 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <span className="rounded-xl bg-orange-500 p-2.5 text-white shadow-sm">
+                <Sparkles size={20} />
+              </span>
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-700">
+                  Novedad
+                </p>
+                <h2 className="mt-1 text-lg font-extrabold text-slate-950">
+                  Aplica un Rapel a varias facturas pendientes
+                </h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                  Puedes dejar el Rapel como saldo a favor y distribuirlo después,
+                  total o parcialmente, sin generar movimientos de caja o banco.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/help?manual=rapel"
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-orange-700"
+            >
+              <BookOpen size={17} />
+              Ver cómo funciona
+            </Link>
+          </div>
+        </section>
+      )}
 
       {isWorkshopOwner && (
         <Link to="/owner/analytics" className="flex items-center justify-between rounded-3xl border border-indigo-200 bg-gradient-to-r from-indigo-950 to-slate-900 p-6 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl">

@@ -36,6 +36,11 @@ import ClientAlertModal from "./ClienteAlertModal";
 import { getBusinessTerminology } from "../utils/businessTerminology";
 import { sendSupportRequest } from "./supportRequest";
 import { manualForPath } from "../content/manualCatalog";
+import {
+  dismissRapelHelpNotice,
+  isRapelHelpNoticeDismissed,
+  RAPEL_HELP_NOTICE_DISMISSED_EVENT,
+} from "../utils/rapelHelpNotice";
 
 const ProductTour = lazy(() => import("./ProductTour"));
 
@@ -72,6 +77,16 @@ export default function Layout({ children }) {
   });
   const [helpSubmitting, setHelpSubmitting] = useState(false);
   const [helpStatus, setHelpStatus] = useState(null);
+  const [rapelHelpUnread, setRapelHelpUnread] = useState(
+    () => !isRapelHelpNoticeDismissed(),
+  );
+
+  useEffect(() => {
+    const markAsRead = () => setRapelHelpUnread(false);
+    window.addEventListener(RAPEL_HELP_NOTICE_DISMISSED_EVENT, markAsRead);
+    return () =>
+      window.removeEventListener(RAPEL_HELP_NOTICE_DISMISSED_EVENT, markAsRead);
+  }, []);
 
   const isAuthRoute = /^\/(login|register)(\/|$)/.test(location.pathname);
   const isPrintRoute = /^\/print-(pre-)?order\/.+/.test(location.pathname);
@@ -224,6 +239,18 @@ export default function Layout({ children }) {
   const helpHref = contextualManual
     ? `/help?manual=${encodeURIComponent(contextualManual)}`
     : "/help";
+  const showRapelHelpBadge =
+    rapelHelpUnread && rapelInvoicesEnabled && accountsReceivableEnabled;
+  const effectiveHelpHref = showRapelHelpBadge
+    ? "/help?manual=rapel"
+    : helpHref;
+  const openHelpManual = () => {
+    if (showRapelHelpBadge) {
+      dismissRapelHelpNotice();
+      setRapelHelpUnread(false);
+    }
+    setOpen(false);
+  };
   const openClientAlerts = () => {
     window.dispatchEvent(new Event("tc:client-alerts:open"));
   };
@@ -333,12 +360,18 @@ export default function Layout({ children }) {
                       Salir
                     </button>
                     <NavLink
-                      to={helpHref}
+                      to={effectiveHelpHref}
                       aria-label="Ayuda y manuales"
-                      title="Ayuda y manuales"
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                      title={showRapelHelpBadge ? "Nuevo: aplicación de Rappels" : "Ayuda y manuales"}
+                      onClick={openHelpManual}
+                      className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     >
                       <CircleHelp size={20} aria-hidden="true" />
+                      {showRapelHelpBadge && (
+                        <span className="absolute -right-2 -top-2 rounded-full bg-orange-500 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-white shadow-sm ring-2 ring-white">
+                          Nuevo
+                        </span>
+                      )}
                     </NavLink>
                     {isSuperAdmin && (
                       <NavLink
@@ -422,14 +455,25 @@ export default function Layout({ children }) {
                     </div>
                     <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                       <NavLink
-                        to={helpHref}
+                        to={effectiveHelpHref}
                         className={`${mobileLink} bg-orange-50 ring-orange-100`}
-                        onClick={() => setOpen(false)}
+                        onClick={openHelpManual}
                       >
                         <CircleHelp size={18} className="text-orange-600" />
                         <span className={mobileLinkText}>
-                          <span className={mobileLinkTitle}>Ayuda y manuales</span>
-                          <span className={mobileLinkHint}>Guías de uso del sistema</span>
+                          <span className={mobileLinkTitle}>
+                            Ayuda y manuales
+                            {showRapelHelpBadge && (
+                              <span className="ml-2 rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-black uppercase text-white">
+                                Nuevo
+                              </span>
+                            )}
+                          </span>
+                          <span className={mobileLinkHint}>
+                            {showRapelHelpBadge
+                              ? "Nueva guía para aplicar Rappels"
+                              : "Guías de uso del sistema"}
+                          </span>
                         </span>
                       </NavLink>
                       {/* <NavLink probando

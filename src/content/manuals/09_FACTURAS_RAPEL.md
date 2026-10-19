@@ -2,8 +2,7 @@
 
 **Aplicación:** ZagaPro / MasterTouch  
 **Módulo:** Facturas Rapel  
-**Versión:** 1.0  
-**Última revisión:** 6 de octubre de 2026
+**Última revisión:** 19 de octubre de 2026
 
 ## 1. ¿Para qué sirve esta modalidad?
 
@@ -98,13 +97,61 @@ Revisa:
 
 Utiliza **Observaciones** para identificar el periodo, acuerdo, contrato o documento que justifica el Rapel.
 
-## 8. Métodos de pago
+## 8. Dejar el Rapel pendiente
 
-Una factura Rapel tiene total negativo y el sistema no exige asignar un método de cobro. Su finalidad es registrar una regularización, no un ingreso del cliente.
+Una factura Rapel representa un **saldo a favor del cliente**, no un cobro. Puedes emitirla a crédito para dejar su importe pendiente de aplicación.
 
-No selecciones Efectivo, Transferencia, TPV o Bizum salvo que el procedimiento contable definido para el taller requiera expresamente registrar algún movimiento relacionado y haya sido validado por administración.
+Cuando queda pendiente:
 
-## 9. Emitir e imprimir
+- No entra ni sale dinero de caja.
+- No se registra ningún movimiento bancario.
+- El saldo permanece disponible en **Facturas pendiente de cobro**.
+- Puede aplicarse más adelante, total o parcialmente.
+
+Los Rappels no admiten cobros mediante Efectivo, Transferencia, TPV o Bizum. Su aplicación es una compensación entre el saldo a favor y la deuda del cliente.
+
+## 9. Aplicar un Rapel a varias facturas
+
+1. Entra en **Facturas pendiente de cobro**.
+2. Localiza el bloque **Rappels pendientes de aplicar**.
+3. Pulsa **Ver** para desplegar los saldos disponibles.
+4. En el Rapel correspondiente, pulsa **Aplicar a facturas**.
+5. Introduce cuánto quieres aplicar en cada factura pendiente.
+6. Comprueba el total aplicado y el saldo restante del Rapel.
+7. Confirma la aplicación.
+
+Puedes repartir un mismo Rapel entre varias facturas del mismo cliente. También puedes aplicar solamente una parte y conservar el resto para otra operación.
+
+### Ejemplo
+
+Un cliente tiene dos facturas pendientes:
+
+| Factura | Saldo pendiente |
+|---|---:|
+| F-101 | 300,00 € |
+| F-102 | 500,00 € |
+
+Dispone de un Rapel de 600,00 €. Puedes aplicar 300,00 € a F-101 y 250,00 € a F-102.
+
+El resultado será:
+
+- F-101 queda pagada.
+- F-102 conserva 250,00 € pendientes.
+- El Rapel conserva 50,00 € disponibles.
+- No se genera ningún movimiento de caja o banco.
+
+### Controles de seguridad
+
+El sistema impide:
+
+- Aplicar más del saldo disponible del Rapel.
+- Superar el saldo pendiente de una factura.
+- Aplicarlo a facturas de otro cliente.
+- Aplicarlo si no coincide el DNI/NIF.
+- Aplicarlo a otro Rapel o a una factura rectificativa.
+- Volver a aplicar un Rapel completamente consumido.
+
+## 10. Emitir e imprimir
 
 Antes de emitir:
 
@@ -116,7 +163,7 @@ Antes de emitir:
 
 El sistema asigna la serie Rapel, guarda el documento y abre la impresión.
 
-## 10. Consultar una factura Rapel
+## 11. Consultar una factura Rapel
 
 1. Entra en **Listado de facturas**.
 2. Selecciona **Rapel** en el filtro **Origen**.
@@ -127,13 +174,13 @@ Desde el historial puedes reimprimir, enviar por email y exportar los datos.
 
 Los importes negativos afectarán al total del libro de ventas del periodo correspondiente.
 
-## 11. Corregir un Rapel emitido
+## 12. Corregir un Rapel emitido
 
 No modifiques ni elimines directamente el documento. Ábrelo desde el historial y utiliza el procedimiento de factura rectificativa cuando corresponda. Indica siempre el motivo y conserva la relación documental entre ambos registros.
 
 Antes de rectificar un Rapel, confirma con administración el efecto esperado, porque se está corrigiendo un documento que ya contiene importes negativos.
 
-## 12. Diferencia entre Rapel y rectificativa
+## 13. Diferencia entre Rapel y rectificativa
 
 | Documento | Uso principal |
 |---|---|
@@ -142,7 +189,7 @@ Antes de rectificar un Rapel, confirma con administración el efecto esperado, p
 
 Si el ajuste identifica directamente una factura errónea, normalmente corresponde una rectificativa, no un Rapel.
 
-## 13. Errores frecuentes
+## 14. Errores frecuentes
 
 ### Los totales aparecen negativos
 
@@ -164,7 +211,11 @@ Comprueba que exista cliente y al menos una línea con descripción, cantidad ma
 
 No emitas hasta confirmarlo con administración o la asesoría fiscal.
 
-## 14. Buenas prácticas
+### No aparecen facturas para aplicar
+
+Comprueba que el cliente y las facturas tengan el mismo DNI/NIF, que exista saldo pendiente y que las facturas no estén rectificadas.
+
+## 15. Buenas prácticas
 
 - Conserva el acuerdo que justifica la bonificación.
 - Identifica claramente el periodo en la descripción u observaciones.
@@ -173,14 +224,17 @@ No emitas hasta confirmarlo con administración o la asesoría fiscal.
 - No utilices Rapel para corregir una factura concreta.
 - Revisa su impacto en el libro de ventas.
 - Envía una copia al cliente o empresa correspondiente.
+- Déjalo pendiente cuando todavía no sepas a qué facturas aplicarlo.
+- Comprueba el saldo restante después de cada aplicación.
 
-## 15. Resumen rápido
+## 16. Resumen rápido
 
 1. Abre **Facturas Rapel**.
 2. Selecciona al cliente.
 3. Añade el concepto y el periodo de la regularización.
 4. Introduce cantidad y precio en positivo.
 5. Confirma que los totales se muestran en negativo.
-6. Pulsa **Emitir e imprimir**.
-7. Consulta el documento con origen **Rapel**.
-
+6. Emítelo a crédito si quieres dejar el saldo pendiente.
+7. Abre **Facturas pendiente de cobro**.
+8. Distribuye el Rapel entre una o varias facturas.
+9. Comprueba el saldo disponible restante.

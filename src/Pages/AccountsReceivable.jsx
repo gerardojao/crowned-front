@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, Download, HandCoins, RefreshCw, Scale } from "lucide-react";
+import { ArrowLeft, BookOpen, CheckCircle2, ChevronDown, ChevronUp, Download, HandCoins, RefreshCw, Scale } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import api from "../Components/api";
@@ -587,6 +587,17 @@ export default function AccountsReceivable() {
             <div className="flex items-center gap-3"><span className="rounded-xl bg-orange-500 p-2.5 text-white"><Scale size={19} /></span><div>
               <h3 className="text-base font-bold text-slate-900">Rappels pendientes de aplicar</h3>
               <p className="text-sm text-slate-600">{rappelsPendientes.length} pendiente{rappelsPendientes.length === 1 ? "" : "s"} · Sin movimientos bancarios.</p>
+              <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                Un Rapel es un saldo a favor que puedes distribuir entre varias
+                facturas del mismo cliente, total o parcialmente.
+              </p>
+              <Link
+                to="/help?manual=rapel"
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-orange-700 underline decoration-orange-300 underline-offset-2 hover:text-orange-900"
+              >
+                <BookOpen size={14} />
+                Consultar el manual de Rappels
+              </Link>
             </div></div>
             <div className="flex items-center gap-2">
               <div className="rounded-xl bg-white px-3 py-2 text-right ring-1 ring-orange-200"><p className="text-[11px] font-bold uppercase text-orange-600">Saldo disponible</p><p className="text-lg font-extrabold text-orange-700">{currency(rapelSummary)}</p></div>
